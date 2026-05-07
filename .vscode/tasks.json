@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Android: forward PocketBase dev server",
+      "type": "shell",
+      "command": "adb",
+      "args": [
+        "reverse",
+        "tcp:8090",
+        "tcp:8090"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "clear": false
+      }
+    }
+  ]
+}
