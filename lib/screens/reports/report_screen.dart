@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 
-import 'admin_dashboard_screen.dart';
-
 class ReportScreen extends StatelessWidget {
   const ReportScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const AdminDashboardScreen();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) {
+        Navigator.pushReplacementNamed(context, '/admin');
+      }
+    });
+
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
   }
 }

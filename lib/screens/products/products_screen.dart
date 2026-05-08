@@ -6,26 +6,12 @@ import 'package:provider/provider.dart';
 // import '../../core/theme/app_theme.dart';
 import '../../core/utils/icon_helper.dart';
 import '../../models/product_model.dart';
+import '../../core/theme/cafe_colors.dart';
+import '../../core/theme/nova_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../widgets/app_navigation.dart';
-
-class CafeColors {
-  static const Color flame = Color(0xFFFF4D1C);
-  static const Color amber = Color(0xFFFFA724);
-  static const Color latte = Color(0xFFFFF3E8);
-  static const Color steam = Color(0xFFFFFAF5);
-  static const Color creme = Color(0xFFFFE4C4);
-  static const Color olive = Color(0xFF2D6A4F);
-  static const Color oliveLight = Color(0xFFD8F3DC);
-  static const Color charcoal = Color(0xFF2C2C2C);
-
-  static const LinearGradient headerGradient = LinearGradient(
-    colors: [Color(0xFFFF4D1C), Color(0xFFFF8C42)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-}
+import '../../widgets/responsive_layout.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -67,299 +53,315 @@ class _ProductsScreenState extends State<ProductsScreen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-              ),
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                ),
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Handle bar
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Sheet header
-                      Row(
+            return Align(
+              alignment: Alignment.bottomCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+                  ),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(28)),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                    child: Form(
+                      key: formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              gradient: CafeColors.headerGradient,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              isEdit ? Icons.edit_rounded : Icons.add_rounded,
-                              color: Colors.white,
-                              size: 20,
+                          // Handle bar
+                          Center(
+                            child: Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.circular(2),
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            isEdit ? 'Edit Product' : 'Add Product',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
+                          const SizedBox(height: 16),
+
+                          // Sheet header
+                          Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  gradient: CafeColors.headerGradient,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  isEdit
+                                      ? Icons.edit_rounded
+                                      : Icons.add_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                isEdit ? 'Edit Product' : 'Add Product',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: CafeColors.charcoal,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+
+                          _StyledField(
+                            controller: nameController,
+                            label: 'Product Name',
+                            icon: Icons.shopping_bag_outlined,
+                            autofocus: !isEdit,
+                            textCapitalization: TextCapitalization.words,
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Name is required'
+                                : null,
+                          ),
+                          const SizedBox(height: 12),
+
+                          _StyledField(
+                            controller: priceController,
+                            label: 'Price',
+                            icon: Icons.payments_outlined,
+                            prefixText: 'Rs ',
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Price is required';
+                              }
+                              if (double.tryParse(v.trim()) == null) {
+                                return 'Enter a valid number';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+
+                          _StyledField(
+                            controller: categoryController,
+                            label: 'Category',
+                            icon: Icons.category_outlined,
+                            hint: 'e.g. Drinks, Pizza, Burgers',
+                            textCapitalization: TextCapitalization.words,
+                            onChanged: (value) {
+                              if (!isEdit && value.isNotEmpty) {
+                                final defaultIcon =
+                                    IconHelper.getDefaultIcon(value);
+                                setSheetState(() => selectedIcon = defaultIcon);
+                              }
+                            },
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Category is required'
+                                : null,
+                          ),
+                          const SizedBox(height: 16),
+
+                          const Text(
+                            'Choose Icon',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
                               color: CafeColors.charcoal,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
+                          const SizedBox(height: 8),
 
-                      _StyledField(
-                        controller: nameController,
-                        label: 'Product Name',
-                        icon: Icons.shopping_bag_outlined,
-                        autofocus: !isEdit,
-                        textCapitalization: TextCapitalization.words,
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Name is required'
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-
-                      _StyledField(
-                        controller: priceController,
-                        label: 'Price',
-                        icon: Icons.payments_outlined,
-                        prefixText: 'Rs ',
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Price is required';
-                          }
-                          if (double.tryParse(v.trim()) == null) {
-                            return 'Enter a valid number';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-
-                      _StyledField(
-                        controller: categoryController,
-                        label: 'Category',
-                        icon: Icons.category_outlined,
-                        hint: 'e.g. Drinks, Pizza, Burgers',
-                        textCapitalization: TextCapitalization.words,
-                        onChanged: (value) {
-                          if (!isEdit && value.isNotEmpty) {
-                            final defaultIcon =
-                                IconHelper.getDefaultIcon(value);
-                            setSheetState(() => selectedIcon = defaultIcon);
-                          }
-                        },
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Category is required'
-                            : null,
-                      ),
-                      const SizedBox(height: 16),
-
-                      const Text(
-                        'Choose Icon',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: CafeColors.charcoal,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      SizedBox(
-                        height: 56,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: IconHelper.fastFoodIcons.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          itemBuilder: (context, index) {
-                            final icon = IconHelper.fastFoodIcons[index];
-                            final isSelected = icon == selectedIcon;
-                            return GestureDetector(
-                              onTap: () =>
-                                  setSheetState(() => selectedIcon = icon),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 150),
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? CafeColors.creme
-                                      : Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? CafeColors.flame
-                                        : Colors.grey[300]!,
-                                    width: isSelected ? 2 : 1,
+                          SizedBox(
+                            height: 56,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: IconHelper.fastFoodIcons.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (context, index) {
+                                final icon = IconHelper.fastFoodIcons[index];
+                                final isSelected = icon == selectedIcon;
+                                return GestureDetector(
+                                  onTap: () =>
+                                      setSheetState(() => selectedIcon = icon),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 150),
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? CafeColors.creme
+                                          : Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? CafeColors.flame
+                                            : Colors.grey[300]!,
+                                        width: isSelected ? 2 : 1,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      icon,
+                                      color: isSelected
+                                          ? CafeColors.flame
+                                          : Colors.grey[500],
+                                      size: 24,
+                                    ),
                                   ),
-                                ),
-                                child: Icon(
-                                  icon,
-                                  color: isSelected
-                                      ? CafeColors.flame
-                                      : Colors.grey[500],
-                                  size: 24,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 24),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 24),
 
-                      // Save button
-                      Consumer<ProductProvider>(
-                        builder: (context, provider, _) {
-                          return SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: provider.isLoading
-                                    ? null
-                                    : CafeColors.headerGradient,
-                                color: provider.isLoading
-                                    ? Colors.grey[200]
-                                    : null,
-                                borderRadius: BorderRadius.circular(14),
-                                boxShadow: provider.isLoading
-                                    ? null
-                                    : [
-                                        BoxShadow(
-                                          color:
-                                              CafeColors.flame.withOpacity(0.3),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                              ),
-                              child: ElevatedButton.icon(
-                                onPressed: provider.isLoading
-                                    ? null
-                                    : () async {
-                                        if (!formKey.currentState!.validate()) {
-                                          return;
-                                        }
-
-                                        final name = nameController.text.trim();
-                                        final price = double.parse(
-                                            priceController.text.trim());
-                                        final category =
-                                            categoryController.text.trim();
-                                        final iconCodePoint =
-                                            selectedIcon.codePoint;
-
-                                        String? error;
-                                        if (isEdit) {
-                                          error = await provider.updateProduct(
-                                            id: product.id,
-                                            name: name,
-                                            price: price,
-                                            category: category,
-                                            iconCodePoint: iconCodePoint,
-                                          );
-                                        } else {
-                                          error = await provider.createProduct(
-                                            name: name,
-                                            price: price,
-                                            category: category,
-                                            iconCodePoint: iconCodePoint,
-                                          );
-                                        }
-
-                                        if (!sheetContext.mounted) return;
-                                        Navigator.pop(sheetContext);
-
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Row(
-                                              children: [
-                                                Icon(
-                                                  error != null
-                                                      ? Icons.error_outline
-                                                      : Icons
-                                                          .check_circle_outline,
-                                                  color: Colors.white,
-                                                  size: 18,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(error ??
-                                                    (isEdit
-                                                        ? 'Product updated'
-                                                        : 'Product added')),
-                                              ],
+                          // Save button
+                          Consumer<ProductProvider>(
+                            builder: (context, provider, _) {
+                              return SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: provider.isLoading
+                                        ? null
+                                        : CafeColors.headerGradient,
+                                    color: provider.isLoading
+                                        ? Colors.grey[200]
+                                        : null,
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: provider.isLoading
+                                        ? null
+                                        : [
+                                            BoxShadow(
+                                              color: CafeColors.flame
+                                                  .withOpacity(0.3),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 4),
                                             ),
-                                            backgroundColor: error != null
-                                                ? const Color(0xFFE53935)
-                                                : CafeColors.olive,
-                                            behavior: SnackBarBehavior.floating,
-                                            shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12)),
+                                          ],
+                                  ),
+                                  child: ElevatedButton.icon(
+                                    onPressed: provider.isLoading
+                                        ? null
+                                        : () async {
+                                            if (!formKey.currentState!
+                                                .validate()) {
+                                              return;
+                                            }
+
+                                            final name =
+                                                nameController.text.trim();
+                                            final price = double.parse(
+                                                priceController.text.trim());
+                                            final category =
+                                                categoryController.text.trim();
+                                            final iconCodePoint =
+                                                selectedIcon.codePoint;
+
+                                            String? error;
+                                            if (isEdit) {
+                                              error =
+                                                  await provider.updateProduct(
+                                                id: product.id,
+                                                name: name,
+                                                price: price,
+                                                category: category,
+                                                iconCodePoint: iconCodePoint,
+                                              );
+                                            } else {
+                                              error =
+                                                  await provider.createProduct(
+                                                name: name,
+                                                price: price,
+                                                category: category,
+                                                iconCodePoint: iconCodePoint,
+                                              );
+                                            }
+
+                                            if (!sheetContext.mounted) return;
+                                            Navigator.pop(sheetContext);
+
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Row(
+                                                  children: [
+                                                    Icon(
+                                                      error != null
+                                                          ? Icons.error_outline
+                                                          : Icons
+                                                              .check_circle_outline,
+                                                      color: Colors.white,
+                                                      size: 18,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(error ??
+                                                        (isEdit
+                                                            ? 'Product updated'
+                                                            : 'Product added')),
+                                                  ],
+                                                ),
+                                                backgroundColor: error != null
+                                                    ? const Color(0xFFE53935)
+                                                    : CafeColors.olive,
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                                shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            12)),
+                                              ),
+                                            );
+                                          },
+                                    icon: provider.isLoading
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : Icon(
+                                            isEdit
+                                                ? Icons.save_rounded
+                                                : Icons.add_rounded,
+                                            color: Colors.white,
                                           ),
-                                        );
-                                      },
-                                icon: provider.isLoading
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : Icon(
-                                        isEdit
-                                            ? Icons.save_rounded
-                                            : Icons.add_rounded,
+                                    label: Text(
+                                      provider.isLoading
+                                          ? (isEdit ? 'Saving...' : 'Adding...')
+                                          : (isEdit
+                                              ? 'Save Changes'
+                                              : 'Add Product'),
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
                                         color: Colors.white,
                                       ),
-                                label: Text(
-                                  provider.isLoading
-                                      ? (isEdit ? 'Saving...' : 'Adding...')
-                                      : (isEdit
-                                          ? 'Save Changes'
-                                          : 'Add Product'),
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      shadowColor: Colors.transparent,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.transparent,
-                                  shadowColor: Colors.transparent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -506,7 +508,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           });
           return const Scaffold(
             body: Center(
-                child: CircularProgressIndicator(color: CafeColors.flame)),
+                child: CircularProgressIndicator(color: NovaColors.violet)),
           );
         }
 
@@ -515,8 +517,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
         final photoUrl = auth.user?.photoURL;
 
         return Scaffold(
-          backgroundColor: CafeColors.latte,
-          drawer: AppNavigationDrawer(auth: auth, currentRoute: '/products'),
+          backgroundColor: NovaColors.bgTertiary,
+          drawer: AppNavigationShell.isDesktop(context)
+              ? null
+              : AppNavigationDrawer(auth: auth, currentRoute: '/products'),
           appBar: PreferredSize(
             preferredSize: const Size.fromHeight(64),
             child: Container(
@@ -564,245 +568,295 @@ class _ProductsScreenState extends State<ProductsScreen> {
               ),
             ),
           ),
-          body: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: CafeColors.flame.withOpacity(0.07),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (v) =>
-                              setState(() => _searchQuery = v.toLowerCase()),
-                          style: const TextStyle(
-                              fontSize: 14, color: CafeColors.charcoal),
-                          decoration: InputDecoration(
-                            hintText: 'Search products...',
-                            hintStyle: TextStyle(
-                                color: Colors.grey[400], fontSize: 14),
-                            prefixIcon: const Icon(Icons.search_rounded,
-                                color: CafeColors.flame, size: 20),
-                            suffixIcon: _searchQuery.isNotEmpty
-                                ? IconButton(
-                                    icon: Icon(Icons.close_rounded,
-                                        color: Colors.grey[400], size: 18),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() => _searchQuery = '');
-                                    },
-                                  )
-                                : null,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding:
-                                const EdgeInsets.symmetric(vertical: 14),
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    // Add button
-                    GestureDetector(
-                      onTap: () => _showProductForm(context),
-                      child: Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          gradient: CafeColors.headerGradient,
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: CafeColors.flame.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.add_rounded,
-                            color: Colors.white, size: 24),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: StreamBuilder<List<Product>>(
-                  stream: context.read<ProductProvider>().productsStream,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child:
-                            CircularProgressIndicator(color: CafeColors.flame),
-                      );
-                    }
-                    if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    }
-
-                    final allProducts = snapshot.data ?? [];
-
-                    if (allProducts.isEmpty) {
-                      return _emptyProductsView(context);
-                    }
-
-                    final categories = [
-                      'All',
-                      ...{...allProducts.map((p) => p.category)},
-                    ];
-
-                    final filtered = allProducts.where((p) {
-                      final matchesSearch = _searchQuery.isEmpty ||
-                          p.name.toLowerCase().contains(_searchQuery) ||
-                          p.category.toLowerCase().contains(_searchQuery);
-                      final matchesCategory = _selectedCategory == 'All' ||
-                          p.category == _selectedCategory;
-                      return matchesSearch && matchesCategory;
-                    }).toList();
-
-                    return Column(
+          body: AppNavigationShell(
+            auth: auth,
+            currentRoute: '/products',
+            child: ResponsiveCenter(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Row(
                       children: [
-                        if (categories.length > 1)
-                          SizedBox(
-                            height: 36,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              itemCount: categories.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 8),
-                              itemBuilder: (context, i) {
-                                final cat = categories[i];
-                                final isSelected = _selectedCategory == cat;
-                                return GestureDetector(
-                                  onTap: () =>
-                                      setState(() => _selectedCategory = cat),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      gradient: isSelected
-                                          ? CafeColors.headerGradient
-                                          : null,
-                                      color: isSelected ? null : Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? Colors.transparent
-                                            : CafeColors.flame.withOpacity(0.2),
-                                      ),
-                                      boxShadow: isSelected
-                                          ? [
-                                              BoxShadow(
-                                                color: CafeColors.flame
-                                                    .withOpacity(0.25),
-                                                blurRadius: 6,
-                                                offset: const Offset(0, 2),
-                                              )
-                                            ]
-                                          : null,
-                                    ),
-                                    child: Text(
-                                      cat,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w700
-                                            : FontWeight.w500,
-                                        color: isSelected
-                                            ? Colors.white
-                                            : CafeColors.charcoal
-                                                .withOpacity(0.6),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: CafeColors.flame.withOpacity(0.07),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: TextField(
+                              controller: _searchController,
+                              onChanged: (v) => setState(
+                                  () => _searchQuery = v.toLowerCase()),
+                              style: const TextStyle(
+                                  fontSize: 14, color: CafeColors.charcoal),
+                              decoration: InputDecoration(
+                                hintText: 'Search products...',
+                                hintStyle: TextStyle(
+                                    color: Colors.grey[400], fontSize: 14),
+                                prefixIcon: const Icon(Icons.search_rounded,
+                                    color: CafeColors.flame, size: 20),
+                                suffixIcon: _searchQuery.isNotEmpty
+                                    ? IconButton(
+                                        icon: Icon(Icons.close_rounded,
+                                            color: Colors.grey[400], size: 18),
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          setState(() => _searchQuery = '');
+                                        },
+                                      )
+                                    : null,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
                             ),
                           ),
-                        const SizedBox(height: 8),
-
-                        // Count label
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 4,
-                                height: 14,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      CafeColors.flame,
-                                      CafeColors.amber
-                                    ],
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                  ),
-                                  borderRadius: BorderRadius.circular(2),
+                        ),
+                        const SizedBox(width: 10),
+                        // Add button
+                        GestureDetector(
+                          onTap: () => _showProductForm(context),
+                          child: Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              gradient: CafeColors.headerGradient,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: CafeColors.flame.withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
                                 ),
-                              ),
-                              const SizedBox(width: 7),
-                              Text(
-                                '${filtered.length} product${filtered.length == 1 ? '' : 's'}',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: CafeColors.charcoal.withOpacity(0.5),
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
+                            child: const Icon(Icons.add_rounded,
+                                color: Colors.white, size: 24),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: StreamBuilder<List<Product>>(
+                      stream: context.read<ProductProvider>().productsStream,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                                color: CafeColors.flame),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return Center(
+                              child: Text('Error: ${snapshot.error}'));
+                        }
 
-                        // Product list
-                        Expanded(
-                          child: filtered.isEmpty
-                              ? _noResultsView()
-                              : ListView.separated(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                                  itemCount: filtered.length,
+                        final allProducts = snapshot.data ?? [];
+
+                        if (allProducts.isEmpty) {
+                          return _emptyProductsView(context);
+                        }
+
+                        final categories = [
+                          'All',
+                          ...{...allProducts.map((p) => p.category)},
+                        ];
+
+                        final filtered = allProducts.where((p) {
+                          final matchesSearch = _searchQuery.isEmpty ||
+                              p.name.toLowerCase().contains(_searchQuery) ||
+                              p.category.toLowerCase().contains(_searchQuery);
+                          final matchesCategory = _selectedCategory == 'All' ||
+                              p.category == _selectedCategory;
+                          return matchesSearch && matchesCategory;
+                        }).toList();
+
+                        return Column(
+                          children: [
+                            if (categories.length > 1)
+                              SizedBox(
+                                height: 36,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  padding: EdgeInsets.zero,
+                                  itemCount: categories.length,
                                   separatorBuilder: (_, __) =>
-                                      const SizedBox(height: 10),
+                                      const SizedBox(width: 8),
                                   itemBuilder: (context, i) {
-                                    final product = filtered[i];
-                                    return _ProductCard(
-                                      product: product,
-                                      onEdit: () => _showProductForm(context,
-                                          product: product),
-                                      onDelete: () =>
-                                          _confirmDelete(context, product),
+                                    final cat = categories[i];
+                                    final isSelected = _selectedCategory == cat;
+                                    return GestureDetector(
+                                      onTap: () => setState(
+                                          () => _selectedCategory = cat),
+                                      child: AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 200),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          gradient: isSelected
+                                              ? CafeColors.headerGradient
+                                              : null,
+                                          color:
+                                              isSelected ? null : Colors.white,
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? Colors.transparent
+                                                : CafeColors.flame
+                                                    .withOpacity(0.2),
+                                          ),
+                                          boxShadow: isSelected
+                                              ? [
+                                                  BoxShadow(
+                                                    color: CafeColors.flame
+                                                        .withOpacity(0.25),
+                                                    blurRadius: 6,
+                                                    offset: const Offset(0, 2),
+                                                  )
+                                                ]
+                                              : null,
+                                        ),
+                                        child: Text(
+                                          cat,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: isSelected
+                                                ? FontWeight.w700
+                                                : FontWeight.w500,
+                                            color: isSelected
+                                                ? Colors.white
+                                                : CafeColors.charcoal
+                                                    .withOpacity(0.6),
+                                          ),
+                                        ),
+                                      ),
                                     );
                                   },
                                 ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                              ),
+                            const SizedBox(height: 8),
+
+                            // Count label
+                            Padding(
+                              padding: EdgeInsets.zero,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 4,
+                                    height: 14,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          CafeColors.flame,
+                                          CafeColors.amber
+                                        ],
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                      ),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 7),
+                                  Text(
+                                    '${filtered.length} product${filtered.length == 1 ? '' : 's'}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color:
+                                          CafeColors.charcoal.withOpacity(0.5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Product list
+                            Expanded(
+                              child: filtered.isEmpty
+                                  ? _noResultsView()
+                                  : LayoutBuilder(
+                                      builder: (context, constraints) {
+                                        final columns =
+                                            ResponsiveLayout.cardColumns(
+                                          constraints.maxWidth,
+                                        );
+
+                                        if (columns == 1) {
+                                          return ListView.separated(
+                                            padding: const EdgeInsets.fromLTRB(
+                                                0, 4, 0, 100),
+                                            itemCount: filtered.length,
+                                            separatorBuilder: (_, __) =>
+                                                const SizedBox(height: 10),
+                                            itemBuilder: (context, i) {
+                                              final product = filtered[i];
+                                              return _ProductCard(
+                                                product: product,
+                                                onEdit: () => _showProductForm(
+                                                  context,
+                                                  product: product,
+                                                ),
+                                                onDelete: () => _confirmDelete(
+                                                    context, product),
+                                              );
+                                            },
+                                          );
+                                        }
+
+                                        return GridView.builder(
+                                          padding: const EdgeInsets.fromLTRB(
+                                              0, 4, 0, 100),
+                                          gridDelegate:
+                                              SliverGridDelegateWithFixedCrossAxisCount(
+                                            crossAxisCount: columns,
+                                            mainAxisSpacing: 12,
+                                            crossAxisSpacing: 12,
+                                            childAspectRatio: 4.8,
+                                          ),
+                                          itemCount: filtered.length,
+                                          itemBuilder: (context, i) {
+                                            final product = filtered[i];
+                                            return _ProductCard(
+                                              product: product,
+                                              onEdit: () => _showProductForm(
+                                                context,
+                                                product: product,
+                                              ),
+                                              onDelete: () => _confirmDelete(
+                                                  context, product),
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },

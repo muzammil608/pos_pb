@@ -3,34 +3,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 // import '../../core/theme/app_theme.dart';
+import '../../core/theme/cafe_colors.dart';
+import '../../core/theme/nova_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/pocketbase/order_service.dart';
 import '../../services/pocketbase/report_service.dart';
 import '../../widgets/app_navigation.dart';
-
-class CafeColors {
-  static const Color flame = Color(0xFFFF4D1C);
-  static const Color amber = Color(0xFFFFA724);
-  static const Color espresso = Color(0xFF1E0F00);
-  static const Color latte = Color(0xFFFFF3E8);
-  static const Color steam = Color(0xFFFFFAF5);
-  static const Color creme = Color(0xFFFFE4C4);
-  static const Color olive = Color(0xFF2D6A4F);
-  static const Color oliveLight = Color(0xFFD8F3DC);
-  static const Color charcoal = Color(0xFF2C2C2C);
-
-  static const LinearGradient headerGradient = LinearGradient(
-    colors: [Color(0xFFFF4D1C), Color(0xFFFF8C42)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const LinearGradient bottomBarGradient = LinearGradient(
-    colors: [Color(0xFFFF4D1C), Color(0xFFFF6B35)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-}
+import '../../widgets/responsive_layout.dart';
 
 class KitchenScreen extends StatefulWidget {
   const KitchenScreen({super.key});
@@ -83,7 +62,7 @@ class _KitchenScreenState extends State<KitchenScreen>
         if (auth.user == null) {
           return const Scaffold(
             body: Center(
-                child: CircularProgressIndicator(color: CafeColors.flame)),
+                child: CircularProgressIndicator(color: NovaColors.violet)),
           );
         }
 
@@ -93,7 +72,7 @@ class _KitchenScreenState extends State<KitchenScreen>
           });
           return const Scaffold(
             body: Center(
-                child: CircularProgressIndicator(color: CafeColors.flame)),
+                child: CircularProgressIndicator(color: NovaColors.violet)),
           );
         }
 
@@ -103,8 +82,10 @@ class _KitchenScreenState extends State<KitchenScreen>
         final photoUrl = auth.user?.photoURL;
 
         return Scaffold(
-          backgroundColor: CafeColors.latte,
-          drawer: AppNavigationDrawer(auth: auth, currentRoute: '/kitchen'),
+          backgroundColor: NovaColors.bgTertiary,
+          drawer: AppNavigationShell.isDesktop(context)
+              ? null
+              : AppNavigationDrawer(auth: auth, currentRoute: '/kitchen'),
           appBar: PreferredSize(
             preferredSize: const Size.fromHeight(64),
             child: Container(
@@ -167,166 +148,202 @@ class _KitchenScreenState extends State<KitchenScreen>
               ),
             ),
           ),
-          body: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: StreamBuilder<Map<String, int>>(
-                  stream: _reportService.getOrderStatusStats(),
-                  builder: (context, snapshot) {
-                    final stats = snapshot.data ??
-                        {'pending': 0, 'ready': 0, 'completed': 0};
-                    return Row(
+          body: AppNavigationShell(
+            auth: auth,
+            currentRoute: '/kitchen',
+            child: ResponsiveCenter(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: StreamBuilder<Map<String, int>>(
+                      stream: _reportService.getOrderStatusStats(),
+                      builder: (context, snapshot) {
+                        final stats = snapshot.data ??
+                            {'pending': 0, 'ready': 0, 'completed': 0};
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: _MetricCard(
+                                title: 'Pending',
+                                value: '${stats['pending']}',
+                                icon: Icons.hourglass_top_rounded,
+                                color: const Color(0xFFFF4D1C),
+                                bgColor: const Color(0xFFFFEDE8),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _MetricCard(
+                                title: 'Ready',
+                                value: '${stats['ready']}',
+                                icon: Icons.check_circle_outline_rounded,
+                                color: CafeColors.olive,
+                                bgColor: CafeColors.oliveLight,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _MetricCard(
+                                title: 'Done',
+                                value: '${stats['completed']}',
+                                icon: Icons.task_alt_rounded,
+                                color: const Color(0xFF6B7280),
+                                bgColor: const Color(0xFFF3F4F6),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: EdgeInsets.zero,
+                    child: Row(
                       children: [
-                        Expanded(
-                          child: _MetricCard(
-                            title: 'Pending',
-                            value: '${stats['pending']}',
-                            icon: Icons.hourglass_top_rounded,
-                            color: const Color(0xFFFF4D1C),
-                            bgColor: const Color(0xFFFFEDE8),
+                        Container(
+                          width: 4,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [CafeColors.flame, CafeColors.amber],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _MetricCard(
-                            title: 'Ready',
-                            value: '${stats['ready']}',
-                            icon: Icons.check_circle_outline_rounded,
-                            color: CafeColors.olive,
-                            bgColor: CafeColors.oliveLight,
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Active Orders',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: CafeColors.charcoal,
+                            letterSpacing: 0.2,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _MetricCard(
-                            title: 'Done',
-                            value: '${stats['completed']}',
-                            icon: Icons.task_alt_rounded,
-                            color: const Color(0xFF6B7280),
-                            bgColor: const Color(0xFFF3F4F6),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: CafeColors.creme,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Live',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: CafeColors.flame,
+                            ),
                           ),
                         ),
                       ],
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 4,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [CafeColors.flame, CafeColors.amber],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
                     ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Active Orders',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: CafeColors.charcoal,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: CafeColors.creme,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'Live',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: CafeColors.flame,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: StreamBuilder<OrderRecordSnapshot>(
-                  stream: _ordersStream,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting &&
-                        !snapshot.hasData) {
-                      return const Center(
-                        child:
-                            CircularProgressIndicator(color: CafeColors.flame),
-                      );
-                    }
-                    if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    }
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: StreamBuilder<OrderRecordSnapshot>(
+                      stream: _ordersStream,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                                ConnectionState.waiting &&
+                            !snapshot.hasData) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                                color: CafeColors.flame),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return Center(
+                              child: Text('Error: ${snapshot.error}'));
+                        }
 
-                    final docs = snapshot.hasData
-                        ? snapshot.data!.docs.where((doc) {
-                            final data = doc.data();
-                            final status =
-                                data['status']?.toString() ?? 'pending';
-                            return !_hiddenOrderIds.contains(doc.id) &&
-                                (status == 'pending' || status == 'ready');
-                          }).toList()
-                        : <OrderRecordDocument>[];
+                        final docs = snapshot.hasData
+                            ? snapshot.data!.docs.where((doc) {
+                                final data = doc.data();
+                                final status =
+                                    data['status']?.toString() ?? 'pending';
+                                return !_hiddenOrderIds.contains(doc.id) &&
+                                    (status == 'pending' || status == 'ready');
+                              }).toList()
+                            : <OrderRecordDocument>[];
 
-                    _visibleOrderIds.clear();
-                    for (final doc in docs) {
-                      _visibleOrderIds.add(doc.id);
-                    }
+                        _visibleOrderIds.clear();
+                        for (final doc in docs) {
+                          _visibleOrderIds.add(doc.id);
+                        }
 
-                    if (docs.isEmpty) {
-                      return _emptyView();
-                    }
+                        if (docs.isEmpty) {
+                          return _emptyView();
+                        }
 
-                    return ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
-                      itemCount: docs.length,
-                      itemBuilder: (context, index) {
-                        final doc = docs[index];
-                        final data = doc.data();
-                        final items = List<Map<String, dynamic>>.from(
-                            data['items'] ?? []);
-                        final status = data['status']?.toString() ?? 'pending';
-                        final orderNumber =
-                            (data['orderNumber'] as num?)?.toInt() ?? 0;
-                        final tableNumber = data['tableNumber']?.toString();
-                        final createdAt = data['createdAt'] as DateTime?;
-                        final orderType =
-                            data['orderType']?.toString() ?? 'takeaway';
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            final columns = ResponsiveLayout.cardColumns(
+                                constraints.maxWidth);
 
-                        return _KitchenOrderCard(
-                          docId: doc.id,
-                          orderNumber: orderNumber,
-                          status: status,
-                          orderType: orderType,
-                          tableNumber: tableNumber,
-                          items: items,
-                          createdAt: createdAt,
-                          onMarkReady: () =>
-                              _service.updateStatus(doc.id, 'ready'),
+                            Widget buildCard(int index) {
+                              final doc = docs[index];
+                              final data = doc.data();
+                              final items = List<Map<String, dynamic>>.from(
+                                  data['items'] ?? []);
+                              final status =
+                                  data['status']?.toString() ?? 'pending';
+                              final orderNumber =
+                                  (data['orderNumber'] as num?)?.toInt() ?? 0;
+                              final tableNumber =
+                                  data['tableNumber']?.toString();
+                              final createdAt = data['createdAt'] as DateTime?;
+                              final orderType =
+                                  data['orderType']?.toString() ?? 'takeaway';
+
+                              return _KitchenOrderCard(
+                                docId: doc.id,
+                                orderNumber: orderNumber,
+                                status: status,
+                                orderType: orderType,
+                                tableNumber: tableNumber,
+                                items: items,
+                                createdAt: createdAt,
+                                onMarkReady: () =>
+                                    _service.updateStatus(doc.id, 'ready'),
+                              );
+                            }
+
+                            if (columns == 1) {
+                              return ListView.builder(
+                                padding:
+                                    const EdgeInsets.fromLTRB(0, 4, 0, 120),
+                                itemCount: docs.length,
+                                itemBuilder: (context, index) =>
+                                    buildCard(index),
+                              );
+                            }
+
+                            return GridView.builder(
+                              padding: const EdgeInsets.fromLTRB(0, 4, 0, 120),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: columns,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                                childAspectRatio: 1.55,
+                              ),
+                              itemCount: docs.length,
+                              itemBuilder: (context, index) => buildCard(index),
+                            );
+                          },
                         );
                       },
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
           floatingActionButton: Container(
             decoration: BoxDecoration(

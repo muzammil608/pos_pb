@@ -4,25 +4,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/theme/cafe_colors.dart';
 import '../providers/auth_provider.dart';
-
-class CafeColors {
-  static const Color flame = Color(0xFFFF4D1C);
-  static const Color amber = Color(0xFFFFA724);
-  static const Color espresso = Color(0xFF1E0F00);
-  static const Color latte = Color(0xFFFFF3E8);
-  static const Color steam = Color(0xFFFFFAF5);
-  static const Color creme = Color(0xFFFFE4C4);
-  static const Color olive = Color(0xFF2D6A4F);
-  static const Color oliveLight = Color(0xFFD8F3DC);
-  static const Color charcoal = Color(0xFF2C2C2C);
-
-  static const LinearGradient headerGradient = LinearGradient(
-    colors: [Color(0xFFFF4D1C), Color(0xFFFF8C42)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-}
 
 class AppUserAvatar extends StatelessWidget {
   const AppUserAvatar({
@@ -395,6 +378,41 @@ class AppNavigationDrawer extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class AppNavigationShell extends StatelessWidget {
+  const AppNavigationShell({
+    super.key,
+    required this.auth,
+    required this.currentRoute,
+    required this.child,
+  });
+
+  final AuthProvider auth;
+  final String currentRoute;
+  final Widget child;
+
+  static bool isDesktop(BuildContext context) {
+    return MediaQuery.sizeOf(context).width >= 900;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isDesktop(context)) return child;
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 300,
+          child: AppNavigationDrawer(
+            auth: auth,
+            currentRoute: currentRoute,
+          ),
+        ),
+        Expanded(child: child),
+      ],
     );
   }
 }

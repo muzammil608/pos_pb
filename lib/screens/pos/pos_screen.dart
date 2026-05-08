@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/nova_theme.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
@@ -10,36 +11,7 @@ import '../../services/pocketbase/order_service.dart';
 import '../../services/pocketbase/product_service.dart';
 import '../../widgets/app_navigation.dart';
 import '../../widgets/receipt_dialog.dart';
-
-class CafeColors {
-  static const Color flame = Color(0xFFFF4D1C); // primary accent
-  static const Color amber = Color(0xFFFFA724); // secondary warm
-  static const Color espresso = Color(0xFF1E0F00); // deep background
-  static const Color latte = Color(0xFFFFF3E8); // light card surface
-  static const Color steam = Color(0xFFFFFAF5); // soft card bg
-  static const Color creme = Color(0xFFFFE4C4); // light chip bg
-  static const Color olive = Color(0xFF2D6A4F); // "ready" green
-  static const Color oliveLight = Color(0xFFD8F3DC); // green badge bg
-  static const Color charcoal = Color(0xFF2C2C2C); // text dark
-
-  static const LinearGradient headerGradient = LinearGradient(
-    colors: [Color(0xFFFF4D1C), Color(0xFFFF8C42)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const LinearGradient bottomBarGradient = LinearGradient(
-    colors: [Color(0xFFFF4D1C), Color(0xFFFF6B35)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const LinearGradient cardGradient = LinearGradient(
-    colors: [Color(0xFFFFFFFF), Color(0xFFFFF8F2)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-}
+import '../../widgets/responsive_layout.dart';
 
 class PosScreen extends StatefulWidget {
   const PosScreen({super.key});
@@ -89,7 +61,8 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     return showDialog<int>(
       context: context,
       builder: (dialogContext) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: NovaColors.bgPrimary,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -99,35 +72,34 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
               Row(
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
-                      gradient: CafeColors.headerGradient,
-                      borderRadius: BorderRadius.circular(12),
+                      color: NovaColors.violetLight,
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.add_shopping_cart_rounded,
-                        color: Colors.white, size: 20),
+                        color: NovaColors.violet, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       productName,
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: CafeColors.charcoal,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: NovaColors.textPrimary,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 'Rs ${price.toStringAsFixed(0)} / item',
                 style: const TextStyle(
                   fontSize: 13,
-                  color: CafeColors.flame,
-                  fontWeight: FontWeight.w600,
+                  color: NovaColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 20),
@@ -135,25 +107,36 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                 keyboardType: TextInputType.number,
                 autofocus: true,
                 onChanged: (value) => qty = int.tryParse(value) ?? 1,
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: NovaColors.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Quantity',
                   hintText: '1',
-                  labelStyle:
-                      TextStyle(color: CafeColors.flame.withOpacity(0.8)),
+                  labelStyle: const TextStyle(
+                      color: NovaColors.textSecondary, fontSize: 13),
                   prefixIcon: const Icon(Icons.format_list_numbered,
-                      color: CafeColors.flame),
+                      color: NovaColors.violet, size: 18),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(10),
                     borderSide:
-                        BorderSide(color: CafeColors.flame.withOpacity(0.3)),
+                        const BorderSide(color: NovaColors.borderTertiary),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide:
+                        const BorderSide(color: NovaColors.borderTertiary),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(10),
                     borderSide:
-                        const BorderSide(color: CafeColors.flame, width: 2),
+                        const BorderSide(color: NovaColors.violet, width: 1.5),
                   ),
+                  filled: true,
+                  fillColor: NovaColors.bgSecondary,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
               ),
               const SizedBox(height: 20),
@@ -163,37 +146,33 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(dialogContext),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(
-                            color: CafeColors.flame.withOpacity(0.4)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side:
+                            const BorderSide(color: NovaColors.borderSecondary),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
+                            borderRadius: BorderRadius.circular(10)),
                       ),
                       child: const Text('Cancel',
-                          style: TextStyle(color: CafeColors.flame)),
+                          style: TextStyle(
+                              color: NovaColors.textSecondary,
+                              fontWeight: FontWeight.w500)),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: CafeColors.headerGradient,
-                        borderRadius: BorderRadius.circular(14),
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(dialogContext, qty),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: NovaColors.violet,
+                        shadowColor: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(dialogContext, qty),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
-                        ),
-                        child: const Text('Add to Cart',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700)),
-                      ),
+                      child: const Text('Add to Cart',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600)),
                     ),
                   ),
                 ],
@@ -220,216 +199,226 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return Container(
-          height: MediaQuery.of(sheetContext).size.height * 0.85,
-          decoration: const BoxDecoration(
-            color: CafeColors.latte,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 10, bottom: 2),
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: CafeColors.flame.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Container(
-                  margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  decoration: BoxDecoration(
-                    gradient: CafeColors.headerGradient,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: CafeColors.flame.withOpacity(0.35),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 920),
+            child: Container(
+              height: MediaQuery.of(sheetContext).size.height * 0.85,
+              decoration: const BoxDecoration(
+                color: NovaColors.bgSecondary,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 10, bottom: 2),
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: NovaColors.borderSecondary,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.check_circle_outline_rounded,
-                            color: Colors.white, size: 22),
+                    ),
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: NovaColors.bgPrimary,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: NovaColors.borderTertiary, width: 0.5),
                       ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Ready to Collect',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: 0.3,
-                              ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: NovaColors.tealLight,
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            Text(
-                              'Tap Print & Complete to close order',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white70,
-                              ),
+                            child: const Icon(
+                                Icons.check_circle_outline_rounded,
+                                color: NovaColors.teal,
+                                size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Ready to Collect',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: NovaColors.textPrimary,
+                                  ),
+                                ),
+                                Text(
+                                  'Tap Print & Complete to close order',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: NovaColors.textSecondary,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                          StreamBuilder(
+                            stream: _orderService?.getOrders(),
+                            builder: (context, snapshot) {
+                              final count = _readyOrderCount(snapshot);
+                              if (count == 0) return const SizedBox.shrink();
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: NovaColors.tealLight,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '$count',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: NovaColors.teal,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                      StreamBuilder(
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: StreamBuilder(
                         stream: _orderService?.getOrders(),
                         builder: (context, snapshot) {
-                          final count = _readyOrderCount(snapshot);
-                          if (count == 0) return const SizedBox.shrink();
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              '$count',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: CafeColors.flame,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Expanded(
-                  child: StreamBuilder(
-                    stream: _orderService?.getOrders(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(
-                              color: CafeColors.flame),
-                        );
-                      }
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                  color: NovaColors.violet),
+                            );
+                          }
 
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return _emptyOrdersView();
-                      }
+                          if (!snapshot.hasData ||
+                              snapshot.data!.docs.isEmpty) {
+                            return _emptyOrdersView();
+                          }
 
-                      final readyOrders = snapshot.data!.docs.where((doc) {
-                        final data = doc.data();
-                        return data['status'] == 'ready';
-                      }).toList();
+                          final readyOrders = snapshot.data!.docs.where((doc) {
+                            final data = doc.data();
+                            return data['status'] == 'ready';
+                          }).toList();
 
-                      readyOrders.sort((a, b) {
-                        final aMs =
-                            ((a.data() as Map)['createdAt'] as DateTime?)
-                                    ?.millisecondsSinceEpoch ??
-                                0;
-                        final bMs =
-                            ((b.data() as Map)['createdAt'] as DateTime?)
-                                    ?.millisecondsSinceEpoch ??
-                                0;
-                        return bMs.compareTo(aMs);
-                      });
+                          readyOrders.sort((a, b) {
+                            final aMs =
+                                ((a.data() as Map)['createdAt'] as DateTime?)
+                                        ?.millisecondsSinceEpoch ??
+                                    0;
+                            final bMs =
+                                ((b.data() as Map)['createdAt'] as DateTime?)
+                                        ?.millisecondsSinceEpoch ??
+                                    0;
+                            return bMs.compareTo(aMs);
+                          });
 
-                      if (readyOrders.isEmpty) return _emptyOrdersView();
+                          if (readyOrders.isEmpty) return _emptyOrdersView();
 
-                      return ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                        itemCount: readyOrders.length,
-                        itemBuilder: (context, index) {
-                          final order = readyOrders[index];
-                          final data = order.data();
-                          final orderId = order.id;
-                          final orderType =
-                              data['orderType']?.toString() ?? 'takeaway';
-                          final customerName =
-                              data['customerName']?.toString().trim();
-                          final orderLabel =
-                              '#${data['orderNumber'] ?? orderId.substring(0, 6)}';
-                          final items = List<Map<String, dynamic>>.from(
-                            (data['items'] as List? ?? []).map(
-                              (item) => Map<String, dynamic>.from(item as Map),
-                            ),
-                          );
-
-                          return _ReadyOrderCard(
-                            orderLabel: orderLabel,
-                            orderType: orderType,
-                            customerName: customerName,
-                            items: items,
-                            total: (data['total'] as num?)?.toDouble() ?? 0,
-                            index: index,
-                            onComplete: () async {
-                              Navigator.pop(sheetContext);
-                              await _orderService?.updateStatus(
-                                  orderId, 'completed');
-                              if (!rootContext.mounted) return;
-
-                              final orderNumber =
-                                  (data['orderNumber'] as num?)?.toInt() ?? 0;
-                              final total =
-                                  (data['total'] as num?)?.toDouble() ?? 0.0;
-                              final tendered = (data['tenderedAmount'] as num?)
-                                      ?.toDouble() ??
-                                  total;
-                              final change =
-                                  (data['change'] as num?)?.toDouble() ?? 0.0;
-                              final createdAt = data['createdAt'] as DateTime?;
-                              final date = createdAt != null
-                                  ? '${createdAt.day}/${createdAt.month}/${createdAt.year} ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}'
-                                  : '';
-                              final servedBy = Provider.of<AuthProvider>(
-                                      rootContext,
-                                      listen: false)
-                                  .role;
-
-                              await showDialog(
-                                context: rootContext,
-                                barrierDismissible: false,
-                                builder: (dialogContext) => ReceiptDialog(
-                                  companyName: 'Orion POS',
-                                  phone: '+92-317-7921817',
-                                  email: 'info@orion.com',
-                                  website: 'www.orion.com',
-                                  servedBy: servedBy,
-                                  customerName:
-                                      customerName ?? 'Walk-in Customer',
-                                  orderType: orderType,
-                                  items: items,
-                                  total: total,
-                                  cash: tendered,
-                                  change: change,
-                                  tax: 0.0,
-                                  paymentMethod:
-                                      data['paymentMethod'] ?? 'cash',
-                                  orderNo: 'ORDER-$orderNumber',
-                                  date: date,
+                          return ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                            itemCount: readyOrders.length,
+                            itemBuilder: (context, index) {
+                              final order = readyOrders[index];
+                              final data = order.data();
+                              final orderId = order.id;
+                              final orderType =
+                                  data['orderType']?.toString() ?? 'takeaway';
+                              final customerName =
+                                  data['customerName']?.toString().trim();
+                              final orderLabel =
+                                  '#${data['orderNumber'] ?? orderId.substring(0, 6)}';
+                              final items = List<Map<String, dynamic>>.from(
+                                (data['items'] as List? ?? []).map(
+                                  (item) =>
+                                      Map<String, dynamic>.from(item as Map),
                                 ),
+                              );
+
+                              return _ReadyOrderCard(
+                                orderLabel: orderLabel,
+                                orderType: orderType,
+                                customerName: customerName,
+                                items: items,
+                                total: (data['total'] as num?)?.toDouble() ?? 0,
+                                index: index,
+                                onComplete: () async {
+                                  Navigator.pop(sheetContext);
+                                  await _orderService?.updateStatus(
+                                      orderId, 'completed');
+                                  if (!rootContext.mounted) return;
+
+                                  final orderNumber =
+                                      (data['orderNumber'] as num?)?.toInt() ??
+                                          0;
+                                  final total =
+                                      (data['total'] as num?)?.toDouble() ??
+                                          0.0;
+                                  final tendered =
+                                      (data['tenderedAmount'] as num?)
+                                              ?.toDouble() ??
+                                          total;
+                                  final change =
+                                      (data['change'] as num?)?.toDouble() ??
+                                          0.0;
+                                  final createdAt =
+                                      data['createdAt'] as DateTime?;
+                                  final date = createdAt != null
+                                      ? '${createdAt.day}/${createdAt.month}/${createdAt.year} ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}'
+                                      : '';
+                                  final servedBy = Provider.of<AuthProvider>(
+                                          rootContext,
+                                          listen: false)
+                                      .role;
+
+                                  await showDialog(
+                                    context: rootContext,
+                                    barrierDismissible: false,
+                                    builder: (dialogContext) => ReceiptDialog(
+                                      companyName: 'Orion POS',
+                                      phone: '+92-317-7921817',
+                                      email: 'info@orion.com',
+                                      website: 'www.orion.com',
+                                      servedBy: servedBy,
+                                      customerName:
+                                          customerName ?? 'Walk-in Customer',
+                                      orderType: orderType,
+                                      items: items,
+                                      total: total,
+                                      cash: tendered,
+                                      change: change,
+                                      tax: 0.0,
+                                      paymentMethod:
+                                          data['paymentMethod'] ?? 'cash',
+                                      orderNo: 'ORDER-$orderNumber',
+                                      date: date,
+                                    ),
+                                  );
+                                },
                               );
                             },
                           );
                         },
-                      );
-                    },
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -444,36 +433,33 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
         children: [
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(
-              color: CafeColors.creme,
+            decoration: BoxDecoration(
+              color: NovaColors.bgSecondary,
               shape: BoxShape.circle,
+              border: Border.all(color: NovaColors.borderTertiary),
             ),
             child: const Icon(Icons.coffee_outlined,
-                size: 48, color: CafeColors.flame),
+                size: 40, color: NovaColors.textTertiary),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           const Text('No ready orders yet',
               style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: CafeColors.charcoal)),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: NovaColors.textPrimary)),
           const SizedBox(height: 4),
-          Text('New orders will appear here',
-              style: TextStyle(
-                  fontSize: 13, color: CafeColors.charcoal.withOpacity(0.5))),
+          const Text('New orders will appear here',
+              style: TextStyle(fontSize: 13, color: NovaColors.textTertiary)),
         ],
       ),
     );
   }
 
   int _crossAxisCount(double width) {
-    if (width >= 1200) return 5;
-    if (width >= 900) return 4;
-    if (width >= 600) return 3;
-    return 2;
+    if (width < 380) return 1;
+    return ResponsiveLayout.productColumns(width);
   }
 
-  /// Derive unique categories from product list
   List<String> _getCategories(List<Product> products) {
     final cats = products.map((p) => p.category).toSet().toList();
     cats.sort();
@@ -490,7 +476,9 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                 .pushNamedAndRemoveUntil('/', (route) => false);
           });
           return const Scaffold(
-              body: Center(child: CircularProgressIndicator()));
+              backgroundColor: NovaColors.bgTertiary,
+              body: Center(
+                  child: CircularProgressIndicator(color: NovaColors.violet)));
         }
 
         final user = auth.user!;
@@ -499,93 +487,89 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
         final photoUrl = user.photoURL;
 
         return Scaffold(
-          backgroundColor: CafeColors.latte,
-          drawer: AppNavigationDrawer(auth: auth, currentRoute: '/pos'),
+          backgroundColor: NovaColors.bgTertiary,
+          resizeToAvoidBottomInset: false, // ← prevents keyboard overflow
+          drawer: AppNavigationShell.isDesktop(context)
+              ? null
+              : AppNavigationDrawer(auth: auth, currentRoute: '/pos'),
           appBar: PreferredSize(
-            preferredSize: const Size.fromHeight(64),
+            preferredSize: const Size.fromHeight(52),
             child: Container(
-              decoration: const BoxDecoration(
-                gradient: CafeColors.headerGradient,
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x33FF4D1C),
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
+              color: NovaColors.bgPrimary,
               child: SafeArea(
                 child: AppBar(
                   backgroundColor: Colors.transparent,
                   elevation: 0,
-                  iconTheme: const IconThemeData(color: Colors.white),
+                  iconTheme:
+                      const IconThemeData(color: NovaColors.textSecondary),
                   title: const Row(
                     children: [
                       Icon(Icons.storefront_rounded,
-                          color: Colors.white70, size: 20),
+                          color: NovaColors.violet, size: 18),
                       SizedBox(width: 8),
                       Text(
                         'Order Station',
                         style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                          letterSpacing: 0.4,
+                          color: NovaColors.textPrimary,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
                         ),
                       ),
                     ],
+                  ),
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(0.5),
+                    child: Container(
+                        height: 0.5, color: NovaColors.borderTertiary),
                   ),
                   actions: [
                     StreamBuilder(
                       stream: _orderService?.getOrders(),
                       builder: (context, snapshot) {
                         final readyCount = _readyOrderCount(snapshot);
-                        return AnimatedBuilder(
-                          animation: _pulseController,
-                          builder: (context, child) {
-                            return IconButton(
-                              tooltip: 'Ready Orders',
-                              onPressed: () => _showReadyOrdersSheet(context),
-                              icon: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Icon(
-                                    readyCount > 0
-                                        ? Icons.notifications_active_rounded
-                                        : Icons.notifications_outlined,
-                                    color: Colors.white,
-                                    size: 26,
-                                  ),
-                                  if (readyCount > 0)
-                                    Positioned(
-                                      top: -4,
-                                      right: -4,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(3),
-                                        decoration: BoxDecoration(
+                        return IconButton(
+                          tooltip: 'Ready Orders',
+                          onPressed: () => _showReadyOrdersSheet(context),
+                          icon: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Icon(
+                                readyCount > 0
+                                    ? Icons.notifications_active_rounded
+                                    : Icons.notifications_outlined,
+                                color: readyCount > 0
+                                    ? NovaColors.violet
+                                    : NovaColors.textSecondary,
+                                size: 22,
+                              ),
+                              if (readyCount > 0)
+                                Positioned(
+                                  top: -3,
+                                  right: -3,
+                                  child: Container(
+                                    width: 14,
+                                    height: 14,
+                                    decoration: BoxDecoration(
+                                      color: NovaColors.teal,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: NovaColors.bgPrimary,
+                                          width: 1.5),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '$readyCount',
+                                        style: const TextStyle(
+                                          fontSize: 7,
+                                          fontWeight: FontWeight.w800,
                                           color: Colors.white,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                              color: CafeColors.flame,
-                                              width: 1.5),
-                                        ),
-                                        constraints: const BoxConstraints(
-                                            minWidth: 16, minHeight: 16),
-                                        child: Text(
-                                          '$readyCount',
-                                          style: const TextStyle(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w800,
-                                            color: CafeColors.flame,
-                                          ),
-                                          textAlign: TextAlign.center,
                                         ),
                                       ),
                                     ),
-                                ],
-                              ),
-                            );
-                          },
+                                  ),
+                                ),
+                            ],
+                          ),
                         );
                       },
                     ),
@@ -601,258 +585,306 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
               ),
             ),
           ),
-          body: StreamBuilder<List<Product>>(
-            stream: _productService?.streamProducts ??
-                Stream<List<Product>>.value([]),
-            builder: (context, snapshot) {
-              final allProducts = snapshot.data ?? [];
-              final categories = _getCategories(allProducts);
+          body: AppNavigationShell(
+            auth: auth,
+            currentRoute: '/pos',
+            child: StreamBuilder<List<Product>>(
+              stream: _productService?.streamProducts ??
+                  Stream<List<Product>>.value([]),
+              builder: (context, snapshot) {
+                final allProducts = snapshot.data ?? [];
+                final categories = _getCategories(allProducts);
 
-              final filteredProducts = allProducts.where((product) {
-                final matchSearch = _searchQuery.isEmpty ||
-                    product.name.toLowerCase().contains(_searchQuery) ||
-                    product.category.toLowerCase().contains(_searchQuery);
-                final matchCategory = _selectedCategory == 'All' ||
-                    product.category == _selectedCategory;
-                return matchSearch && matchCategory;
-              }).toList();
+                final filteredProducts = allProducts.where((product) {
+                  final matchSearch = _searchQuery.isEmpty ||
+                      product.name.toLowerCase().contains(_searchQuery) ||
+                      product.category.toLowerCase().contains(_searchQuery);
+                  final matchCategory = _selectedCategory == 'All' ||
+                      product.category == _selectedCategory;
+                  return matchSearch && matchCategory;
+                }).toList();
 
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: CafeColors.flame.withOpacity(0.08),
-                            blurRadius: 12,
-                            offset: const Offset(0, 3),
+                return ResponsiveCenter(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    children: [
+                      // ── Search bar ──────────────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                        child: Container(
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: NovaColors.bgPrimary,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: NovaColors.borderTertiary, width: 0.5),
                           ),
-                        ],
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (v) =>
-                            setState(() => _searchQuery = v.toLowerCase()),
-                        style: const TextStyle(
-                            fontSize: 14, color: CafeColors.charcoal),
-                        decoration: InputDecoration(
-                          hintText: 'Search menu items...',
-                          hintStyle:
-                              TextStyle(color: Colors.grey[400], fontSize: 14),
-                          prefixIcon: const Icon(Icons.search_rounded,
-                              color: CafeColors.flame, size: 20),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(Icons.close_rounded,
-                                      color: Colors.grey[500], size: 18),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (v) =>
+                                setState(() => _searchQuery = v.toLowerCase()),
+                            style: const TextStyle(
+                                fontSize: 14, color: NovaColors.textPrimary),
+                            decoration: InputDecoration(
+                              hintText: 'Search menu items…',
+                              hintStyle: const TextStyle(
+                                  color: NovaColors.textTertiary, fontSize: 13),
+                              prefixIcon: const Icon(Icons.search_rounded,
+                                  color: NovaColors.textSecondary, size: 18),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close_rounded,
+                                          color: NovaColors.textTertiary,
+                                          size: 16),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _searchQuery = '');
+                                      },
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              contentPadding:
+                                  const EdgeInsets.symmetric(vertical: 10),
+                            ),
                           ),
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 14),
-                          filled: true,
-                          fillColor: Colors.white,
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (allProducts.isNotEmpty)
-                    SizedBox(
-                      height: 36,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: categories.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final cat = categories[index];
-                          final isSelected = _selectedCategory == cat;
-                          return GestureDetector(
-                            onTap: () =>
-                                setState(() => _selectedCategory = cat),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 6),
-                              decoration: BoxDecoration(
-                                gradient: isSelected
-                                    ? CafeColors.headerGradient
-                                    : null,
-                                color: isSelected ? null : Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? Colors.transparent
-                                      : CafeColors.flame.withOpacity(0.2),
+                      const SizedBox(height: 10),
+
+                      // ── Category chips ────────────────────────────────
+                      if (allProducts.isNotEmpty)
+                        SizedBox(
+                          height: 32,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: categories.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 6),
+                            itemBuilder: (context, index) {
+                              final cat = categories[index];
+                              final isSelected = _selectedCategory == cat;
+                              return GestureDetector(
+                                onTap: () =>
+                                    setState(() => _selectedCategory = cat),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? NovaColors.violet
+                                        : NovaColors.bgPrimary,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? NovaColors.violet
+                                          : NovaColors.borderTertiary,
+                                      width: 0.5,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    cat,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : NovaColors.textSecondary,
+                                    ),
+                                  ),
                                 ),
-                                boxShadow: isSelected
-                                    ? [
-                                        BoxShadow(
-                                          color:
-                                              CafeColors.flame.withOpacity(0.3),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 2),
-                                        )
-                                      ]
-                                    : null,
-                              ),
-                              child: Text(
-                                cat,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: isSelected
-                                      ? Colors.white
-                                      : CafeColors.charcoal.withOpacity(0.7),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: () {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(
-                              color: CafeColors.flame),
-                        );
-                      }
-                      if (snapshot.hasError) {
-                        return const Center(
-                            child: Text('Error loading products'));
-                      }
-                      if (filteredProducts.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(24),
-                                decoration: const BoxDecoration(
-                                  color: CafeColors.creme,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.coffee_maker_outlined,
-                                    size: 52, color: CafeColors.flame),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _searchQuery.isNotEmpty
-                                    ? 'No items match "$_searchQuery"'
-                                    : 'No items in this category',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: CafeColors.charcoal,
-                                ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
-                        );
-                      }
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          final columns = _crossAxisCount(constraints.maxWidth);
-                          return GridView.builder(
-                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: columns,
-                              childAspectRatio: 0.95,
-                              mainAxisSpacing: 12,
-                              crossAxisSpacing: 12,
-                            ),
-                            itemCount: filteredProducts.length,
-                            itemBuilder: (_, index) {
-                              final product = filteredProducts[index];
-                              return _ProductCard(
-                                product: product,
-                                onTap: () async {
-                                  final qty = await _showQtyDialog(
-                                      context, product.name, product.price);
-                                  if (qty != null && qty > 0) {
-                                    final productMap = product.toMap();
-                                    productMap['qty'] = qty;
-                                    await cart.addItem(productMap);
-                                  }
+                        ),
+                      const SizedBox(height: 10),
+
+                      // ── Product area ──────────────────────────────────
+                      Expanded(
+                        child: () {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                  color: NovaColors.violet),
+                            );
+                          }
+                          if (snapshot.hasError) {
+                            return const Center(
+                                child: Text('Error loading products',
+                                    style: TextStyle(
+                                        color: NovaColors.textSecondary)));
+                          }
+                          if (filteredProducts.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: NovaColors.bgSecondary,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: NovaColors.borderTertiary),
+                                    ),
+                                    child: const Icon(
+                                        Icons.coffee_maker_outlined,
+                                        size: 40,
+                                        color: NovaColors.textTertiary),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    _searchQuery.isNotEmpty
+                                        ? 'No items match "$_searchQuery"'
+                                        : 'No items in this category',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w500,
+                                      color: NovaColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return LayoutBuilder(
+                            builder: (context, constraints) {
+                              final isMobile = constraints.maxWidth < 600;
+
+                              // ── Mobile: vertical list ─────────────────
+                              if (isMobile) {
+                                return ListView.builder(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                                  itemCount: filteredProducts.length,
+                                  itemBuilder: (_, index) {
+                                    final product = filteredProducts[index];
+                                    return _ProductListTile(
+                                      product: product,
+                                      onTap: () async {
+                                        final qty = await _showQtyDialog(
+                                            context,
+                                            product.name,
+                                            product.price);
+                                        if (qty != null && qty > 0) {
+                                          final productMap = product.toMap();
+                                          productMap['qty'] = qty;
+                                          await cart.addItem(productMap);
+                                        }
+                                      },
+                                    );
+                                  },
+                                );
+                              }
+
+                              // ── Desktop / tablet: grid ────────────────
+                              return GridView.builder(
+                                scrollDirection: Axis.vertical,
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount:
+                                      _crossAxisCount(constraints.maxWidth),
+                                  childAspectRatio:
+                                      constraints.maxWidth < 380 ? 1.35 : 0.95,
+                                  mainAxisSpacing: 10,
+                                  crossAxisSpacing: 10,
+                                ),
+                                itemCount: filteredProducts.length,
+                                itemBuilder: (_, index) {
+                                  final product = filteredProducts[index];
+                                  return _ProductCard(
+                                    product: product,
+                                    onTap: () async {
+                                      final qty = await _showQtyDialog(
+                                          context, product.name, product.price);
+                                      if (qty != null && qty > 0) {
+                                        final productMap = product.toMap();
+                                        productMap['qty'] = qty;
+                                        await cart.addItem(productMap);
+                                      }
+                                    },
+                                  );
                                 },
                               );
                             },
                           );
-                        },
-                      );
-                    }(),
-                  ),
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: CafeColors.bottomBarGradient,
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(24)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x44FF4D1C),
-                          blurRadius: 16,
-                          offset: Offset(0, -4),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
-                    child: Row(
-                      children: [
-                        // Checkout button
-                        Expanded(
-                          child: _BottomBarButton(
-                            onPressed: cart.items.isEmpty
-                                ? null
-                                : () =>
-                                    Navigator.pushNamed(context, '/checkout'),
-                            icon: Icons.shopping_bag_outlined,
-                            label: 'Checkout',
-                            badge: cart.items.isNotEmpty
-                                ? '${cart.items.length}'
-                                : null,
+                        }(),
+                      ),
+
+                      // ── Bottom action bar ─────────────────────────────
+                      SafeArea(
+                        top: false,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: NovaColors.bgPrimary,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(18),
+                            ),
+                            border: const Border(
+                              top: BorderSide(
+                                  color: NovaColors.borderTertiary, width: 0.5),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 18,
+                                offset: const Offset(0, -4),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _BottomBarButton(
+                                  onPressed: cart.items.isEmpty
+                                      ? null
+                                      : () => Navigator.pushNamed(
+                                          context, '/checkout'),
+                                  icon: Icons.shopping_bag_outlined,
+                                  label: 'Checkout',
+                                  badge: cart.items.isNotEmpty
+                                      ? '${cart.items.length}'
+                                      : null,
+                                  isPrimary: true,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: StreamBuilder(
+                                  stream: _orderService?.getOrders(),
+                                  builder: (context, snapshot) {
+                                    final readyCount =
+                                        _readyOrderCount(snapshot);
+                                    return _BottomBarButton(
+                                      onPressed: () =>
+                                          _showReadyOrdersSheet(context),
+                                      icon: Icons.receipt_long_outlined,
+                                      label: 'Ready Orders',
+                                      badge:
+                                          readyCount > 0 ? '$readyCount' : null,
+                                      isPrimary: false,
+                                      badgeColor: NovaColors.teal,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        // Ready orders button
-                        Expanded(
-                          child: StreamBuilder(
-                            stream: _orderService?.getOrders(),
-                            builder: (context, snapshot) {
-                              final readyCount = _readyOrderCount(snapshot);
-                              return _BottomBarButton(
-                                onPressed: () => _showReadyOrdersSheet(context),
-                                icon: Icons.receipt_long_outlined,
-                                label: 'Ready Orders',
-                                badge: readyCount > 0 ? '$readyCount' : null,
-                                badgeColor: const Color(0xFF2ECC71),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              );
-            },
+                );
+              },
+            ),
           ),
         );
       },
@@ -860,6 +892,178 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   }
 }
 
+// ─── Product List Tile (mobile) ────────────────────────────────────────────────
+class _ProductListTile extends StatefulWidget {
+  final Product product;
+  final VoidCallback onTap;
+
+  const _ProductListTile({required this.product, required this.onTap});
+
+  @override
+  State<_ProductListTile> createState() => _ProductListTileState();
+}
+
+class _ProductListTileState extends State<_ProductListTile>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.97)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  String _emoji(String category) {
+    final c = category.toLowerCase();
+    if (c.contains('coffee') || c.contains('hot drink')) return '☕';
+    if (c.contains('cold') || c.contains('drink') || c.contains('juice')) {
+      return '🧃';
+    }
+    if (c.contains('food') || c.contains('meal') || c.contains('snack')) {
+      return '🍽️';
+    }
+    if (c.contains('dessert') || c.contains('sweet')) return '🍰';
+    if (c.contains('sandwich') || c.contains('burger')) return '🥪';
+    if (c.contains('pizza')) return '🍕';
+    if (c.contains('salad')) return '🥗';
+    return '🍴';
+  }
+
+  Color _bgColor(String name) {
+    final colors = [
+      const Color(0xFFF3F2FE),
+      const Color(0xFFE1F5EE),
+      const Color(0xFFFAEEDA),
+      const Color(0xFFFFEEF3),
+      const Color(0xFFE8F4FD),
+    ];
+    return colors[name.codeUnitAt(0) % colors.length];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _ctrl.forward(),
+      onTapUp: (_) {
+        _ctrl.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _ctrl.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: NovaColors.bgPrimary,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: NovaColors.borderTertiary, width: 0.5),
+          ),
+          child: Row(
+            children: [
+              // Emoji thumbnail
+              Container(
+                width: 56,
+                height: 56,
+                margin: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _bgColor(widget.product.name),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Text(
+                    _emoji(widget.product.category),
+                    style: const TextStyle(fontSize: 22),
+                  ),
+                ),
+              ),
+              // Name + category
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      widget.product.name,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: NovaColors.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      widget.product.category,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: NovaColors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Price + add button
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: NovaColors.violetLight,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Rs ${widget.product.price.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: NovaColors.violet,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 26,
+                      height: 26,
+                      decoration: const BoxDecoration(
+                        color: NovaColors.violetLight,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.add_rounded,
+                        color: NovaColors.violet,
+                        size: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Product Card (desktop/tablet) ────────────────────────────────────────────
 class _ProductCard extends StatefulWidget {
   final Product product;
   final VoidCallback onTap;
@@ -880,9 +1084,9 @@ class _ProductCardState extends State<_ProductCard>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 100),
     );
-    _scaleAnim = Tween<double>(begin: 1.0, end: 0.94).animate(
+    _scaleAnim = Tween<double>(begin: 1.0, end: 0.96).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
   }
@@ -893,7 +1097,6 @@ class _ProductCardState extends State<_ProductCard>
     super.dispose();
   }
 
-  // Pick an emoji icon for category
   String _categoryEmoji(String category) {
     final c = category.toLowerCase();
     if (c.contains('coffee') || c.contains('hot drink')) return '☕';
@@ -910,15 +1113,15 @@ class _ProductCardState extends State<_ProductCard>
     return '🍴';
   }
 
-  LinearGradient _cardAccentGradient(String name) {
-    final gradients = [
-      const LinearGradient(colors: [Color(0xFFFFE0CC), Color(0xFFFFCDB5)]),
-      const LinearGradient(colors: [Color(0xFFFFE5D9), Color(0xFFFFCEC5)]),
-      const LinearGradient(colors: [Color(0xFFFFF0CC), Color(0xFFFFE4A0)]),
-      const LinearGradient(colors: [Color(0xFFE8F4FD), Color(0xFFCDE8FB)]),
-      const LinearGradient(colors: [Color(0xFFEDF9EC), Color(0xFFCCF0CB)]),
+  Color _cardBgColor(String name) {
+    final colors = [
+      const Color(0xFFF3F2FE),
+      const Color(0xFFE1F5EE),
+      const Color(0xFFFAEEDA),
+      const Color(0xFFFFEEF3),
+      const Color(0xFFE8F4FD),
     ];
-    return gradients[name.codeUnitAt(0) % gradients.length];
+    return colors[name.codeUnitAt(0) % colors.length];
   }
 
   @override
@@ -934,41 +1137,33 @@ class _ProductCardState extends State<_ProductCard>
         scale: _scaleAnim,
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: CafeColors.flame.withOpacity(0.07),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            color: NovaColors.bgPrimary,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: NovaColors.borderTertiary, width: 0.5),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Top colored icon area
               Expanded(
                 flex: 5,
                 child: Container(
                   decoration: BoxDecoration(
-                    gradient: _cardAccentGradient(widget.product.name),
+                    color: _cardBgColor(widget.product.name),
                     borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(18)),
+                        const BorderRadius.vertical(top: Radius.circular(12)),
                   ),
                   child: Center(
                     child: Text(
                       _categoryEmoji(widget.product.category),
-                      style: const TextStyle(fontSize: 36),
+                      style: const TextStyle(fontSize: 26),
                     ),
                   ),
                 ),
               ),
-              // Bottom info area
               Expanded(
                 flex: 4,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -976,44 +1171,48 @@ class _ProductCardState extends State<_ProductCard>
                       Text(
                         widget.product.name,
                         style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: CafeColors.charcoal,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: NovaColors.textPrimary,
                           height: 1.2,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              gradient: CafeColors.headerGradient,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Rs ${widget.product.price.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: NovaColors.violetLight,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Rs ${widget.product.price.toStringAsFixed(0)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: NovaColors.violet,
+                                ),
                               ),
                             ),
                           ),
+                          const SizedBox(width: 6),
                           Container(
-                            width: 26,
-                            height: 26,
+                            width: 22,
+                            height: 22,
                             decoration: BoxDecoration(
-                              color: CafeColors.flame.withOpacity(0.1),
+                              color: NovaColors.violetLight,
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
                               Icons.add_rounded,
-                              color: CafeColors.flame,
-                              size: 16,
+                              color: NovaColors.violet,
+                              size: 13,
                             ),
                           ),
                         ],
@@ -1030,11 +1229,13 @@ class _ProductCardState extends State<_ProductCard>
   }
 }
 
+// ─── Bottom Bar Button ─────────────────────────────────────────────────────────
 class _BottomBarButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final IconData icon;
   final String label;
   final String? badge;
+  final bool isPrimary;
   final Color badgeColor;
 
   const _BottomBarButton({
@@ -1042,7 +1243,8 @@ class _BottomBarButton extends StatelessWidget {
     required this.icon,
     required this.label,
     this.badge,
-    this.badgeColor = Colors.red,
+    this.isPrimary = true,
+    this.badgeColor = NovaColors.teal,
   });
 
   @override
@@ -1052,28 +1254,46 @@ class _BottomBarButton extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         SizedBox(
-          height: 52,
+          height: 44,
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: onPressed,
             icon: Icon(icon,
-                size: 18, color: isDisabled ? Colors.white38 : Colors.white),
+                size: 16,
+                color: isDisabled
+                    ? NovaColors.textTertiary
+                    : isPrimary
+                        ? Colors.white
+                        : NovaColors.violet),
             label: Text(
               label,
               style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: isDisabled ? Colors.white38 : Colors.white,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+                color: isDisabled
+                    ? NovaColors.textTertiary
+                    : isPrimary
+                        ? Colors.white
+                        : NovaColors.violet,
               ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDisabled ? Colors.white12 : Colors.white24,
+              backgroundColor: isDisabled
+                  ? NovaColors.bgSecondary
+                  : isPrimary
+                      ? NovaColors.violet
+                      : NovaColors.violetLight,
               shadowColor: Colors.transparent,
               elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(10),
                 side: BorderSide(
-                  color: isDisabled ? Colors.white12 : Colors.white38,
+                  color: isDisabled
+                      ? NovaColors.borderTertiary
+                      : isPrimary
+                          ? NovaColors.violet
+                          : NovaColors.violet.withOpacity(0.3),
+                  width: 0.5,
                 ),
               ),
             ),
@@ -1084,19 +1304,19 @@ class _BottomBarButton extends StatelessWidget {
             top: -6,
             right: -6,
             child: Container(
-              padding: const EdgeInsets.all(5),
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: badgeColor,
                 shape: BoxShape.circle,
-                border: Border.all(color: CafeColors.flame, width: 2),
+                border: Border.all(color: NovaColors.bgPrimary, width: 1.5),
               ),
-              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
               child: Text(
                 badge!,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -1107,6 +1327,7 @@ class _BottomBarButton extends StatelessWidget {
   }
 }
 
+// ─── Ready Order Card ──────────────────────────────────────────────────────────
 class _ReadyOrderCard extends StatelessWidget {
   final String orderLabel;
   final String orderType;
@@ -1134,66 +1355,38 @@ class _ReadyOrderCard extends StatelessWidget {
     return '📦';
   }
 
-  LinearGradient _accentGradient() {
-    final gradients = [
-      const LinearGradient(
-          colors: [Color(0xFFFFE0CC), Color(0xFFFFCDB5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight),
-      const LinearGradient(
-          colors: [Color(0xFFFFF0CC), Color(0xFFFFE4A0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight),
-      const LinearGradient(
-          colors: [Color(0xFFEDF9EC), Color(0xFFCCF0CB)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight),
-      const LinearGradient(
-          colors: [Color(0xFFE8F4FD), Color(0xFFCDE8FB)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight),
-    ];
-    return gradients[index % gradients.length];
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: CafeColors.flame.withOpacity(0.07),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        color: NovaColors.bgPrimary,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: NovaColors.borderTertiary, width: 0.5),
       ),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              gradient: _accentGradient(),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(20)),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: const BoxDecoration(
+              color: NovaColors.bgSecondary,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
               children: [
-                // Order type emoji badge
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(12),
+                    color: NovaColors.bgPrimary,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: NovaColors.borderTertiary, width: 0.5),
                   ),
                   child: Center(
                     child: Text(
                       _orderTypeEmoji(orderType),
-                      style: const TextStyle(fontSize: 22),
+                      style: const TextStyle(fontSize: 20),
                     ),
                   ),
                 ),
@@ -1205,9 +1398,9 @@ class _ReadyOrderCard extends StatelessWidget {
                       Text(
                         'Order $orderLabel',
                         style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: CafeColors.charcoal,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: NovaColors.textPrimary,
                         ),
                       ),
                       if (customerName != null && customerName!.isNotEmpty) ...[
@@ -1215,13 +1408,13 @@ class _ReadyOrderCard extends StatelessWidget {
                         Row(
                           children: [
                             const Icon(Icons.person_outline_rounded,
-                                size: 12, color: CafeColors.charcoal),
+                                size: 11, color: NovaColors.textTertiary),
                             const SizedBox(width: 3),
                             Text(
                               customerName!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: CafeColors.charcoal.withOpacity(0.6),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: NovaColors.textSecondary,
                               ),
                             ),
                           ],
@@ -1232,24 +1425,17 @@ class _ReadyOrderCard extends StatelessWidget {
                 ),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    gradient: CafeColors.headerGradient,
+                    color: NovaColors.tealLight,
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: CafeColors.flame.withOpacity(0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                   child: Text(
                     orderType.toUpperCase(),
                     style: const TextStyle(
                       fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      color: NovaColors.tealDeep,
                     ),
                   ),
                 ),
@@ -1257,7 +1443,7 @@ class _ReadyOrderCard extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
             child: Column(
               children: items.map((item) {
                 final name = item['name'] ?? 'Unknown';
@@ -1270,15 +1456,15 @@ class _ReadyOrderCard extends StatelessWidget {
                 final price = (item['price'] as num?)?.toDouble();
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.only(bottom: 6),
                   child: Row(
                     children: [
                       Container(
-                        width: 7,
-                        height: 7,
+                        width: 6,
+                        height: 6,
                         margin: const EdgeInsets.only(right: 10, top: 1),
                         decoration: const BoxDecoration(
-                          gradient: CafeColors.headerGradient,
+                          color: NovaColors.violet,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -1287,33 +1473,32 @@ class _ReadyOrderCard extends StatelessWidget {
                           name,
                           style: const TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: CafeColors.charcoal,
+                            color: NovaColors.textPrimary,
                           ),
                         ),
                       ),
                       if (price != null)
                         Text(
                           'Rs ${(price * qty).toStringAsFixed(0)}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 12,
-                            color: CafeColors.charcoal.withOpacity(0.5),
+                            color: NovaColors.textSecondary,
                           ),
                         ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                            horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
-                          gradient: CafeColors.headerGradient,
-                          borderRadius: BorderRadius.circular(8),
+                          color: NovaColors.violetLight,
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           '×$qty',
                           style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: NovaColors.violet,
                           ),
                         ),
                       ),
@@ -1323,71 +1508,51 @@ class _ReadyOrderCard extends StatelessWidget {
               }).toList(),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child:
-                Divider(color: CafeColors.flame.withOpacity(0.1), height: 20),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14),
+            child: Divider(
+                color: NovaColors.borderTertiary, height: 20, thickness: 0.5),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
             child: Row(
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Total',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: CafeColors.charcoal.withOpacity(0.45)),
-                    ),
+                    const Text('Total',
+                        style: TextStyle(
+                            fontSize: 11, color: NovaColors.textTertiary)),
                     Text(
                       'Rs ${total.toStringAsFixed(0)}',
                       style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: CafeColors.charcoal,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: NovaColors.textPrimary,
                       ),
                     ),
                   ],
                 ),
                 const Spacer(),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF2ECC71), Color(0xFF27AE60)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                ElevatedButton.icon(
+                  onPressed: onComplete,
+                  icon: const Icon(Icons.print_rounded,
+                      color: Colors.white, size: 15),
+                  label: const Text(
+                    'Print & Complete',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
                     ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF2ECC71).withOpacity(0.35),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
                   ),
-                  child: ElevatedButton.icon(
-                    onPressed: onComplete,
-                    icon: const Icon(Icons.print_rounded,
-                        color: Colors.white, size: 17),
-                    label: const Text(
-                      'Print & Complete',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: NovaColors.teal,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
               ],

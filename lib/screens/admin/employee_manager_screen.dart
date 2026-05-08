@@ -2,32 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/theme/cafe_colors.dart';
+import '../../core/theme/nova_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/app_navigation.dart';
-
-class CafeColors {
-  static const Color flame = Color(0xFFFF4D1C);
-  static const Color amber = Color(0xFFFFA724);
-  static const Color espresso = Color(0xFF1E0F00);
-  static const Color latte = Color(0xFFFFF3E8);
-  static const Color steam = Color(0xFFFFFAF5);
-  static const Color creme = Color(0xFFFFE4C4);
-  static const Color olive = Color(0xFF2D6A4F);
-  static const Color oliveLight = Color(0xFFD8F3DC);
-  static const Color charcoal = Color(0xFF2C2C2C);
-
-  static const LinearGradient headerGradient = LinearGradient(
-    colors: [Color(0xFFFF4D1C), Color(0xFFFF8C42)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const LinearGradient bottomBarGradient = LinearGradient(
-    colors: [Color(0xFFFF4D1C), Color(0xFFFF6B35)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-}
+import '../../widgets/responsive_layout.dart';
 
 class EmployeeManagerScreen extends StatefulWidget {
   const EmployeeManagerScreen({super.key});
@@ -623,7 +602,7 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
       builder: (context, auth, child) {
         if (!auth.isAdmin) {
           return Scaffold(
-            backgroundColor: CafeColors.latte,
+            backgroundColor: NovaColors.bgTertiary,
             appBar: PreferredSize(
               preferredSize: const Size.fromHeight(64),
               child: Container(
@@ -702,8 +681,10 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
         final photoUrl = auth.user?.photoURL;
 
         return Scaffold(
-          backgroundColor: CafeColors.latte,
-          drawer: AppNavigationDrawer(auth: auth, currentRoute: '/employees'),
+          backgroundColor: NovaColors.bgTertiary,
+          drawer: AppNavigationShell.isDesktop(context)
+              ? null
+              : AppNavigationDrawer(auth: auth, currentRoute: '/employees'),
           appBar: PreferredSize(
             preferredSize: const Size.fromHeight(64),
             child: Container(
@@ -750,158 +731,202 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
               ),
             ),
           ),
-          body: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: CafeColors.flame.withOpacity(0.08),
-                              blurRadius: 12,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (v) =>
-                              setState(() => _searchQuery = v.toLowerCase()),
-                          style: const TextStyle(
-                              fontSize: 14, color: CafeColors.charcoal),
-                          decoration: InputDecoration(
-                            hintText: 'Search employees...',
-                            hintStyle: TextStyle(
-                                color: Colors.grey[400], fontSize: 14),
-                            prefixIcon: const Icon(Icons.search_rounded,
-                                color: CafeColors.flame, size: 20),
-                            suffixIcon: _searchQuery.isNotEmpty
-                                ? IconButton(
-                                    icon: Icon(Icons.close_rounded,
-                                        color: Colors.grey[500], size: 18),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() => _searchQuery = '');
-                                    },
-                                  )
-                                : null,
-                            border: OutlineInputBorder(
+          body: AppNavigationShell(
+            auth: auth,
+            currentRoute: '/employees',
+            child: ResponsiveCenter(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide.none,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: CafeColors.flame.withOpacity(0.08),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
-                            contentPadding:
-                                const EdgeInsets.symmetric(vertical: 14),
-                            filled: true,
-                            fillColor: Colors.white,
+                            child: TextField(
+                              controller: _searchController,
+                              onChanged: (v) => setState(
+                                  () => _searchQuery = v.toLowerCase()),
+                              style: const TextStyle(
+                                  fontSize: 14, color: CafeColors.charcoal),
+                              decoration: InputDecoration(
+                                hintText: 'Search employees...',
+                                hintStyle: TextStyle(
+                                    color: Colors.grey[400], fontSize: 14),
+                                prefixIcon: const Icon(Icons.search_rounded,
+                                    color: CafeColors.flame, size: 20),
+                                suffixIcon: _searchQuery.isNotEmpty
+                                    ? IconButton(
+                                        icon: Icon(Icons.close_rounded,
+                                            color: Colors.grey[500], size: 18),
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          setState(() => _searchQuery = '');
+                                        },
+                                      )
+                                    : null,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    // Add employee button
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        gradient: CafeColors.headerGradient,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: CafeColors.flame.withOpacity(0.35),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                        const SizedBox(width: 10),
+                        // Add employee button
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            gradient: CafeColors.headerGradient,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: CafeColors.flame.withOpacity(0.35),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: IconButton(
-                        tooltip: 'Add Employee',
-                        onPressed: () => _showCreateDialog(context),
-                        icon: const Icon(Icons.person_add_rounded,
-                            color: Colors.white, size: 20),
-                      ),
+                          child: IconButton(
+                            tooltip: 'Add Employee',
+                            onPressed: () => _showCreateDialog(context),
+                            icon: const Icon(Icons.person_add_rounded,
+                                color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: StreamBuilder<List<Map<String, dynamic>>>(
-                  stream: auth.getEmployees(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child:
-                            CircularProgressIndicator(color: CafeColors.flame),
-                      );
-                    }
-                    if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    }
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: StreamBuilder<List<Map<String, dynamic>>>(
+                      stream: auth.getEmployees(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                                color: NovaColors.violet),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return Center(
+                              child: Text('Error: ${snapshot.error}'));
+                        }
 
-                    final employees = snapshot.data ?? [];
-                    final filtered = employees.where((e) {
-                      final name = e['name']?.toString().toLowerCase() ?? '';
-                      final email = e['email']?.toString().toLowerCase() ?? '';
-                      final role = e['role']?.toString().toLowerCase() ?? '';
-                      return _searchQuery.isEmpty ||
-                          name.contains(_searchQuery) ||
-                          email.contains(_searchQuery) ||
-                          role.contains(_searchQuery);
-                    }).toList();
+                        final employees = snapshot.data ?? [];
+                        final filtered = employees.where((e) {
+                          final name =
+                              e['name']?.toString().toLowerCase() ?? '';
+                          final email =
+                              e['email']?.toString().toLowerCase() ?? '';
+                          final role =
+                              e['role']?.toString().toLowerCase() ?? '';
+                          return _searchQuery.isEmpty ||
+                              name.contains(_searchQuery) ||
+                              email.contains(_searchQuery) ||
+                              role.contains(_searchQuery);
+                        }).toList();
 
-                    // Empty states
-                    if (employees.isEmpty) {
-                      return _emptyStateView(
-                        icon: Icons.people_outline_rounded,
-                        title: 'No employees yet',
-                        subtitle: 'Tap + to add your first employee',
-                      );
-                    }
-                    if (filtered.isEmpty) {
-                      return _emptyStateView(
-                        icon: Icons.search_off_rounded,
-                        title: 'No results found',
-                        subtitle: 'No employees match "$_searchQuery"',
-                      );
-                    }
+                        // Empty states
+                        if (employees.isEmpty) {
+                          return _emptyStateView(
+                            icon: Icons.people_outline_rounded,
+                            title: 'No employees yet',
+                            subtitle: 'Tap + to add your first employee',
+                          );
+                        }
+                        if (filtered.isEmpty) {
+                          return _emptyStateView(
+                            icon: Icons.search_off_rounded,
+                            title: 'No results found',
+                            subtitle: 'No employees match "$_searchQuery"',
+                          );
+                        }
 
-                    return ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, index) {
-                        final employee = filtered[index];
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            final columns = ResponsiveLayout.cardColumns(
+                                constraints.maxWidth);
 
-                        final rawName =
-                            (employee['name']?.toString() ?? '').trim();
-                        final name = rawName.isEmpty ? 'Unknown' : rawName;
+                            Widget buildEmployeeCard(int index) {
+                              final employee = filtered[index];
 
-                        final email = employee['email']?.toString() ?? '';
-                        final role = employee['role']?.toString() ?? 'cashier';
-                        final userId = employee['id']?.toString() ?? '';
+                              final rawName =
+                                  (employee['name']?.toString() ?? '').trim();
+                              final name =
+                                  rawName.isEmpty ? 'Unknown' : rawName;
 
-                        return _EmployeeCard(
-                          name: name,
-                          email: email,
-                          role: role,
-                          avatarGradient: _avatarGradient(name),
-                          roleColor: _roleColor(role),
-                          roleBgColor: _roleBgColor(role),
-                          onEdit: () =>
-                              _showEditRoleDialog(context, userId, role, name),
-                          onDelete: () => _confirmDelete(context, userId, name),
+                              final email = employee['email']?.toString() ?? '';
+                              final role =
+                                  employee['role']?.toString() ?? 'cashier';
+                              final userId = employee['id']?.toString() ?? '';
+
+                              return _EmployeeCard(
+                                name: name,
+                                email: email,
+                                role: role,
+                                avatarGradient: _avatarGradient(name),
+                                roleColor: _roleColor(role),
+                                roleBgColor: _roleBgColor(role),
+                                onEdit: () => _showEditRoleDialog(
+                                  context,
+                                  userId,
+                                  role,
+                                  name,
+                                ),
+                                onDelete: () =>
+                                    _confirmDelete(context, userId, name),
+                              );
+                            }
+
+                            if (columns == 1) {
+                              return ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
+                                itemCount: filtered.length,
+                                itemBuilder: (context, index) =>
+                                    buildEmployeeCard(index),
+                              );
+                            }
+
+                            return GridView.builder(
+                              padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: columns,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                                mainAxisExtent: 136,
+                              ),
+                              itemCount: filtered.length,
+                              itemBuilder: (context, index) =>
+                                  buildEmployeeCard(index),
+                            );
+                          },
                         );
                       },
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },

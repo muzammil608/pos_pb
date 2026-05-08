@@ -4,34 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/pocketbase/report_service.dart';
 import '../../../widgets/status_donut_chart.dart';
+import '../../core/theme/cafe_colors.dart';
+import '../../core/theme/nova_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/app_navigation.dart';
+import '../../widgets/responsive_layout.dart';
 
-// ─── Vibrant Café Color Palette ───────────────────────────────────────────────
-class CafeColors {
-  static const Color flame = Color(0xFFFF4D1C);
-  static const Color amber = Color(0xFFFFA724);
-  static const Color espresso = Color(0xFF1E0F00);
-  static const Color latte = Color(0xFFFFF3E8);
-  static const Color steam = Color(0xFFFFFAF5);
-  static const Color creme = Color(0xFFFFE4C4);
-  static const Color olive = Color(0xFF2D6A4F);
-  static const Color oliveLight = Color(0xFFD8F3DC);
-  static const Color charcoal = Color(0xFF2C2C2C);
-
-  static const LinearGradient headerGradient = LinearGradient(
-    colors: [Color(0xFFFF4D1C), Color(0xFFFF8C42)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const LinearGradient bottomBarGradient = LinearGradient(
-    colors: [Color(0xFFFF4D1C), Color(0xFFFF6B35)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-}
-
+// ─── Admin Dashboard Screen ────────────────────────────────────────────────────
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -55,8 +34,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder: (context, auth, child) {
         if (auth.user == null) {
           return const Scaffold(
+            backgroundColor: NovaColors.bgSecondary,
             body: Center(
-                child: CircularProgressIndicator(color: CafeColors.flame)),
+              child: CircularProgressIndicator(color: NovaColors.violet),
+            ),
           );
         }
 
@@ -65,20 +46,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Navigator.pushReplacementNamed(context, '/pos');
           });
           return const Scaffold(
+            backgroundColor: NovaColors.bgSecondary,
             body: Center(
-                child: CircularProgressIndicator(color: CafeColors.flame)),
+              child: CircularProgressIndicator(color: NovaColors.violet),
+            ),
           );
         }
 
         final userEmail = auth.user?.email ?? 'No Email';
         final userName = auth.user?.displayName ?? userEmail.split('@').first;
         final photoUrl = auth.user?.photoURL;
+        final isDesktop = AppNavigationShell.isDesktop(context);
 
         return Scaffold(
-          backgroundColor: CafeColors.latte,
-          drawer: AppNavigationDrawer(auth: auth, currentRoute: '/admin'),
-
-          // ─── AppBar ──────────────────────────────────────────────────────
+          backgroundColor: NovaColors.bgTertiary,
+          drawer: isDesktop
+              ? null
+              : AppNavigationDrawer(auth: auth, currentRoute: '/admin'),
           appBar: PreferredSize(
             preferredSize: const Size.fromHeight(64),
             child: Container(
@@ -99,7 +83,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   iconTheme: const IconThemeData(color: Colors.white),
                   title: const Row(
                     children: [
-                      Icon(Icons.admin_panel_settings_rounded,
+                      Icon(Icons.analytics_rounded,
                           color: Colors.white70, size: 22),
                       SizedBox(width: 10),
                       Text(
@@ -126,244 +110,416 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             ),
           ),
-
-          // ─── Body ────────────────────────────────────────────────────────
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ─── Revenue Card ───────────────────────────────────────────
-                StreamBuilder<double>(
-                  stream: _reportService.getTodayRevenue(),
-                  builder: (context, snapshot) {
-                    final revenue = snapshot.data ?? 0.0;
-                    final isLoading = !snapshot.hasData;
-
-                    return Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: CafeColors.headerGradient,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: CafeColors.flame.withOpacity(0.3),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      padding: const EdgeInsets.all(24),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Today\'s Revenue',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                isLoading
-                                    ? const SizedBox(
-                                        height: 36,
-                                        width: 36,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2.5,
-                                        ),
-                                      )
-                                    : Text(
-                                        'Rs ${revenue.toStringAsFixed(0)}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 34,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: -0.5,
-                                        ),
-                                      ),
-                                const SizedBox(height: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.trending_up_rounded,
-                                          color: Colors.white, size: 14),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Live total',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Icon(
-                              Icons.payments_rounded,
-                              color: Colors.white,
-                              size: 36,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+          body: AppNavigationShell(
+            auth: auth,
+            currentRoute: '/admin',
+            child: ResponsiveCenter(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(0, 20, 0, 32),
+                child: _DashboardContent(
+                  auth: auth,
+                  reportService: _reportService,
+                  isDesktop: isDesktop,
                 ),
-
-                const SizedBox(height: 24),
-
-                // ─── Order Status Stats ─────────────────────────────────────
-                _SectionHeader(
-                  icon: Icons.bar_chart_rounded,
-                  title: 'Order Status',
-                ),
-                const SizedBox(height: 12),
-                StreamBuilder<Map<String, int>>(
-                  stream: _reportService.getOrderStatusStats(),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(24),
-                          child: CircularProgressIndicator(
-                              color: CafeColors.flame),
-                        ),
-                      );
-                    }
-                    final stats = snapshot.data!;
-                    final cards = [
-                      _StatusCardData(
-                        key: 'pending',
-                        value: stats['pending'] ?? 0,
-                        label: 'Pending',
-                        icon: Icons.hourglass_top_rounded,
-                        color: CafeColors.flame,
-                        bgColor: const Color(0xFFFFEDE8),
-                      ),
-                      _StatusCardData(
-                        key: 'ready',
-                        value: stats['ready'] ?? 0,
-                        label: 'Ready',
-                        icon: Icons.check_circle_outline_rounded,
-                        color: CafeColors.olive,
-                        bgColor: CafeColors.oliveLight,
-                      ),
-                      _StatusCardData(
-                        key: 'completed',
-                        value: stats['completed'] ?? 0,
-                        label: 'Done',
-                        icon: Icons.task_alt_rounded,
-                        color: const Color(0xFF6B7280),
-                        bgColor: const Color(0xFFF3F4F6),
-                      ),
-                    ];
-
-                    return Row(
-                      children: cards
-                          .map((c) => Expanded(
-                                child: Padding(
-                                  padding: EdgeInsets.only(
-                                    left: c.key == 'pending' ? 0 : 5,
-                                    right: c.key == 'completed' ? 0 : 5,
-                                  ),
-                                  child: _StatusCard(data: c),
-                                ),
-                              ))
-                          .toList(),
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 24),
-
-                // ─── Donut Chart ────────────────────────────────────────────
-                _SectionHeader(
-                  icon: Icons.donut_large_rounded,
-                  title: 'Order Distribution',
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: CafeColors.flame.withOpacity(0.06),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  // FIX: Removed the duplicate legend Row that was manually
-                  // added here. StatusDonutChart already renders its own
-                  // legend internally, so having both caused Pending, Ready
-                  // and Completed labels to appear twice under the chart.
-                  child: StatusDonutChart(ownerId: auth.ownerId, size: 280),
-                ),
-
-                const SizedBox(height: 24),
-
-                // ─── Quick Actions ──────────────────────────────────────────
-                _SectionHeader(
-                  icon: Icons.flash_on_rounded,
-                  title: 'Quick Actions',
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _QuickActionCard(
-                        icon: Icons.storefront_rounded,
-                        label: 'POS',
-                        subtitle: 'Order Station',
-                        color: CafeColors.flame,
-                        bgColor: const Color(0xFFFFEDE8),
-                        onTap: () => Navigator.pushNamed(context, '/pos'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _QuickActionCard(
-                        icon: Icons.kitchen_rounded,
-                        label: 'Kitchen',
-                        subtitle: 'Live Orders',
-                        color: CafeColors.olive,
-                        bgColor: CafeColors.oliveLight,
-                        onTap: () => Navigator.pushNamed(context, '/kitchen'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHARED DASHBOARD CONTENT
+// ═══════════════════════════════════════════════════════════════════════════════
+class _DashboardContent extends StatelessWidget {
+  final AuthProvider auth;
+  final ReportService reportService;
+  final bool isDesktop;
+
+  const _DashboardContent({
+    required this.auth,
+    required this.reportService,
+    required this.isDesktop,
+  });
+
+  // Ensures Order Status cards, Quick Actions cards, and Order Breakdown card
+  // are the same visible height.
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ─── Revenue Stat Cards Row ────────────────────────────────────
+        StreamBuilder<double>(
+          stream: reportService.getTodayRevenue(),
+          builder: (context, snapshot) {
+            final revenue = snapshot.data ?? 0.0;
+            final revenueLoading = !snapshot.hasData;
+
+            return StreamBuilder<int>(
+              stream: reportService.getTodayOrderCount(),
+              builder: (context, ordersSnapshot) {
+                final ordersToday = ordersSnapshot.data ?? 0;
+                final ordersLoading = !ordersSnapshot.hasData;
+
+                return StreamBuilder<int>(
+                  stream: reportService.getKitchenQueueCount(),
+                  builder: (context, queueSnapshot) {
+                    final queueCount = queueSnapshot.data ?? 0;
+                    final queueLoading = !queueSnapshot.hasData;
+
+                    final cards = [
+                      _StatCard(
+                        icon: Icons.trending_up_rounded,
+                        iconColor: NovaColors.violet,
+                        label: "Today's Revenue",
+                        value: revenueLoading
+                            ? '—'
+                            : 'Rs ${revenue.toStringAsFixed(0)}',
+                        delta: 'Live total',
+                        deltaUp: true,
+                        isLoading: revenueLoading,
+                        fullWidth: !isDesktop,
+                      ),
+                      _StatCard(
+                        icon: Icons.receipt_long_rounded,
+                        iconColor: NovaColors.teal,
+                        label: 'Orders Today',
+                        value: ordersLoading ? '—' : '$ordersToday',
+                        delta: 'Updated live',
+                        deltaUp: true,
+                        isLoading: ordersLoading,
+                        fullWidth: !isDesktop,
+                      ),
+                      _StatCard(
+                        icon: Icons.kitchen_rounded,
+                        iconColor: NovaColors.amber,
+                        label: 'Kitchen Queue',
+                        value: queueLoading ? '—' : '$queueCount',
+                        delta: 'Active items',
+                        deltaUp: null,
+                        isLoading: queueLoading,
+                        fullWidth: !isDesktop,
+                      ),
+                      _StatCard(
+                        icon: Icons.star_rounded,
+                        iconColor: NovaColors.rose,
+                        label: 'Satisfaction',
+                        value: '94.6%',
+                        delta: '↑ 1.8% vs last month',
+                        deltaUp: true,
+                        fullWidth: !isDesktop,
+                      ),
+                    ];
+
+                    if (isDesktop) {
+                      return Row(
+                        children: [
+                          for (int i = 0; i < cards.length; i++) ...[
+                            if (i > 0) const SizedBox(width: 12),
+                            Expanded(child: cards[i]),
+                          ],
+                        ],
+                      );
+                    }
+
+                    return Column(
+                      children: [
+                        for (int i = 0; i < cards.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 12),
+                          cards[i],
+                        ],
+                      ],
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ),
+
+        SizedBox(height: isDesktop ? 16 : 16),
+
+        // ─── Desktop: side-by-side ─────────────────────────────────────
+        if (isDesktop)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  children: [
+                    _SectionHeader(
+                      icon: Icons.bar_chart_rounded,
+                      title: 'Order Status',
+                    ),
+                    const SizedBox(height: 12),
+                    _OrderStatusCards(reportService: reportService),
+                    const SizedBox(height: 20),
+                    _SectionHeader(
+                      icon: Icons.flash_on_rounded,
+                      title: 'Quick Actions',
+                    ),
+                    const SizedBox(height: 12),
+                    _QuickActionsRow(isDesktop: true),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  children: [
+                    _SectionHeader(
+                      icon: Icons.bar_chart_rounded,
+                      title: 'Order Breakdown',
+                    ),
+                    const SizedBox(height: 12),
+                    _OrderBreakdownCard(
+                      auth: auth,
+                      isDesktop: true,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          )
+        else ...[
+          // ─── Mobile: stacked ─────────────────────────────────────────
+          _SectionHeader(
+            icon: Icons.bar_chart_rounded,
+            title: 'Order Status',
+          ),
+          const SizedBox(height: 12),
+          _OrderStatusCards(reportService: reportService),
+          const SizedBox(height: 20),
+          _SectionHeader(
+            icon: Icons.bar_chart_rounded,
+            title: 'Order Breakdown',
+          ),
+          const SizedBox(height: 12),
+          _OrderBreakdownCard(
+            auth: auth,
+            isDesktop: false,
+          ),
+          const SizedBox(height: 20),
+          _SectionHeader(
+            icon: Icons.flash_on_rounded,
+            title: 'Quick Actions',
+          ),
+          const SizedBox(height: 12),
+          _QuickActionsRow(isDesktop: false),
+        ],
+      ],
+    );
+  }
+}
+
+// ─── Stat Card ─────────────────────────────────────────────────────────────────
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+  final String delta;
+  final bool? deltaUp;
+  final bool isLoading;
+  final bool fullWidth;
+
+  const _StatCard({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+    required this.delta,
+    this.deltaUp,
+    this.isLoading = false,
+    this.fullWidth = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color deltaColor = NovaColors.textTertiary;
+    if (deltaUp == true) deltaColor = NovaColors.teal;
+    if (deltaUp == false) deltaColor = NovaColors.danger;
+
+    return Container(
+      width: fullWidth ? double.infinity : null,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: NovaColors.bgPrimary,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: NovaColors.borderTertiary, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 15, color: iconColor),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: NovaColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          isLoading
+              ? const SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: CircularProgressIndicator(
+                    color: NovaColors.violet,
+                    strokeWidth: 2,
+                  ),
+                )
+              : Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w500,
+                    color: NovaColors.textPrimary,
+                  ),
+                ),
+          const SizedBox(height: 4),
+          Text(
+            delta,
+            style: TextStyle(fontSize: 12, color: deltaColor),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Order Status Cards ────────────────────────────────────────────────────────
+class _OrderStatusCards extends StatelessWidget {
+  final ReportService reportService;
+
+  const _OrderStatusCards({required this.reportService});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Map<String, int>>(
+      stream: reportService.getOrderStatusStats(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(color: NovaColors.violet),
+            ),
+          );
+        }
+        final stats = snapshot.data!;
+        final cards = [
+          _StatusCardData(
+            key: 'pending',
+            value: stats['pending'] ?? 0,
+            label: 'Pending',
+            icon: Icons.hourglass_top_rounded,
+            color: NovaColors.danger,
+            bgColor: NovaColors.dangerLight,
+          ),
+          _StatusCardData(
+            key: 'ready',
+            value: stats['ready'] ?? 0,
+            label: 'Ready',
+            icon: Icons.check_circle_outline_rounded,
+            color: NovaColors.teal,
+            bgColor: NovaColors.tealLight,
+          ),
+          _StatusCardData(
+            key: 'completed',
+            value: stats['completed'] ?? 0,
+            label: 'Done',
+            icon: Icons.task_alt_rounded,
+            color: NovaColors.textSecondary,
+            bgColor: NovaColors.bgSecondary,
+          ),
+        ];
+        return Row(
+          children: cards
+              .map(
+                (c) => Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: c.key == 'pending' ? 0 : 6,
+                      right: c.key == 'completed' ? 0 : 6,
+                    ),
+                    child: _StatusCard(data: c),
+                  ),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+// ─── Order Breakdown Card ──────────────────────────────────────────────────────
+// ✅ FIX: Removed fixed height — card wraps to the chart's intrinsic height.
+// StatusDonutChart uses mainAxisSize.min internally so it never overflows.
+class _OrderBreakdownCard extends StatelessWidget {
+  final AuthProvider auth;
+  final bool isDesktop;
+
+  const _OrderBreakdownCard({
+    required this.auth,
+    required this.isDesktop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StatusDonutChart(
+      ownerId: auth.ownerId,
+      cardHeight: isDesktop ? 224 : null,
+      chartSize: isDesktop ? 116 : 160,
+      showSegmentBar: !isDesktop,
+    );
+  }
+}
+
+// ─── Quick Actions Row ─────────────────────────────────────────────────────────
+class _QuickActionsRow extends StatelessWidget {
+  final bool isDesktop;
+
+  const _QuickActionsRow({required this.isDesktop});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _QuickActionCard(
+            icon: Icons.storefront_rounded,
+            label: 'POS',
+            subtitle: 'Order Station',
+            color: NovaColors.violet,
+            bgColor: NovaColors.violetLight,
+            onTap: () => Navigator.pushNamed(context, '/pos'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _QuickActionCard(
+            icon: Icons.kitchen_rounded,
+            label: 'Kitchen',
+            subtitle: 'Live Orders',
+            color: NovaColors.teal,
+            bgColor: NovaColors.tealLight,
+            onTap: () => Navigator.pushNamed(context, '/kitchen'),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -379,28 +535,14 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 4,
-          height: 18,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [CafeColors.flame, CafeColors.amber],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Icon(icon, size: 18, color: CafeColors.flame),
+        Icon(icon, size: 16, color: NovaColors.violet),
         const SizedBox(width: 6),
         Text(
           title,
           style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: CafeColors.charcoal,
-            letterSpacing: 0.2,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: NovaColors.textPrimary,
           ),
         ),
       ],
@@ -436,17 +578,11 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: data.color.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        color: NovaColors.bgPrimary,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: NovaColors.borderTertiary, width: 0.5),
       ),
       child: Column(
         children: [
@@ -454,26 +590,25 @@ class _StatusCard extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: data.bgColor,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(data.icon, color: data.color, size: 20),
+            child: Icon(data.icon, color: data.color, size: 18),
           ),
           const SizedBox(height: 8),
           Text(
             '${data.value}',
             style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              fontWeight: FontWeight.w500,
               color: data.color,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             data.label,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: CafeColors.charcoal.withOpacity(0.5),
+              color: NovaColors.textTertiary,
             ),
           ),
         ],
@@ -505,49 +640,44 @@ class _QuickActionCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          color: NovaColors.bgPrimary,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: NovaColors.borderTertiary, width: 0.5),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(9),
               decoration: BoxDecoration(
                 color: bgColor,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: color, size: 22),
+              child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: CafeColors.charcoal,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: NovaColors.textPrimary,
+                    ),
                   ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: CafeColors.charcoal.withOpacity(0.5),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: NovaColors.textTertiary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),

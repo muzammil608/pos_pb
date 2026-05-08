@@ -2,17 +2,22 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/nova_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/auth_login_result.dart';
 
 class _LoginColors {
-  static const Color flame = Color(0xFFFF4D1C);
-  static const Color espresso = Color(0xFF1E0F00);
-  static const Color charcoal = Color(0xFF2C2C2C);
-  static const Color error = Color(0xFFD32F2F);
+  static const Color flame = NovaColors.violet;
+  static const Color espresso = NovaColors.textPrimary;
+  static const Color charcoal = NovaColors.textPrimary;
+  static const Color error = NovaColors.danger;
 
   static const LinearGradient bgGradient = LinearGradient(
-    colors: [Color(0xFFFF4D1C), Color(0xFFFF6B35), Color(0xFFFF8C42)],
+    colors: [
+      NovaColors.violet,
+      NovaColors.violetDeep,
+      NovaColors.tealDeep,
+    ],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -366,43 +371,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           horizontal: layout.horizontalPadding,
                           vertical: layout.verticalPadding,
                         ),
-                        child: ConstrainedBox(
-                          constraints:
-                              BoxConstraints(maxWidth: layout.cardMaxWidth),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _BrandMark(
-                                outerSize: layout.logoSize,
-                                iconSize: layout.logoIconSize,
-                              ),
-                              SizedBox(height: layout.spacingAfterLogo),
-                              Text(
-                                'ORION',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: layout.titleFontSize,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 4,
-                                  height: 0.95,
-                                  shadows: const [
-                                    Shadow(
-                                      color: Color(0x44000000),
-                                      blurRadius: 12,
-                                      offset: Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              SizedBox(height: layout.spacingAfterTitle),
-                              _buildDividerRow('PIZZA RESTAURANT'),
-                              SizedBox(height: layout.spacingBeforeCard),
-                              _buildLoginCard(layout),
-                              SizedBox(height: layout.spacingAfterCard),
-                              _buildFooter(),
-                            ],
-                          ),
-                        ),
+                        child: _buildPageLayout(layout, constraints.maxWidth),
                       ),
                     ),
                   ),
@@ -412,6 +381,130 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildPageLayout(_ResponsiveLayout layout, double screenWidth) {
+    final bool isWide = screenWidth >= _Breakpoint.lg;
+
+    if (!isWide) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: layout.cardMaxWidth),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildBrandStack(layout),
+            SizedBox(height: layout.spacingBeforeCard),
+            _buildLoginCard(layout),
+            SizedBox(height: layout.spacingAfterCard),
+            _buildFooter(),
+          ],
+        ),
+      );
+    }
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 1080),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _buildWideBrandPanel(layout),
+            ),
+          ),
+          const SizedBox(width: 56),
+          SizedBox(
+            width: layout.cardMaxWidth,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLoginCard(layout),
+                SizedBox(height: layout.spacingAfterCard),
+                _buildFooter(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWideBrandPanel(_ResponsiveLayout layout) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _BrandMark(
+          outerSize: layout.logoSize,
+          iconSize: layout.logoIconSize,
+        ),
+        const SizedBox(height: 22),
+        Text(
+          'ORION',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: layout.titleFontSize + 8,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 4,
+            height: 0.9,
+            shadows: const [
+              Shadow(
+                color: Color(0x44000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildDividerRow('PIZZA RESTAURANT', shrinkWrap: true),
+        const SizedBox(height: 26),
+        SizedBox(
+          width: 430,
+          child: Text(
+            'Fast order taking, live kitchen tickets, and clean reporting for busy restaurant teams.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.82),
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              height: 1.45,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBrandStack(_ResponsiveLayout layout) {
+    return Column(
+      children: [
+        _BrandMark(
+          outerSize: layout.logoSize,
+          iconSize: layout.logoIconSize,
+        ),
+        SizedBox(height: layout.spacingAfterLogo),
+        Text(
+          'ORION',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: layout.titleFontSize,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 4,
+            height: 0.95,
+            shadows: const [
+              Shadow(
+                color: Color(0x44000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: layout.spacingAfterTitle),
+        Center(child: _buildDividerRow('PIZZA RESTAURANT', shrinkWrap: true)),
+      ],
     );
   }
 
@@ -475,9 +568,9 @@ class _LoginScreenState extends State<LoginScreen> {
       child: ElevatedButton(
         onPressed: _isLoading ? null : _handleEmailLogin,
         style: ElevatedButton.styleFrom(
-          backgroundColor: _LoginColors.espresso,
+          backgroundColor: _LoginColors.flame,
           foregroundColor: Colors.white,
-          shadowColor: _LoginColors.espresso.withOpacity(0.45),
+          shadowColor: _LoginColors.flame.withOpacity(0.35),
           elevation: 6,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -559,8 +652,9 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildDividerRow(String text) {
+  Widget _buildDividerRow(String text, {bool shrinkWrap = false}) {
     return Row(
+      mainAxisSize: shrinkWrap ? MainAxisSize.min : MainAxisSize.max,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const SizedBox(
@@ -652,7 +746,7 @@ class _BrandMark extends StatelessWidget {
                 height: innerSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.orange.withOpacity(0.10),
+                  color: _LoginColors.flame.withOpacity(0.12),
                   border: Border.all(
                     color: Colors.white.withOpacity(0.55),
                     width: 2.5,
