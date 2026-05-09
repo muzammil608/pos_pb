@@ -13,6 +13,67 @@ import '../../widgets/app_navigation.dart';
 import '../../widgets/receipt_dialog.dart';
 import '../../widgets/responsive_layout.dart';
 
+// ─── Category → Unsplash image URL ────────────────────────────────────────────
+class _CategoryImages {
+  static const Map<String, String> _images = {
+    'dairy':
+        'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&h=300&fit=crop',
+    'fruit':
+        'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&h=300&fit=crop',
+    'vegetable':
+        'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop',
+    'bakery':
+        'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=300&fit=crop',
+    'meat':
+        'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=400&h=300&fit=crop',
+    'vegan':
+        'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop',
+    'drinks':
+        'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&h=300&fit=crop',
+    'coffee':
+        'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=300&fit=crop',
+    'dessert':
+        'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=400&h=300&fit=crop',
+    'pizza':
+        'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop',
+    'burger':
+        'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop',
+    'salad':
+        'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop',
+    'sandwich':
+        'https://images.unsplash.com/photo-1539252554453-80ab65ce3586?w=400&h=300&fit=crop',
+    'soup':
+        'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=300&fit=crop',
+    'pasta':
+        'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=300&fit=crop',
+    'rice':
+        'https://images.unsplash.com/photo-1536304993881-ff86e6a7cf78?w=400&h=300&fit=crop',
+    'seafood':
+        'https://images.unsplash.com/photo-1559737558-2f5a35f4523b?w=400&h=300&fit=crop',
+    'chicken':
+        'https://images.unsplash.com/photo-1598103442097-8b74394b95c1?w=400&h=300&fit=crop',
+    'breakfast':
+        'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400&h=300&fit=crop',
+    'snack':
+        'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=400&h=300&fit=crop',
+  };
+
+  static const String _fallback =
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=300&fit=crop';
+
+  static String forCategory(String category) {
+    final key = category.toLowerCase().trim();
+    if (_images.containsKey(key)) return _images[key]!;
+    for (final entry in _images.entries) {
+      if (key.contains(entry.key) || entry.key.contains(key)) {
+        return entry.value;
+      }
+    }
+    return _fallback;
+  }
+}
+
+// ─── POS Screen ────────────────────────────────────────────────────────────────
 class PosScreen extends StatefulWidget {
   const PosScreen({super.key});
 
@@ -55,132 +116,157 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  // Replace the entire _showQtyDialog method in pos_screen.dart with this:
+
   Future<int?> _showQtyDialog(
       BuildContext context, String productName, double price) async {
     int qty = 1;
     return showDialog<int>(
       context: context,
-      builder: (dialogContext) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        backgroundColor: NovaColors.bgPrimary,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      builder: (dialogContext) {
+        final screenWidth = MediaQuery.of(dialogContext).size.width;
+        final isDesktop = screenWidth >= 768;
+
+        return Dialog(
+          // On desktop: constrain width and center; on mobile: default full behaviour
+          insetPadding: isDesktop
+              ? EdgeInsets.symmetric(
+                  horizontal: (screenWidth - 400) / 2,
+                  vertical: 80,
+                )
+              : const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: NovaColors.bgPrimary,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? 400 : double.infinity,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: NovaColors.violetLight,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.add_shopping_cart_rounded,
-                        color: NovaColors.violet, size: 20),
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: NovaColors.violetLight,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.add_shopping_cart_rounded,
+                            color: NovaColors.violet, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          productName,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: NovaColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      // Close button — useful on desktop where Esc may not dismiss
+                      GestureDetector(
+                        onTap: () => Navigator.pop(dialogContext),
+                        child: const Icon(Icons.close_rounded,
+                            color: NovaColors.textTertiary, size: 20),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      productName,
-                      style: const TextStyle(
-                        fontSize: 15,
+                  const SizedBox(height: 6),
+                  Text(
+                    'Rs ${price.toStringAsFixed(0)} / item',
+                    style: const TextStyle(
+                        fontSize: 13, color: NovaColors.textSecondary),
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    onChanged: (value) => qty = int.tryParse(value) ?? 1,
+                    onSubmitted: (_) => Navigator.pop(dialogContext, qty),
+                    style: const TextStyle(
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: NovaColors.textPrimary,
+                        color: NovaColors.textPrimary),
+                    decoration: InputDecoration(
+                      labelText: 'Quantity',
+                      hintText: '1',
+                      labelStyle: const TextStyle(
+                          color: NovaColors.textSecondary, fontSize: 13),
+                      prefixIcon: const Icon(Icons.format_list_numbered,
+                          color: NovaColors.violet, size: 18),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide:
+                            const BorderSide(color: NovaColors.borderTertiary),
                       ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide:
+                            const BorderSide(color: NovaColors.borderTertiary),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(
+                            color: NovaColors.violet, width: 1.5),
+                      ),
+                      filled: true,
+                      fillColor: NovaColors.bgSecondary,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
                     ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: const BorderSide(
+                                color: NovaColors.borderSecondary),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text('Cancel',
+                              style: TextStyle(
+                                  color: NovaColors.textSecondary,
+                                  fontWeight: FontWeight.w500)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(dialogContext, qty),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: NovaColors.violet,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text('Add to Cart',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Rs ${price.toStringAsFixed(0)} / item',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: NovaColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                onChanged: (value) => qty = int.tryParse(value) ?? 1,
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: NovaColors.textPrimary),
-                decoration: InputDecoration(
-                  labelText: 'Quantity',
-                  hintText: '1',
-                  labelStyle: const TextStyle(
-                      color: NovaColors.textSecondary, fontSize: 13),
-                  prefixIcon: const Icon(Icons.format_list_numbered,
-                      color: NovaColors.violet, size: 18),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: NovaColors.borderTertiary),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: NovaColors.borderTertiary),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: NovaColors.violet, width: 1.5),
-                  ),
-                  filled: true,
-                  fillColor: NovaColors.bgSecondary,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        side:
-                            const BorderSide(color: NovaColors.borderSecondary),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: const Text('Cancel',
-                          style: TextStyle(
-                              color: NovaColors.textSecondary,
-                              fontWeight: FontWeight.w500)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(dialogContext, qty),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: NovaColors.violet,
-                        shadowColor: Colors.transparent,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: const Text('Add to Cart',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -488,7 +574,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
 
         return Scaffold(
           backgroundColor: NovaColors.bgTertiary,
-          resizeToAvoidBottomInset: false, // ← prevents keyboard overflow
+          resizeToAvoidBottomInset: false,
           drawer: AppNavigationShell.isDesktop(context)
               ? null
               : AppNavigationDrawer(auth: auth, currentRoute: '/pos'),
@@ -608,7 +694,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                   padding: EdgeInsets.zero,
                   child: Column(
                     children: [
-                      // ── Search bar ──────────────────────────────────────
+                      // ── Search bar ───────────────────────────────
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                         child: Container(
@@ -651,7 +737,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                       ),
                       const SizedBox(height: 10),
 
-                      // ── Category chips ────────────────────────────────
+                      // ── Category chips ───────────────────────────
                       if (allProducts.isNotEmpty)
                         SizedBox(
                           height: 32,
@@ -702,7 +788,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                         ),
                       const SizedBox(height: 10),
 
-                      // ── Product area ──────────────────────────────────
+                      // ── Product area ─────────────────────────────
                       Expanded(
                         child: () {
                           if (snapshot.connectionState ==
@@ -756,7 +842,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                             builder: (context, constraints) {
                               final isMobile = constraints.maxWidth < 600;
 
-                              // ── Mobile: vertical list ─────────────────
+                              // ── Mobile: list ──────────────────
                               if (isMobile) {
                                 return ListView.builder(
                                   padding:
@@ -782,9 +868,8 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                                 );
                               }
 
-                              // ── Desktop / tablet: grid ────────────────
+                              // ── Desktop/tablet: grid ──────────
                               return GridView.builder(
-                                scrollDirection: Axis.vertical,
                                 padding:
                                     const EdgeInsets.fromLTRB(16, 4, 16, 12),
                                 gridDelegate:
@@ -792,7 +877,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                                   crossAxisCount:
                                       _crossAxisCount(constraints.maxWidth),
                                   childAspectRatio:
-                                      constraints.maxWidth < 380 ? 1.35 : 0.95,
+                                      constraints.maxWidth < 380 ? 1.35 : 0.78,
                                   mainAxisSpacing: 10,
                                   crossAxisSpacing: 10,
                                 ),
@@ -818,7 +903,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                         }(),
                       ),
 
-                      // ── Bottom action bar ─────────────────────────────
+                      // ── Bottom action bar ────────────────────────
                       SafeArea(
                         top: false,
                         child: Container(
@@ -892,6 +977,67 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   }
 }
 
+// ─── Product Image Widget ──────────────────────────────────────────────────────
+class _ProductImage extends StatelessWidget {
+  final Product product;
+  final double? width;
+  final double? height;
+  final BorderRadius? borderRadius;
+
+  const _ProductImage({
+    required this.product,
+    this.width,
+    this.height,
+    this.borderRadius,
+  });
+
+  String get _imageUrl => product.imageUrl?.isNotEmpty == true
+      ? product.imageUrl!
+      : _CategoryImages.forCategory(product.category);
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: borderRadius ?? BorderRadius.zero,
+      child: Image.network(
+        _imageUrl,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: width,
+            height: height,
+            color: NovaColors.bgSecondary,
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: NovaColors.violet,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: width,
+            height: height,
+            color: NovaColors.violetLight,
+            child: const Center(
+              child: Icon(Icons.fastfood_rounded,
+                  color: NovaColors.violet, size: 28),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 // ─── Product List Tile (mobile) ────────────────────────────────────────────────
 class _ProductListTile extends StatefulWidget {
   final Product product;
@@ -912,9 +1058,7 @@ class _ProductListTileState extends State<_ProductListTile>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 100),
-    );
+        vsync: this, duration: const Duration(milliseconds: 100));
     _scale = Tween<double>(begin: 1.0, end: 0.97)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
@@ -923,33 +1067,6 @@ class _ProductListTileState extends State<_ProductListTile>
   void dispose() {
     _ctrl.dispose();
     super.dispose();
-  }
-
-  String _emoji(String category) {
-    final c = category.toLowerCase();
-    if (c.contains('coffee') || c.contains('hot drink')) return '☕';
-    if (c.contains('cold') || c.contains('drink') || c.contains('juice')) {
-      return '🧃';
-    }
-    if (c.contains('food') || c.contains('meal') || c.contains('snack')) {
-      return '🍽️';
-    }
-    if (c.contains('dessert') || c.contains('sweet')) return '🍰';
-    if (c.contains('sandwich') || c.contains('burger')) return '🥪';
-    if (c.contains('pizza')) return '🍕';
-    if (c.contains('salad')) return '🥗';
-    return '🍴';
-  }
-
-  Color _bgColor(String name) {
-    final colors = [
-      const Color(0xFFF3F2FE),
-      const Color(0xFFE1F5EE),
-      const Color(0xFFFAEEDA),
-      const Color(0xFFFFEEF3),
-      const Color(0xFFE8F4FD),
-    ];
-    return colors[name.codeUnitAt(0) % colors.length];
   }
 
   @override
@@ -972,23 +1089,16 @@ class _ProductListTileState extends State<_ProductListTile>
           ),
           child: Row(
             children: [
-              // Emoji thumbnail
-              Container(
-                width: 56,
-                height: 56,
-                margin: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: _bgColor(widget.product.name),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
-                  child: Text(
-                    _emoji(widget.product.category),
-                    style: const TextStyle(fontSize: 22),
-                  ),
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.horizontal(left: Radius.circular(12)),
+                child: _ProductImage(
+                  product: widget.product,
+                  width: 72,
+                  height: 72,
                 ),
               ),
-              // Name + category
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1005,17 +1115,24 @@ class _ProductListTileState extends State<_ProductListTile>
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 3),
-                    Text(
-                      widget.product.category,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: NovaColors.textTertiary,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: NovaColors.bgTertiary,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        widget.product.category,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: NovaColors.textTertiary,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              // Price + add button
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Column(
@@ -1046,11 +1163,8 @@ class _ProductListTileState extends State<_ProductListTile>
                         color: NovaColors.violetLight,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.add_rounded,
-                        color: NovaColors.violet,
-                        size: 15,
-                      ),
+                      child: const Icon(Icons.add_rounded,
+                          color: NovaColors.violet, size: 15),
                     ),
                   ],
                 ),
@@ -1063,7 +1177,7 @@ class _ProductListTileState extends State<_ProductListTile>
   }
 }
 
-// ─── Product Card (desktop/tablet) ────────────────────────────────────────────
+// ─── Product Card (desktop/tablet grid) ───────────────────────────────────────
 class _ProductCard extends StatefulWidget {
   final Product product;
   final VoidCallback onTap;
@@ -1083,45 +1197,15 @@ class _ProductCardState extends State<_ProductCard>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 100),
-    );
-    _scaleAnim = Tween<double>(begin: 1.0, end: 0.96).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+        vsync: this, duration: const Duration(milliseconds: 100));
+    _scaleAnim = Tween<double>(begin: 1.0, end: 0.96)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  String _categoryEmoji(String category) {
-    final c = category.toLowerCase();
-    if (c.contains('coffee') || c.contains('hot drink')) return '☕';
-    if (c.contains('cold') || c.contains('drink') || c.contains('juice')) {
-      return '🧃';
-    }
-    if (c.contains('food') || c.contains('meal') || c.contains('snack')) {
-      return '🍽️';
-    }
-    if (c.contains('dessert') || c.contains('sweet')) return '🍰';
-    if (c.contains('sandwich') || c.contains('burger')) return '🥪';
-    if (c.contains('pizza')) return '🍕';
-    if (c.contains('salad')) return '🥗';
-    return '🍴';
-  }
-
-  Color _cardBgColor(String name) {
-    final colors = [
-      const Color(0xFFF3F2FE),
-      const Color(0xFFE1F5EE),
-      const Color(0xFFFAEEDA),
-      const Color(0xFFFFEEF3),
-      const Color(0xFFE8F4FD),
-    ];
-    return colors[name.codeUnitAt(0) % colors.length];
   }
 
   @override
@@ -1146,18 +1230,10 @@ class _ProductCardState extends State<_ProductCard>
             children: [
               Expanded(
                 flex: 5,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _cardBgColor(widget.product.name),
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(12)),
-                  ),
-                  child: Center(
-                    child: Text(
-                      _categoryEmoji(widget.product.category),
-                      style: const TextStyle(fontSize: 26),
-                    ),
-                  ),
+                child: _ProductImage(
+                  product: widget.product,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(12)),
                 ),
               ),
               Expanded(
@@ -1205,15 +1281,12 @@ class _ProductCardState extends State<_ProductCard>
                           Container(
                             width: 22,
                             height: 22,
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               color: NovaColors.violetLight,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
-                              Icons.add_rounded,
-                              color: NovaColors.violet,
-                              size: 13,
-                            ),
+                            child: const Icon(Icons.add_rounded,
+                                color: NovaColors.violet, size: 13),
                           ),
                         ],
                       ),
@@ -1384,10 +1457,8 @@ class _ReadyOrderCard extends StatelessWidget {
                         color: NovaColors.borderTertiary, width: 0.5),
                   ),
                   child: Center(
-                    child: Text(
-                      _orderTypeEmoji(orderType),
-                      style: const TextStyle(fontSize: 20),
-                    ),
+                    child: Text(_orderTypeEmoji(orderType),
+                        style: const TextStyle(fontSize: 20)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1410,13 +1481,10 @@ class _ReadyOrderCard extends StatelessWidget {
                             const Icon(Icons.person_outline_rounded,
                                 size: 11, color: NovaColors.textTertiary),
                             const SizedBox(width: 3),
-                            Text(
-                              customerName!,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: NovaColors.textSecondary,
-                              ),
-                            ),
+                            Text(customerName!,
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    color: NovaColors.textSecondary)),
                           ],
                         ),
                       ],
@@ -1454,7 +1522,6 @@ class _ReadyOrderCard extends StatelessWidget {
                     1;
                 final qty = int.tryParse(rawQty.toString()) ?? 1;
                 final price = (item['price'] as num?)?.toDouble();
-
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Row(
@@ -1469,21 +1536,15 @@ class _ReadyOrderCard extends StatelessWidget {
                         ),
                       ),
                       Expanded(
-                        child: Text(
-                          name,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: NovaColors.textPrimary,
-                          ),
-                        ),
+                        child: Text(name,
+                            style: const TextStyle(
+                                fontSize: 13, color: NovaColors.textPrimary)),
                       ),
                       if (price != null)
                         Text(
                           'Rs ${(price * qty).toStringAsFixed(0)}',
                           style: const TextStyle(
-                            fontSize: 12,
-                            color: NovaColors.textSecondary,
-                          ),
+                              fontSize: 12, color: NovaColors.textSecondary),
                         ),
                       const SizedBox(width: 8),
                       Container(
@@ -1493,14 +1554,11 @@ class _ReadyOrderCard extends StatelessWidget {
                           color: NovaColors.violetLight,
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(
-                          '×$qty',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: NovaColors.violet,
-                          ),
-                        ),
+                        child: Text('×$qty',
+                            style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: NovaColors.violet)),
                       ),
                     ],
                   ),
@@ -1538,14 +1596,11 @@ class _ReadyOrderCard extends StatelessWidget {
                   onPressed: onComplete,
                   icon: const Icon(Icons.print_rounded,
                       color: Colors.white, size: 15),
-                  label: const Text(
-                    'Print & Complete',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
+                  label: const Text('Print & Complete',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: NovaColors.teal,
                     shadowColor: Colors.transparent,

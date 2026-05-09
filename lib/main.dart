@@ -30,7 +30,7 @@ class MyApp extends StatelessWidget {
               'MAIN: roleLoaded=${auth.isRoleLoaded}, user=${auth.user?.id}');
 
           return KeyedSubtree(
-            key: ValueKey(auth.currentUid ?? 'guest'),
+            key: ValueKey(auth.currentUid),
             child: MultiProvider(
               providers: [
                 ChangeNotifierProvider(

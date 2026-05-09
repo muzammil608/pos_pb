@@ -47,8 +47,6 @@ class _ResponsiveLayout {
     horizontalPadding = screenWidth < _Breakpoint.xs ? 12.0 : 24.0;
     verticalPadding = screenHeight < 600 ? 20.0 : 40.0;
 
-    // Clamp cardMaxWidth to the screen width minus padding on both sides so
-    // the card never overflows on narrow mobile screens.
     cardMaxWidth = cardMaxWidth.clamp(0, screenWidth - horizontalPadding * 2);
 
     if (screenWidth < _Breakpoint.xs || screenHeight < 600) {
@@ -80,10 +78,6 @@ class _ResponsiveLayout {
         ? const EdgeInsets.fromLTRB(14, 22, 14, 20)
         : const EdgeInsets.fromLTRB(24, 28, 24, 24);
 
-    // FIX: Always allow scroll. On mobile web the keyboard shrinks the
-    // viewport and without scrolling the content gets clipped. The old
-    // `!kIsWeb` condition disabled scrolling on all web targets, which
-    // prevented the page from adjusting when the soft keyboard appeared.
     allowScroll = true;
   }
 
@@ -216,12 +210,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final bool isEmptyError = _emailError == 'Please fill out required field!';
     return TextField(
       controller: _emailController,
-      // FIX: Explicitly set keyboard type and enable interactive selection
-      // so the virtual keyboard opens reliably on mobile web browsers.
       keyboardType: TextInputType.emailAddress,
       textInputAction: TextInputAction.next,
       autocorrect: false,
       enableSuggestions: false,
+      cursorColor: _LoginColors.flame,
       style: const TextStyle(
         fontSize: 15,
         color: _LoginColors.charcoal,
@@ -245,11 +238,10 @@ class _LoginScreenState extends State<LoginScreen> {
     return TextField(
       controller: _passwordController,
       obscureText: _obscurePassword,
-      // FIX: Explicit keyboard type keeps the default keyboard on mobile web
-      // and ensures the field is focusable / tappable on all browsers.
       keyboardType: TextInputType.visiblePassword,
       textInputAction: TextInputAction.done,
       onSubmitted: (_) => _isLoading ? null : _handleEmailLogin(),
+      cursorColor: _LoginColors.flame,
       style: const TextStyle(
         fontSize: 15,
         color: _LoginColors.charcoal,
@@ -335,9 +327,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // FIX: Set to true so Flutter resizes the body when the keyboard
-      // appears. Combined with SingleChildScrollView this lets the user
-      // scroll to see the focused field without any content being hidden.
       resizeToAvoidBottomInset: true,
       backgroundColor: _LoginColors.espresso,
       body: LayoutBuilder(
@@ -347,17 +336,10 @@ class _LoginScreenState extends State<LoginScreen> {
             constraints.maxHeight,
           );
 
-          // FIX: Always wrap in SingleChildScrollView so the content can
-          // scroll up when the soft keyboard appears on mobile web.
-          // Use keyboardDismissBehavior so tapping outside a field hides
-          // the keyboard naturally on touch devices.
           return SingleChildScrollView(
             physics: const ClampingScrollPhysics(),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: ConstrainedBox(
-              // FIX: minHeight ensures the content fills the screen when the
-              // keyboard is hidden, while allowing it to grow taller when the
-              // keyboard is shown (unlike the old fixed-height Container).
               constraints: BoxConstraints(minHeight: constraints.maxHeight),
               child: IntrinsicHeight(
                 child: Container(
@@ -403,34 +385,69 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     }
 
+    // ── Desktop: brand panel | vertical divider | login card ──────────────
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 1080),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _buildWideBrandPanel(layout),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Brand panel
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _buildWideBrandPanel(layout),
+              ),
             ),
-          ),
-          const SizedBox(width: 56),
-          SizedBox(
-            width: layout.cardMaxWidth,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildLoginCard(layout),
-                SizedBox(height: layout.spacingAfterCard),
-                _buildFooter(),
-              ],
+
+            // ── Vertical divider — centered between both sides ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: SizedBox(
+                width: 1,
+                height: double.infinity,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.0),
+                        Colors.white.withOpacity(0.35),
+                        Colors.white.withOpacity(0.35),
+                        Colors.white.withOpacity(0.0),
+                      ],
+                      stops: const [0.0, 0.2, 0.8, 1.0],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ],
+
+            // Login card
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: layout.cardMaxWidth,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildLoginCard(layout),
+                      SizedBox(height: layout.spacingAfterCard),
+                      _buildFooter(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
+  // ── Desktop brand panel ─────────────────────────────────────────────────
   Widget _buildWideBrandPanel(_ResponsiveLayout layout) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -440,43 +457,47 @@ class _LoginScreenState extends State<LoginScreen> {
           outerSize: layout.logoSize,
           iconSize: layout.logoIconSize,
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 24),
+
+        // Main title
         Text(
           'ORION',
           style: TextStyle(
             color: Colors.white,
             fontSize: layout.titleFontSize + 8,
             fontWeight: FontWeight.w900,
-            letterSpacing: 4,
+            letterSpacing: 5,
             height: 0.9,
             shadows: const [
               Shadow(
-                color: Color(0x44000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
+                color: Color(0x55000000),
+                blurRadius: 20,
+                offset: Offset(0, 6),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
+
+        // Subtitle pill
         _buildDividerRow('PIZZA RESTAURANT', shrinkWrap: true),
-        const SizedBox(height: 26),
-        SizedBox(
-          width: 430,
-          child: Text(
-            'Fast order taking, live kitchen tickets, and clean reporting for busy restaurant teams.',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.82),
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-              height: 1.45,
-            ),
+        const SizedBox(height: 28),
+
+        // Tagline
+        Text(
+          'Built for busy restaurant teams\n— so you can focus on the food,\nnot the paperwork.',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.82),
+            fontSize: 16,
+            fontWeight: FontWeight.w400,
+            height: 1.65,
           ),
         ),
       ],
     );
   }
 
+  // ── Mobile brand stack ──────────────────────────────────────────────────
   Widget _buildBrandStack(_ResponsiveLayout layout) {
     return Column(
       children: [
@@ -544,6 +565,15 @@ class _LoginScreenState extends State<LoginScreen> {
               fontSize: 26,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Welcome back — enter your credentials to continue.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
             ),
           ),
           const SizedBox(height: 20),
@@ -712,6 +742,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
+// ─── Brand Mark ────────────────────────────────────────────────────────────────
 class _BrandMark extends StatelessWidget {
   const _BrandMark({this.outerSize = 118, this.iconSize = 74});
 
@@ -762,7 +793,7 @@ class _BrandMark extends StatelessWidget {
               ),
             ),
           ),
-          // Top gloss on circle
+          // Top gloss
           Positioned(
             top: innerSize * 0.08,
             left: innerSize * 0.22,
@@ -787,6 +818,7 @@ class _BrandMark extends StatelessWidget {
   }
 }
 
+// ─── Background Pattern Painter ────────────────────────────────────────────────
 class _FoodPatternPainter extends CustomPainter {
   const _FoodPatternPainter();
 

@@ -1,186 +1,150 @@
-import 'dart:async';
-
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:pocketbase/pocketbase.dart';
 
 import '../models/auth_login_result.dart';
 import '../models/user_model.dart';
 import '../services/pocketbase/auth_service.dart';
 
-class AuthProvider with ChangeNotifier {
+class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
 
-  UserModel? user;
-  Map<String, dynamic>? userData;
-  bool isLoading = false;
-  bool _roleLoaded = false;
-  Future<String?>? _googleSignInOperation;
+  bool _isRoleLoaded = false;
+  bool _isLoading = false;
 
-  bool get isRoleLoaded => _roleLoaded;
-  String get role => userData?['role']?.toString() ?? 'cashier';
-  String? get currentUid => user?.id;
-  String get ownerId => user?.effectiveAdminId ?? currentUid ?? '';
-  bool get isAdmin => role == 'admin';
-  bool get isCashier => role == 'cashier';
-  bool get isKitchen => role == 'kitchen';
+  UserModel? _user;
+  UserModel? _userData;
+
+  String _role = '';
+  String _currentUid = 'guest';
+  String _ownerId = '';
+
+  // Used by ProductSeeder (expects synchronous PocketBase access).
+  PocketBase? _pb;
 
   AuthProvider() {
     _init();
   }
 
+  bool get isRoleLoaded => _isRoleLoaded;
+  bool get isLoading => _isLoading;
+
+  UserModel? get user => _user;
+  UserModel? get userData => _userData;
+
+  String get role => _role;
+  String get currentUid => _currentUid;
+  String get ownerId => _ownerId;
+
+  bool get isAdmin => role == 'admin';
+  bool get isCashier => role == 'cashier';
+  bool get isKitchen => role == 'kitchen';
+
+  /// PocketBase instance for services that need direct access.
+  /// Must only be accessed after initialization completes.
+  PocketBase get pb {
+    final value = _pb;
+    if (value == null) {
+      throw StateError('PocketBase client not initialized yet.');
+    }
+    return value;
+  }
+
   Future<void> _init() async {
-    debugPrint('AUTH-PROVIDER-INIT: Starting PocketBase auth...');
-    _roleLoaded = false;
+    _isLoading = true;
     notifyListeners();
 
     try {
-      user = await _authService.refreshAuth();
-      debugPrint('AUTH-PROVIDER-INIT: refreshAuth user=${user?.id ?? 'null'}');
+      // Initialize PocketBase client (so `pb` is usable synchronously later).
+      _pb = await _authService.initPb();
 
-      await _loadUserRole(user);
-      debugPrint('AUTH-PROVIDER-INIT: Complete user=${user?.id ?? 'null'}');
-    } catch (e, st) {
-      debugPrint('🔴 AUTH-PROVIDER-INIT FAILED: $e');
-      debugPrint('$st');
+      final current = await _authService.currentUser;
+      _user = current;
 
-      // Fail-safe: unblock UI even if auth init fails.
-      user = null;
-      userData = null;
-      _roleLoaded = true;
+      // Role-derived fields
+      _role = current?.role ?? '';
+      _currentUid = current?.uid ?? 'guest';
+      _ownerId = current?.effectiveAdminId ?? '';
+
+      // Optional: keep a copy of userData if some screens expect it.
+      _userData = current;
+
+      _isRoleLoaded = true;
+    } catch (e) {
+      debugPrint('[AuthProvider] init error: $e');
+      _isRoleLoaded = true; // allow app to show LoginScreen
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
-  }
-
-  Future<void> _loadUserRole(UserModel? pbUser) async {
-    debugPrint('LOAD-ROLE-START: uid=${pbUser?.id}');
-
-    if (pbUser == null) {
-      userData = null;
-      _roleLoaded = true;
-      notifyListeners();
-      return;
-    }
-
-    if (!pbUser.isActive) {
-      await logout();
-      return;
-    }
-
-    userData = pbUser.toMap()
-      ..addAll({
-        'id': pbUser.id,
-        'adminId': pbUser.effectiveAdminId,
-      });
-    _roleLoaded = true;
-    notifyListeners();
   }
 
   Future<AuthLoginResult?> login(String email, String password) async {
-    isLoading = true;
+    _isLoading = true;
     notifyListeners();
 
-    final trimmedEmail = email.trim();
-    final trimmedPassword = password.trim();
-
-    if (trimmedEmail.isEmpty || trimmedPassword.isEmpty) {
-      isLoading = false;
-      notifyListeners();
-      return AuthLoginResult(
-        emailError:
-            trimmedEmail.isEmpty ? 'Please fill out required field!' : null,
-        passwordError:
-            trimmedPassword.isEmpty ? 'Please fill out required field!' : null,
-      );
-    }
-
     try {
-      final loggedInUser =
-          await _authService.login(trimmedEmail, trimmedPassword);
-      user = loggedInUser;
-      await _loadUserRole(loggedInUser);
-
-      if (!(userData?['isActive'] ?? true)) {
-        await logout();
-        return AuthLoginResult(
-          emailError: 'This account has been deactivated.',
-          passwordError: 'This account has been deactivated.',
-        );
-      }
-
-      return null;
+      await _initMaybe(); // ensures pb is ready
+      final user = await _authService.login(email, password);
+      _setUser(user);
+      return null; // success => no errors
     } catch (e) {
-      debugPrint('🔴 LOGIN ERROR: $e');
-      debugPrint('🔴 LOGIN ERROR TYPE: ${e.runtimeType}');
-
-      final message = e.toString().replaceFirst('Exception: ', '');
-      debugPrint('🔴 LOGIN MESSAGE: $message');
-
-      final isCredentialError =
-          message.toLowerCase().contains('invalid email or password') ||
-              message.toLowerCase().contains('invalid credentials');
-
+      // Map provider/POCKETBASE errors to AuthLoginResult if needed.
+      // Current UI only checks for null vs non-null.
       return AuthLoginResult(
-        emailError: isCredentialError ? 'Wrong credentials!' : message,
-        passwordError: isCredentialError ? 'Wrong credentials!' : message,
+        emailError: 'Login failed.',
+        passwordError: e.toString(),
       );
     } finally {
-      isLoading = false;
+      _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<String?> signInWithGoogle() {
-    _googleSignInOperation ??= _runGoogleSignIn().whenComplete(() {
-      _googleSignInOperation = null;
-    });
-
-    return _googleSignInOperation!;
-  }
-
-  Future<String?> _runGoogleSignIn() async {
-    isLoading = true;
+  Future<String?> signInWithGoogle() async {
+    _isLoading = true;
     notifyListeners();
 
     try {
-      final loggedInUser =
-          await _authService.loginWithGoogle(provider: 'google');
-
-      user = loggedInUser;
-      await _loadUserRole(loggedInUser);
-
-      final refreshed = await _authService.currentUser;
-      if (refreshed != null && refreshed.id != loggedInUser.id) {
-        user = refreshed;
-        await _loadUserRole(refreshed);
-      }
-
-      if (!(userData?['isActive'] ?? true)) {
-        await logout();
-        return 'This account has been deactivated.';
-      }
-
-      return null;
+      await _initMaybe();
+      final user = await _authService.loginWithGoogle();
+      _setUser(user);
+      return null; // success
     } catch (e) {
-      debugPrint('📣 GOOGLE LOGIN ERROR: $e');
-      final message = e.toString().replaceFirst('Exception: ', '');
-      return message;
+      return e.toString();
     } finally {
-      isLoading = false;
+      _isLoading = false;
       notifyListeners();
     }
   }
 
   Future<void> logout() async {
-    isLoading = true;
+    await _authService.logout();
+    _user = null;
+    _userData = null;
+    _role = '';
+    _currentUid = 'guest';
+    _ownerId = '';
     notifyListeners();
-    try {
-      await _authService.logout();
-      user = null;
-      userData = null;
-      _roleLoaded = true;
-    } finally {
-      isLoading = false;
-      notifyListeners();
+  }
+
+  // Used by some admin screens.
+  bool _started = false;
+  Future<void> _initMaybe() async {
+    if (_started) return;
+    _started = true;
+    // Wait for init to complete.
+    while (!_isRoleLoaded) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
     }
+  }
+
+  void _setUser(UserModel user) {
+    _user = user;
+    _userData = user;
+
+    _role = user.role;
+    _currentUid = user.uid;
+    _ownerId = user.effectiveAdminId;
   }
 
   Future<Map<String, dynamic>> createEmployee({
@@ -189,59 +153,44 @@ class AuthProvider with ChangeNotifier {
     required String name,
     required String role,
   }) async {
-    if (!isAdmin || currentUid == null) {
-      return {'success': false, 'error': 'Admin only'};
-    }
-
     try {
+      if (_ownerId.isEmpty) {
+        return {'success': false, 'error': 'Missing owner/admin id.'};
+      }
+
       await _authService.createStaff(
-        email: email.trim(),
+        email: email,
         password: password,
-        adminId: currentUid!,
+        adminId: _ownerId,
         role: role,
-        name: name.trim(),
+        name: name,
       );
 
-      return {
-        'success': true,
-        'email': email.trim(),
-        'password': password,
-      };
+      return {'success': true};
     } catch (e) {
-      debugPrint('Error creating employee: $e');
-      return {
-        'success': false,
-        'error': e.toString().replaceFirst('Exception: ', ''),
-      };
-    }
-  }
-
-  Future<bool> updateUserRole(String userId, String newRole) async {
-    if (!isAdmin) return false;
-
-    try {
-      await _authService.updateUser(userId, {'role': newRole});
-      return true;
-    } catch (e) {
-      debugPrint('Error updating role: $e');
-      return false;
+      return {'success': false, 'error': e.toString()};
     }
   }
 
   Future<bool> deleteEmployee(String userId) async {
-    if (!isAdmin) return false;
-
     try {
       await _authService.deleteUser(userId);
       return true;
-    } catch (e) {
-      debugPrint('Error deleting employee: $e');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> updateUserRole(String userId, String role) async {
+    try {
+      await _authService.updateUser(userId, {'role': role});
+      return true;
+    } catch (_) {
       return false;
     }
   }
 
   Stream<List<Map<String, dynamic>>> getEmployees() {
-    if (!isAdmin || currentUid == null) return Stream.value([]);
-    return _authService.getStaffStream(currentUid!);
+    return _authService.getStaffStream(_ownerId);
   }
 }

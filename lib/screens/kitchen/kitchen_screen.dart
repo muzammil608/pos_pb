@@ -1,8 +1,7 @@
-// ignore_for_file: deprecated_member_use
+// ignore_for_file: curly_braces_in_flow_control_structures, deprecated_member_use
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-// import '../../core/theme/app_theme.dart';
 import '../../core/theme/cafe_colors.dart';
 import '../../core/theme/nova_theme.dart';
 import '../../providers/auth_provider.dart';
@@ -11,6 +10,106 @@ import '../../services/pocketbase/report_service.dart';
 import '../../widgets/app_navigation.dart';
 import '../../widgets/responsive_layout.dart';
 
+// ─── Category → Unsplash image URL ────────────────────────────────────────────
+class _CategoryImages {
+  static const Map<String, String> _images = {
+    'dairy':
+        'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&h=200&fit=crop',
+    'fruit':
+        'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=200&h=200&fit=crop',
+    'vegetable':
+        'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=200&h=200&fit=crop',
+    'bakery':
+        'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&h=200&fit=crop',
+    'meat':
+        'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=200&h=200&fit=crop',
+    'vegan':
+        'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&h=200&fit=crop',
+    'drinks':
+        'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=200&h=200&fit=crop',
+    'coffee':
+        'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&h=200&fit=crop',
+    'dessert':
+        'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=200&h=200&fit=crop',
+    'pizza':
+        'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop',
+    'burger':
+        'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&h=200&fit=crop',
+    'salad':
+        'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&h=200&fit=crop',
+    'sandwich':
+        'https://images.unsplash.com/photo-1539252554453-80ab65ce3586?w=200&h=200&fit=crop',
+    'soup':
+        'https://images.unsplash.com/photo-1547592180-85f173990554?w=200&h=200&fit=crop',
+    'pasta':
+        'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=200&h=200&fit=crop',
+    'rice':
+        'https://images.unsplash.com/photo-1536304993881-ff86e6a7cf78?w=200&h=200&fit=crop',
+    'seafood':
+        'https://images.unsplash.com/photo-1559737558-2f5a35f4523b?w=200&h=200&fit=crop',
+    'chicken':
+        'https://images.unsplash.com/photo-1598103442097-8b74394b95c1?w=200&h=200&fit=crop',
+    'breakfast':
+        'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=200&h=200&fit=crop',
+    'snack':
+        'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=200&h=200&fit=crop',
+  };
+
+  static const String _fallback =
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=200&h=200&fit=crop';
+
+  static String forItem(Map<String, dynamic> item) {
+    final imageUrl = item['imageUrl']?.toString() ?? '';
+    if (imageUrl.isNotEmpty) return imageUrl;
+    final category = item['category']?.toString() ?? '';
+    if (category.isNotEmpty) {
+      final key = category.toLowerCase().trim();
+      if (_images.containsKey(key)) return _images[key]!;
+      for (final e in _images.entries) {
+        if (key.contains(e.key) || e.key.contains(key)) return e.value;
+      }
+    }
+    final name = item['name']?.toString().toLowerCase() ?? '';
+    for (final e in _images.entries) {
+      if (name.contains(e.key)) return e.value;
+    }
+    return _fallback;
+  }
+}
+
+// ─── Tiny item thumbnail ───────────────────────────────────────────────────────
+class _ItemThumb extends StatelessWidget {
+  final Map<String, dynamic> item;
+  const _ItemThumb({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: Image.network(
+        _CategoryImages.forItem(item),
+        width: 32,
+        height: 32,
+        fit: BoxFit.cover,
+        loadingBuilder: (_, child, p) => p == null
+            ? child
+            : Container(width: 32, height: 32, color: const Color(0xFFF3F4F6)),
+        errorBuilder: (_, __, ___) => Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: CafeColors.creme,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Icon(Icons.fastfood_rounded,
+              color: CafeColors.flame, size: 14),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Kitchen Screen ────────────────────────────────────────────────────────────
 class KitchenScreen extends StatefulWidget {
   const KitchenScreen({super.key});
 
@@ -93,10 +192,9 @@ class _KitchenScreenState extends State<KitchenScreen>
                 gradient: CafeColors.headerGradient,
                 boxShadow: [
                   BoxShadow(
-                    color: Color(0x33FF4D1C),
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
-                  ),
+                      color: Color(0x33FF4D1C),
+                      blurRadius: 12,
+                      offset: Offset(0, 4)),
                 ],
               ),
               child: SafeArea(
@@ -113,24 +211,18 @@ class _KitchenScreenState extends State<KitchenScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Kitchen Dashboard',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 17,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                          Text(
-                            userRole.toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
+                          const Text('Kitchen Dashboard',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 17,
+                                  letterSpacing: 0.3)),
+                          Text(userRole.toUpperCase(),
+                              style: const TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1.0)),
                         ],
                       ),
                     ],
@@ -139,9 +231,7 @@ class _KitchenScreenState extends State<KitchenScreen>
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: AppDrawerAvatarButton(
-                        photoUrl: photoUrl,
-                        userName: userName,
-                      ),
+                          photoUrl: photoUrl, userName: userName),
                     ),
                   ],
                 ),
@@ -154,8 +244,9 @@ class _KitchenScreenState extends State<KitchenScreen>
             child: ResponsiveCenter(
               child: Column(
                 children: [
+                  // ── Metric cards ───────────────────────────────────
                   Padding(
-                    padding: const EdgeInsets.only(top: 16),
+                    padding: const EdgeInsets.only(top: 14),
                     child: StreamBuilder<Map<String, int>>(
                       stream: _reportService.getOrderStatusStats(),
                       builder: (context, snapshot) {
@@ -198,53 +289,46 @@ class _KitchenScreenState extends State<KitchenScreen>
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Padding(
-                    padding: EdgeInsets.zero,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 4,
-                          height: 18,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [CafeColors.flame, CafeColors.amber],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                            borderRadius: BorderRadius.circular(2),
+
+                  // ── Section header ─────────────────────────────────
+                  Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [CafeColors.flame, CafeColors.amber],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
                           ),
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Active Orders',
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('Active Orders',
                           style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: CafeColors.charcoal,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: CafeColors.charcoal)),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
                             color: CafeColors.creme,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Text(
-                            'Live',
+                            borderRadius: BorderRadius.circular(20)),
+                        child: const Text('Live',
                             style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: CafeColors.flame,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: CafeColors.flame)),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
+
+                  // ── Orders ─────────────────────────────────────────
                   Expanded(
                     child: StreamBuilder<OrderRecordSnapshot>(
                       stream: _ordersStream,
@@ -253,9 +337,8 @@ class _KitchenScreenState extends State<KitchenScreen>
                                 ConnectionState.waiting &&
                             !snapshot.hasData) {
                           return const Center(
-                            child: CircularProgressIndicator(
-                                color: CafeColors.flame),
-                          );
+                              child: CircularProgressIndicator(
+                                  color: CafeColors.flame));
                         }
                         if (snapshot.hasError) {
                           return Center(
@@ -273,71 +356,61 @@ class _KitchenScreenState extends State<KitchenScreen>
                             : <OrderRecordDocument>[];
 
                         _visibleOrderIds.clear();
-                        for (final doc in docs) {
-                          _visibleOrderIds.add(doc.id);
-                        }
+                        for (final doc in docs) _visibleOrderIds.add(doc.id);
 
-                        if (docs.isEmpty) {
-                          return _emptyView();
-                        }
+                        if (docs.isEmpty) return _emptyView();
 
-                        return LayoutBuilder(
-                          builder: (context, constraints) {
-                            final columns = ResponsiveLayout.cardColumns(
-                                constraints.maxWidth);
+                        return LayoutBuilder(builder: (context, constraints) {
+                          final columns = constraints.maxWidth > 900
+                              ? 3
+                              : constraints.maxWidth > 580
+                                  ? 2
+                                  : 1;
 
-                            Widget buildCard(int index) {
-                              final doc = docs[index];
-                              final data = doc.data();
-                              final items = List<Map<String, dynamic>>.from(
-                                  data['items'] ?? []);
-                              final status =
-                                  data['status']?.toString() ?? 'pending';
-                              final orderNumber =
-                                  (data['orderNumber'] as num?)?.toInt() ?? 0;
-                              final tableNumber =
-                                  data['tableNumber']?.toString();
-                              final createdAt = data['createdAt'] as DateTime?;
-                              final orderType =
-                                  data['orderType']?.toString() ?? 'takeaway';
+                          Widget buildCard(int index) {
+                            final doc = docs[index];
+                            final data = doc.data();
+                            final items = List<Map<String, dynamic>>.from(
+                                data['items'] ?? []);
+                            final status =
+                                data['status']?.toString() ?? 'pending';
+                            final orderNumber =
+                                (data['orderNumber'] as num?)?.toInt() ?? 0;
+                            final tableNumber = data['tableNumber']?.toString();
+                            final createdAt = data['createdAt'] as DateTime?;
+                            final orderType =
+                                data['orderType']?.toString() ?? 'takeaway';
 
-                              return _KitchenOrderCard(
-                                docId: doc.id,
-                                orderNumber: orderNumber,
-                                status: status,
-                                orderType: orderType,
-                                tableNumber: tableNumber,
-                                items: items,
-                                createdAt: createdAt,
-                                onMarkReady: () =>
-                                    _service.updateStatus(doc.id, 'ready'),
-                              );
-                            }
-
-                            if (columns == 1) {
-                              return ListView.builder(
-                                padding:
-                                    const EdgeInsets.fromLTRB(0, 4, 0, 120),
-                                itemCount: docs.length,
-                                itemBuilder: (context, index) =>
-                                    buildCard(index),
-                              );
-                            }
-
-                            return GridView.builder(
-                              padding: const EdgeInsets.fromLTRB(0, 4, 0, 120),
-                              gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: columns,
-                                mainAxisSpacing: 12,
-                                crossAxisSpacing: 12,
-                                childAspectRatio: 1.55,
-                              ),
-                              itemCount: docs.length,
-                              itemBuilder: (context, index) => buildCard(index),
+                            return _KitchenOrderCard(
+                              docId: doc.id,
+                              orderNumber: orderNumber,
+                              status: status,
+                              orderType: orderType,
+                              tableNumber: tableNumber,
+                              items: items,
+                              createdAt: createdAt,
+                              onMarkReady: () =>
+                                  _service.updateStatus(doc.id, 'ready'),
                             );
-                          },
-                        );
+                          }
+
+                          // Mobile & single column: plain list
+                          if (columns == 1) {
+                            return ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(0, 2, 0, 100),
+                              itemCount: docs.length,
+                              itemBuilder: (_, i) => buildCard(i),
+                            );
+                          }
+
+                          // Desktop/tablet: masonry-friendly — use ListView of Rows
+                          // so each card shrinks to its content with no fixed aspect ratio
+                          return _MasonryGrid(
+                            columns: columns,
+                            count: docs.length,
+                            builder: buildCard,
+                          );
+                        });
                       },
                     ),
                   ),
@@ -345,71 +418,71 @@ class _KitchenScreenState extends State<KitchenScreen>
               ),
             ),
           ),
-          floatingActionButton: Container(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFFF4D1C), Color(0xFFFF8C42)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: CafeColors.flame.withOpacity(0.4),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () {
-                  setState(() {
-                    for (final id in _visibleOrderIds) {
-                      _hiddenOrderIds.add(id);
-                    }
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Row(
-                        children: [
-                          Icon(Icons.delete_sweep_rounded,
-                              color: Colors.white, size: 18),
-                          SizedBox(width: 8),
-                          Text('Kitchen history cleared'),
-                        ],
-                      ),
-                      backgroundColor: CafeColors.charcoal,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+          // Clear History FAB — admin only
+          floatingActionButton: auth.isAdmin
+              ? Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFF4D1C), Color(0xFFFF8C42)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  );
-                },
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.delete_sweep_rounded,
-                          color: Colors.white, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Clear History',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                          color: CafeColors.flame.withOpacity(0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4)),
                     ],
                   ),
-                ),
-              ),
-            ),
-          ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        setState(() {
+                          for (final id in _visibleOrderIds) {
+                            _hiddenOrderIds.add(id);
+                          }
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Row(
+                              children: [
+                                Icon(Icons.delete_sweep_rounded,
+                                    color: Colors.white, size: 18),
+                                SizedBox(width: 8),
+                                Text('Kitchen history cleared'),
+                              ],
+                            ),
+                            backgroundColor: CafeColors.charcoal,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      },
+                      child: const Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.delete_sweep_rounded,
+                                color: Colors.white, size: 20),
+                            SizedBox(width: 8),
+                            Text('Clear History',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : null,
         );
       },
     );
@@ -423,35 +496,70 @@ class _KitchenScreenState extends State<KitchenScreen>
           Container(
             padding: const EdgeInsets.all(24),
             decoration: const BoxDecoration(
-              color: CafeColors.creme,
-              shape: BoxShape.circle,
-            ),
+                color: CafeColors.creme, shape: BoxShape.circle),
             child: const Icon(Icons.restaurant_menu_rounded,
                 size: 48, color: CafeColors.flame),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'All caught up!',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: CafeColors.charcoal,
-            ),
-          ),
+          const Text('All caught up!',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: CafeColors.charcoal)),
           const SizedBox(height: 4),
-          Text(
-            'No active orders right now',
-            style: TextStyle(
-              fontSize: 13,
-              color: CafeColors.charcoal.withOpacity(0.5),
-            ),
-          ),
+          Text('No active orders right now',
+              style: TextStyle(
+                  fontSize: 13, color: CafeColors.charcoal.withOpacity(0.5))),
         ],
       ),
     );
   }
 }
 
+// ─── Masonry-style grid: cards shrink to their own content height ─────────────
+class _MasonryGrid extends StatelessWidget {
+  final int columns;
+  final int count;
+  final Widget Function(int index) builder;
+
+  const _MasonryGrid({
+    required this.columns,
+    required this.count,
+    required this.builder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Distribute indices into columns top-to-bottom, left-to-right
+    final cols = List.generate(columns, (_) => <int>[]);
+    for (var i = 0; i < count; i++) {
+      cols[i % columns].add(i);
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(0, 2, 0, 100),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: cols.map((indices) {
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: cols.indexOf(indices) == 0 ? 0 : 4,
+                right: cols.indexOf(indices) == columns - 1 ? 0 : 4,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: indices.map((i) => builder(i)).toList(),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// ─── Metric Card ──────────────────────────────────────────────────────────────
 class _MetricCard extends StatelessWidget {
   final String title;
   final String value;
@@ -470,52 +578,42 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
+              color: color.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 3)),
         ],
       ),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 20),
+                color: bgColor, borderRadius: BorderRadius.circular(9)),
+            child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: CafeColors.charcoal.withOpacity(0.5),
-            ),
-          ),
+          const SizedBox(height: 6),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+          const SizedBox(height: 1),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: CafeColors.charcoal.withOpacity(0.5))),
         ],
       ),
     );
   }
 }
 
+// ─── Kitchen Order Card ───────────────────────────────────────────────────────
 class _KitchenOrderCard extends StatelessWidget {
   final String docId;
   final int orderNumber;
@@ -539,11 +637,9 @@ class _KitchenOrderCard extends StatelessWidget {
 
   bool get isPending => status == 'pending';
 
-  String _formatTime(DateTime? dateTime) {
-    if (dateTime == null) return '--:--';
-    return '${dateTime.hour.toString().padLeft(2, '0')}:'
-        '${dateTime.minute.toString().padLeft(2, '0')}:'
-        '${dateTime.second.toString().padLeft(2, '0')}';
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return '--:--';
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -551,224 +647,197 @@ class _KitchenOrderCard extends StatelessWidget {
     final statusColor = isPending ? CafeColors.flame : CafeColors.olive;
     final statusBg =
         isPending ? const Color(0xFFFFEDE8) : CafeColors.oliveLight;
-    final statusLabel = isPending ? 'PENDING' : 'READY';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      // margin only bottom — card height = content height, nothing extra
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: isPending
-            ? Border.all(color: CafeColors.flame.withOpacity(0.15), width: 1)
-            : Border.all(color: CafeColors.olive.withOpacity(0.2), width: 1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: statusColor.withOpacity(0.15), width: 1),
         boxShadow: [
           BoxShadow(
-            color: statusColor.withOpacity(0.07),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
+              color: statusColor.withOpacity(0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 3)),
         ],
       ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.05),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(18)),
-            ),
-            child: Row(
-              children: [
-                // Order number badge
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    gradient: isPending
-                        ? CafeColors.headerGradient
-                        : const LinearGradient(
-                            colors: [Color(0xFF2D6A4F), Color(0xFF40916C)],
-                          ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '#$orderNumber',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        orderType.toUpperCase() +
-                            (tableNumber != null
-                                ? ' · Table $tableNumber'
-                                : ''),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: CafeColors.charcoal.withOpacity(0.6),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Icon(Icons.access_time_rounded,
-                              size: 12,
-                              color: CafeColors.charcoal.withOpacity(0.4)),
-                          const SizedBox(width: 3),
-                          Text(
-                            _formatTime(createdAt),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: CafeColors.charcoal.withOpacity(0.4),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // Status chip
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusBg,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    statusLabel,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: statusColor,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Column(
-              children: items.map((item) {
-                final name = item['name']?.toString() ?? 'Item';
-                final qty = (item['qty'] as num?)?.toInt() ??
-                    (item['quantity'] as num?)?.toInt() ??
-                    1;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: isPending
-                              ? CafeColors.creme
-                              : CafeColors.oliveLight,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '$qty',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: statusColor,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          name,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: CafeColors.charcoal,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (isPending)
-                  DecoratedBox(
+      // intrinsic height — wraps content exactly
+      child: IntrinsicHeight(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Header ──────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.04),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(14)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2D6A4F), Color(0xFF40916C)],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: CafeColors.olive.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
+                      gradient: isPending
+                          ? CafeColors.headerGradient
+                          : const LinearGradient(
+                              colors: [Color(0xFF2D6A4F), Color(0xFF40916C)]),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text('#$orderNumber',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12)),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      orderType.toUpperCase() +
+                          (tableNumber != null ? ' · T$tableNumber' : ''),
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: CafeColors.charcoal.withOpacity(0.55),
+                          letterSpacing: 0.3),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time_rounded,
+                          size: 11,
+                          color: CafeColors.charcoal.withOpacity(0.35)),
+                      const SizedBox(width: 2),
+                      Text(_formatTime(createdAt),
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: CafeColors.charcoal.withOpacity(0.35))),
+                    ],
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                        color: statusBg,
+                        borderRadius: BorderRadius.circular(16)),
+                    child: Text(
+                      isPending ? 'PENDING' : 'READY',
+                      style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: statusColor),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Items ────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: items.map((item) {
+                  final name = item['name']?.toString() ?? 'Item';
+                  final qty = (item['qty'] as num?)?.toInt() ??
+                      (item['quantity'] as num?)?.toInt() ??
+                      1;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        _ItemThumb(item: item),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(name,
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: CafeColors.charcoal),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isPending
+                                ? CafeColors.creme
+                                : CafeColors.oliveLight,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text('×$qty',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: statusColor)),
                         ),
                       ],
                     ),
-                    child: ElevatedButton.icon(
-                      onPressed: onMarkReady,
-                      icon: const Icon(Icons.check_rounded,
-                          color: Colors.white, size: 16),
-                      label: const Text(
-                        'Mark Ready',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  )
-                else
-                  Row(
-                    children: [
-                      const Icon(Icons.check_circle_rounded,
-                          color: CafeColors.olive, size: 16),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Ready for pickup',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: CafeColors.olive.withOpacity(0.8),
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
+                  );
+                }).toList(),
+              ),
             ),
-          ),
-        ],
+
+            // ── Footer ───────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              child: isPending
+                  ? SizedBox(
+                      width: double.infinity,
+                      height: 34,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                              colors: [Color(0xFF2D6A4F), Color(0xFF40916C)]),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: CafeColors.olive.withOpacity(0.25),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: onMarkReady,
+                          icon: const Icon(Icons.check_rounded,
+                              color: Colors.white, size: 14),
+                          label: const Text('Mark Ready',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded,
+                            color: CafeColors.olive, size: 13),
+                        const SizedBox(width: 4),
+                        Text('Ready for pickup',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: CafeColors.olive.withOpacity(0.8))),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -6,7 +6,9 @@ import '../../services/pocketbase/report_service.dart';
 import '../../../widgets/status_donut_chart.dart';
 import '../../core/theme/cafe_colors.dart';
 import '../../core/theme/nova_theme.dart';
+import '../../core/utils/product_seeder.dart'; // ← NEW
 import '../../providers/auth_provider.dart';
+import '../../services/pocketbase/auth_service.dart'; // ← NEW
 import '../../widgets/app_navigation.dart';
 import '../../widgets/responsive_layout.dart';
 
@@ -20,12 +22,39 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   late final ReportService _reportService;
+  bool _seeded = false; // guard — runs only once per session
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final auth = Provider.of<AuthProvider>(context, listen: false);
     _reportService = ReportService(auth.ownerId);
+
+    // ── ONE-TIME SEED ──────────────────────────────────────────────────────
+    // Reads assets/products.json and inserts into PocketBase.
+    // Skips automatically if products already exist for this owner.
+    // Remove this block once you've seeded successfully.
+    if (!_seeded && auth.ownerId.isNotEmpty) {
+      _seeded = true;
+      final seeder = ProductSeeder(
+        authService: AuthService(), // ✅ uses initPb() internally — safe
+        ownerId: auth.ownerId,
+      );
+      seeder.seed().then((count) {
+        if (count > 0 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ $count products added to your menu!'),
+              backgroundColor: NovaColors.teal,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      });
+    }
+    // ── END SEED ───────────────────────────────────────────────────────────
   }
 
   @override
@@ -144,9 +173,6 @@ class _DashboardContent extends StatelessWidget {
     required this.isDesktop,
   });
 
-  // Ensures Order Status cards, Quick Actions cards, and Order Breakdown card
-  // are the same visible height.
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -243,7 +269,6 @@ class _DashboardContent extends StatelessWidget {
 
         SizedBox(height: isDesktop ? 16 : 16),
 
-        // ─── Desktop: side-by-side ─────────────────────────────────────
         if (isDesktop)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,17 +303,13 @@ class _DashboardContent extends StatelessWidget {
                       title: 'Order Breakdown',
                     ),
                     const SizedBox(height: 12),
-                    _OrderBreakdownCard(
-                      auth: auth,
-                      isDesktop: true,
-                    ),
+                    _OrderBreakdownCard(auth: auth, isDesktop: true),
                   ],
                 ),
               ),
             ],
           )
         else ...[
-          // ─── Mobile: stacked ─────────────────────────────────────────
           _SectionHeader(
             icon: Icons.bar_chart_rounded,
             title: 'Order Status',
@@ -301,10 +322,7 @@ class _DashboardContent extends StatelessWidget {
             title: 'Order Breakdown',
           ),
           const SizedBox(height: 12),
-          _OrderBreakdownCard(
-            auth: auth,
-            isDesktop: false,
-          ),
+          _OrderBreakdownCard(auth: auth, isDesktop: false),
           const SizedBox(height: 20),
           _SectionHeader(
             icon: Icons.flash_on_rounded,
@@ -466,16 +484,11 @@ class _OrderStatusCards extends StatelessWidget {
 }
 
 // ─── Order Breakdown Card ──────────────────────────────────────────────────────
-// ✅ FIX: Removed fixed height — card wraps to the chart's intrinsic height.
-// StatusDonutChart uses mainAxisSize.min internally so it never overflows.
 class _OrderBreakdownCard extends StatelessWidget {
   final AuthProvider auth;
   final bool isDesktop;
 
-  const _OrderBreakdownCard({
-    required this.auth,
-    required this.isDesktop,
-  });
+  const _OrderBreakdownCard({required this.auth, required this.isDesktop});
 
   @override
   Widget build(BuildContext context) {
@@ -550,7 +563,7 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ─── Status Card Data Model ────────────────────────────────────────────────────
+// ─── Status Card Data ──────────────────────────────────────────────────────────
 class _StatusCardData {
   final String key;
   final int value;
