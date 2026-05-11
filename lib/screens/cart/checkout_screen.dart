@@ -1,5 +1,7 @@
 // lib/screens/pos/checkout_screen.dart
 
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/keyboard/pos_keyboard_system.dart';
@@ -118,84 +120,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       fillColor: NovaColors.bgSecondary,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     );
-  }
-
-  bool _canPlaceOrder(CartProvider cart) {
-    return cart.items.isNotEmpty &&
-        !(_paymentMethod == 'cash' && _tenderedAmount < cart.total) &&
-        !_isSubmitting;
-  }
-
-  Future<void> _placeOrder(CartProvider cart) async {
-    if (!_canPlaceOrder(cart)) return;
-
-    if (_orderType == 'dine_in' &&
-        (_tableNumber == null || _tableNumber!.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a table for dine in orders.'),
-        ),
-      );
-      return;
-    }
-
-    final changeAmount =
-        _paymentMethod == 'cash' ? _tenderedAmount - cart.total : 0.0;
-
-    setState(() => _isSubmitting = true);
-
-    try {
-      final cartSnapshot = cart.items.map((item) {
-        final qty = (item['qty'] as num?)?.toInt() ??
-            (item['quantity'] as num?)?.toInt() ??
-            1;
-        final price = (item['price'] as num?)?.toDouble() ?? 0.0;
-        return <String, dynamic>{
-          'name': item['name'] ?? 'Unknown',
-          'qty': qty,
-          'quantity': qty,
-          'price': price,
-          'unitPrice': price,
-          'lineTotal': price * qty,
-          if (item['productId'] != null) 'productId': item['productId'],
-        };
-      }).toList();
-
-      await _orderService.createOrder(
-        items: cartSnapshot,
-        total: cart.total,
-        orderType: _orderType,
-        tableNumber: _tableNumber,
-        customerName: _customerName,
-        paymentMethod: _paymentMethod,
-        tenderedAmount: _paymentMethod == 'cash' ? _tenderedAmount : 0.0,
-        change: changeAmount,
-      );
-
-      if (!mounted) return;
-
-      cart.clear();
-
-      Navigator.pushNamedAndRemoveUntil(context, '/pos', (route) => false);
-    } catch (e) {
-      if (!mounted) return;
-
-      final errorMsg = e.toString().toLowerCase().contains('network') ||
-              e.toString().toLowerCase().contains('internet') ||
-              e.toString().toLowerCase().contains('connect') ||
-              e.toString().toLowerCase().contains('timeout') ||
-              e.toString().toLowerCase().contains('unavailable')
-          ? 'No internet connection. Please check your connection and try again.'
-          : 'Error: $e';
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMsg)),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
-    }
   }
 
   Future<void> _showEditItemDialog(
@@ -395,14 +319,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // FIX: wrap entire body in CheckoutKeyboardScope so physical numpad works
         body: CheckoutKeyboardScope(
           cashController: _cashController,
-          cashFocusNode: _cashFocus,
           onCashChanged: (value) {
             setState(() => _tenderedAmount = double.tryParse(value) ?? 0.0);
           },
           onBack: () => Navigator.pop(context),
-          onConfirm: () => _placeOrder(
-            Provider.of<CartProvider>(context, listen: false),
-          ),
           child: AppNavigationShell(
             auth: auth,
             currentRoute: '/checkout',
@@ -588,16 +508,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               TextField(
                                 focusNode: _cashFocus,
                                 controller: _cashController,
-                                autofocus: true,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
                                         decimal: true),
-                                textInputAction: TextInputAction.done,
                                 onChanged: (value) => setState(() {
                                   _tenderedAmount =
                                       double.tryParse(value) ?? 0.0;
                                 }),
-                                onSubmitted: (_) => _placeOrder(cart),
                                 style: const TextStyle(
                                     fontSize: 13,
                                     color: NovaColors.textPrimary,
@@ -1066,9 +983,125 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 child: SizedBox(
                                   height: 44,
                                   child: ElevatedButton.icon(
-                                    onPressed: _canPlaceOrder(cart)
-                                        ? () => _placeOrder(cart)
-                                        : null,
+                                    onPressed: cart.items.isEmpty ||
+                                            (_paymentMethod == 'cash' &&
+                                                _tenderedAmount < cart.total) ||
+                                            _isSubmitting
+                                        ? null
+                                        : () async {
+                                            if (_orderType == 'dine_in' &&
+                                                (_tableNumber == null ||
+                                                    _tableNumber!.isEmpty)) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                      'Please select a table for dine in orders.'),
+                                                ),
+                                              );
+                                              return;
+                                            }
+
+                                            final changeAmount =
+                                                _paymentMethod == 'cash'
+                                                    ? _tenderedAmount -
+                                                        cart.total
+                                                    : 0.0;
+
+                                            setState(
+                                                () => _isSubmitting = true);
+
+                                            try {
+                                              final cartSnapshot =
+                                                  cart.items.map((item) {
+                                                final qty = (item['qty']
+                                                            as num?)
+                                                        ?.toInt() ??
+                                                    (item['quantity'] as num?)
+                                                        ?.toInt() ??
+                                                    1;
+                                                final price =
+                                                    (item['price'] as num?)
+                                                            ?.toDouble() ??
+                                                        0.0;
+                                                return <String, dynamic>{
+                                                  'name':
+                                                      item['name'] ?? 'Unknown',
+                                                  'qty': qty,
+                                                  'quantity': qty,
+                                                  'price': price,
+                                                  'unitPrice': price,
+                                                  'lineTotal': price * qty,
+                                                  if (item['productId'] != null)
+                                                    'productId':
+                                                        item['productId'],
+                                                };
+                                              }).toList();
+
+                                              await _orderService.createOrder(
+                                                items: cartSnapshot,
+                                                total: cart.total,
+                                                orderType: _orderType,
+                                                tableNumber: _tableNumber,
+                                                customerName: _customerName,
+                                                paymentMethod: _paymentMethod,
+                                                tenderedAmount:
+                                                    _paymentMethod == 'cash'
+                                                        ? _tenderedAmount
+                                                        : 0.0,
+                                                change: changeAmount,
+                                              );
+
+                                              if (!mounted) return;
+
+                                              cart.clear();
+                                              Navigator.pushNamedAndRemoveUntil(
+                                                  context,
+                                                  '/pos',
+                                                  (route) => false);
+                                            } catch (e) {
+                                              if (!mounted) return;
+
+                                              final errorMsg = e
+                                                          .toString()
+                                                          .toLowerCase()
+                                                          .contains(
+                                                              'network') ||
+                                                      e
+                                                          .toString()
+                                                          .toLowerCase()
+                                                          .contains(
+                                                              'internet') ||
+                                                      e
+                                                          .toString()
+                                                          .toLowerCase()
+                                                          .contains(
+                                                              'connect') ||
+                                                      e
+                                                          .toString()
+                                                          .toLowerCase()
+                                                          .contains(
+                                                              'timeout') ||
+                                                      e
+                                                          .toString()
+                                                          .toLowerCase()
+                                                          .contains(
+                                                              'unavailable')
+                                                  ? 'No internet connection. Please check your connection and try again.'
+                                                  : 'Error: $e';
+
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                    content: Text(errorMsg)),
+                                              );
+                                            } finally {
+                                              if (mounted) {
+                                                setState(() =>
+                                                    _isSubmitting = false);
+                                              }
+                                            }
+                                          },
                                     icon: _isSubmitting
                                         ? const SizedBox(
                                             width: 16,
