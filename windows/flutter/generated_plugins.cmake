@@ -5,6 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   connectivity_plus
   file_selector_windows
+  hotkey_manager_windows
   printing
   url_launcher_windows
 )

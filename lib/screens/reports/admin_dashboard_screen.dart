@@ -6,9 +6,9 @@ import '../../services/pocketbase/report_service.dart';
 import '../../../widgets/status_donut_chart.dart';
 import '../../core/theme/cafe_colors.dart';
 import '../../core/theme/nova_theme.dart';
-import '../../core/utils/product_seeder.dart'; // ← NEW
+import '../../core/utils/product_seeder.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/pocketbase/auth_service.dart'; // ← NEW
+import '../../services/pocketbase/auth_service.dart';
 import '../../widgets/app_navigation.dart';
 import '../../widgets/responsive_layout.dart';
 

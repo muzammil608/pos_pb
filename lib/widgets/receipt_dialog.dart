@@ -42,30 +42,66 @@ class ReceiptDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    void printReceipt() => _printReceipt(context);
+    void closeReceipt() => Navigator.pop(context);
+
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Center(
-        child: SingleChildScrollView(
-          child: ReceiptWidget(
-            companyName: companyName,
-            phone: phone,
-            email: email,
-            website: website,
-            servedBy: servedBy,
-            customerName: customerName,
-            orderType: orderType,
-            items: items,
-            total: total,
-            cash: cash,
-            change: change,
-            tax: tax,
-            paymentMethod: paymentMethod,
-            orderNo: orderNo,
-            date: date,
-            onPrint: () => _printReceipt(context),
-            onClose: () => Navigator.pop(context),
+      child: Shortcuts(
+        shortcuts: {
+          const SingleActivator(LogicalKeyboardKey.enter):
+              const _ReceiptPrintIntent(),
+          const SingleActivator(LogicalKeyboardKey.numpadEnter):
+              const _ReceiptPrintIntent(),
+          const SingleActivator(LogicalKeyboardKey.keyP):
+              const _ReceiptPrintIntent(),
+          const SingleActivator(LogicalKeyboardKey.escape):
+              const _ReceiptCloseIntent(),
+          const SingleActivator(LogicalKeyboardKey.keyC):
+              const _ReceiptCloseIntent(),
+        },
+        child: Actions(
+          actions: {
+            _ReceiptPrintIntent: CallbackAction<_ReceiptPrintIntent>(
+              onInvoke: (_) {
+                printReceipt();
+                return null;
+              },
+            ),
+            _ReceiptCloseIntent: CallbackAction<_ReceiptCloseIntent>(
+              onInvoke: (_) {
+                closeReceipt();
+                return null;
+              },
+            ),
+          },
+          child: Focus(
+            autofocus: true,
+            child: Center(
+              child: SingleChildScrollView(
+                child: ReceiptWidget(
+                  companyName: companyName,
+                  phone: phone,
+                  email: email,
+                  website: website,
+                  servedBy: servedBy,
+                  customerName: customerName,
+                  orderType: orderType,
+                  items: items,
+                  total: total,
+                  cash: cash,
+                  change: change,
+                  tax: tax,
+                  paymentMethod: paymentMethod,
+                  orderNo: orderNo,
+                  date: date,
+                  onPrint: printReceipt,
+                  onClose: closeReceipt,
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -332,6 +368,14 @@ class ReceiptDialog extends StatelessWidget {
   }
 }
 
+class _ReceiptPrintIntent extends Intent {
+  const _ReceiptPrintIntent();
+}
+
+class _ReceiptCloseIntent extends Intent {
+  const _ReceiptCloseIntent();
+}
+
 class ReceiptWidget extends StatelessWidget {
   final String companyName;
   final String phone;
@@ -489,7 +533,7 @@ class ReceiptWidget extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: onClose,
                   icon: const Icon(Icons.close, size: 18),
-                  label: const Text('Close'),
+                  label: const Text('Close (Esc)'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.black,
                     side: const BorderSide(color: Colors.black26),
@@ -502,7 +546,7 @@ class ReceiptWidget extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: onPrint,
                   icon: const Icon(Icons.print, size: 18),
-                  label: const Text('Print'),
+                  label: const Text('Print (Enter)'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
