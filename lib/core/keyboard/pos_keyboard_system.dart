@@ -4,33 +4,104 @@
 // Packages: hotkey_manager (F-keys + global shortcuts), flutter built-ins
 // (Shortcuts/Actions/Focus) for navigation, Enter, Escape, Delete, arrows.
 //
-// What's wired up:
-//   Ctrl+F       → focus product search
-//   F1           → open new order / focus POS
-//   F2           → open cart / checkout panel
-//   F3           → hold order
-//   F4           → add customer
-//   F5           → refresh inventory
-//   Enter        → confirm / add focused item
-//   Escape       → cancel dialog / clear search
-//   Delete       → remove focused cart item
-//   Ctrl+Z       → undo last cart action
-//   Arrow keys   → navigate product list / cart list
-//   Tab          → move forward between fields
-//   Shift+Tab    → move backward between fields
-//   Ctrl+→/←     → next / previous category
-//   Ctrl+Enter   → proceed to checkout
-//   Ctrl+Delete  → clear entire cart
-//   Shift+/  (?) → show shortcut help
+// ── FIXES IN THIS VERSION ──────────────────────────────────────────────────
+//
+// FIX 1 — ESC corrupts nav state and blocks Ready Orders sheet from reopening.
+//   Root cause: ClearSearchIntent's onInvoke called nav.pop() whenever
+//   canPop() was true, which consumed the bottom-sheet route. The next ESC
+//   then popped a screen-level route, leaving the navigator in a broken state
+//   so _showReadyOrdersSheet could never push again.
+//   Fix: ClearSearchIntent now ONLY clears the search bar text. It never
+//   touches the navigator. Bottom sheets and dialogs handle their own ESC
+//   dismiss via Flutter's built-in PopScope / barrierDismissible behaviour.
+//
+// FIX 2 — Physical numpad keys (right side, Numpad0–Numpad9) ignored in cash field.
+//   Root cause: PosShortcuts.numpad only mapped LogicalKeyboardKey.digit0–9.
+//   Physical numpad keys produce LogicalKeyboardKey.numpad0–numpad9 which are
+//   completely different logical codes that were never in the map.
+//   Fix: Added all numpad logical keys (numpad0–numpad9, numpadDecimal, etc.)
+//   to the shortcut map alongside the existing top-row digit entries.
+//
+// FIX 3 — Top-row digit keys wrote to cash field even when it was not focused.
+//   Root cause: CheckoutKeyboardScope._handleNumpad called
+//   cashFocusNode?.requestFocus() unconditionally before writing, so pressing
+//   any digit anywhere always stole focus and wrote to the cash field —
+//   including while typing in the Customer Name text field.
+//   Fix: _handleNumpad now writes only when cashFocusNode.hasFocus is already
+//   true. Focus is never stolen. The cash field works normally once the user
+//   clicks or Tabs into it.
+//
+// FIX 4 — MissingPluginException on Android/iOS.
+//   hotkey_manager is a desktop-only plugin (Windows, macOS, Linux).
+//   All hotKeyManager calls are now guarded by _isDesktop so the app runs
+//   safely on mobile without crashing.
+//
+// FIX 5 — RenderFlex overflow in PosShortcutHelp on small screens.
+//   _KeyBadge now has a maxWidth constraint + TextOverflow.ellipsis.
+//   The dialog body is wrapped in SingleChildScrollView to handle vertical
+//   overflow on small viewports.
+//
+// FIX 6 — Keyboard shortcut button + dialog shown on mobile.
+//   ShowShortcutsIntent is now guarded by _isDesktop so pressing '?' on a
+//   physical keyboard connected to a phone does nothing.
+//   The AppBar button is hidden on mobile — callers should also guard it
+//   (see pos_screen.dart).
+//
+// FIX 7 — F7/F8 not working on POS screen cash/card buttons.
+//   Root cause: SelectPaymentMethodIntent (F7/F8) was only registered in
+//   CheckoutKeyboardScope's numpad shortcut map and Actions. When the
+//   cash/card buttons live on the POS screen, PosKeyboardScope never saw
+//   those intents — posScreen map had no F7/F8 entries and PosKeyboardScope
+//   had no SelectPaymentMethodIntent action handler.
+//   Fix: Added F7/F8 to PosShortcuts.posScreen and wired
+//   SelectPaymentMethodIntent + onSelectPaymentMethod callback into
+//   PosKeyboardScope.
+//
+// FIX 8 — Double-ESC breaks navigator state so F2 Ready Orders sheet won't open.
+//   Root cause: PosShortcuts.numpad mapped Escape → NumpadKeyIntent('ESC'),
+//   and _handleNumpad called widget.onBack?.call() for that key. When
+//   CheckoutKeyboardScope was anywhere in the widget tree it intercepted every
+//   ESC — including ESCs meant to dismiss a bottom sheet — and called onBack
+//   which popped an extra route. A second ESC left the navigator in a broken
+//   state where _showReadyOrdersSheet could no longer push.
+//   Fix: Removed Escape from PosShortcuts.numpad entirely. Removed the ESC
+//   branch from _handleNumpad. Checkout back-navigation is now handled solely
+//   by PopScope / WillPopScope on the checkout route (barrierDismissible) so
+//   no double-pop is possible.
+//
+// ADDITION 1 — CheckoutKeyboardScope auto-focuses cash field on mount.
+//   Uses addPostFrameCallback so the focus system is ready before requesting.
+//
+// ADDITION 2 — Kitchen screen keyboard intents + KitchenKeyboardScope widget.
+//   Wrap your kitchen screen body with KitchenKeyboardScope and supply the
+//   five callbacks (onNavigate, onEdit, onDelete, onConfirm, onReadyOrder).
+//   Shortcuts: ↑/↓ navigate, E edit, Delete remove, Enter = Mark Ready.
+//
+// ADDITION 3 — SelectPaymentMethodIntent for checkout payment method selection.
+//   F7 = Cash, F8 = Card. Now works from BOTH PosKeyboardScope and
+//   CheckoutKeyboardScope. Wire onSelectPaymentMethod on whichever scope
+//   wraps your cash/card buttons.
+// ──────────────────────────────────────────────────────────────────────────
 
 import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PLATFORM HELPER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// True only on desktop platforms that support hotkey_manager.
+bool get _isDesktop =>
+    !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // INTENT DEFINITIONS
-// ═══════════════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class FocusSearchIntent extends Intent {
   const FocusSearchIntent();
@@ -97,19 +168,59 @@ class NumpadKeyIntent extends Intent {
   const NumpadKeyIntent(this.key);
 }
 
+// ── ADDITION 3: Payment method selection intent ───────────────────────────────
+
+/// Selects a payment method on the checkout screen.
+/// [method] is 'cash' or 'card' (or any other method string your app supports).
+/// Triggered by F7 (cash) and F8 (card).
+/// FIX 7: Now also registered in PosKeyboardScope so buttons on the POS
+/// screen respond to F7/F8 without needing CheckoutKeyboardScope in the tree.
+class SelectPaymentMethodIntent extends Intent {
+  final String method;
+  const SelectPaymentMethodIntent(this.method);
+}
+
+// ── Kitchen-specific intents ──────────────────────────────────────────────────
+
+/// Navigate up/down through the kitchen order list.
+class KitchenNavigateIntent extends Intent {
+  final bool up;
+  const KitchenNavigateIntent({required this.up});
+}
+
+/// Open the edit-quantity dialog for the focused kitchen order item.
+class KitchenEditItemIntent extends Intent {
+  const KitchenEditItemIntent();
+}
+
+/// Delete / remove the focused kitchen order item.
+class KitchenDeleteItemIntent extends Intent {
+  const KitchenDeleteItemIntent();
+}
+
+/// Called when Enter is pressed (legacy confirm — kept for compatibility).
+class KitchenConfirmItemIntent extends Intent {
+  const KitchenConfirmItemIntent();
+}
+
+/// Mark the focused kitchen order as READY (Enter key on kitchen screen).
+class KitchenReadyOrderIntent extends Intent {
+  const KitchenReadyOrderIntent();
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// SHORTCUT MAPS — covers every built-in Flutter shortcut (no hidden fields)
-// ═══════════════════════════════════════════════════════════════════════════════════════
+// SHORTCUT MAPS
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class PosShortcuts {
-  /// POS screen shortcuts (handled by Shortcuts widget + Actions)
+  /// POS screen shortcuts (handled by Shortcuts widget + Actions).
   static Map<ShortcutActivator, Intent> posScreen = {
     // Search
     const SingleActivator(LogicalKeyboardKey.keyF, control: true):
         const FocusSearchIntent(),
     const SingleActivator(LogicalKeyboardKey.slash): const FocusSearchIntent(),
 
-    // Clear / cancel
+    // Clear / cancel — FIX 1: handler no longer calls nav.pop()
     const SingleActivator(LogicalKeyboardKey.escape): const ClearSearchIntent(),
 
     // Category navigation
@@ -146,10 +257,22 @@ class PosShortcuts {
     // Help
     const SingleActivator(LogicalKeyboardKey.slash, shift: true):
         const ShowShortcutsIntent(),
+
+    // ── FIX 7: Payment method selection on the POS screen (F7/F8) ────────────
+    // These are also in PosShortcuts.numpad for the checkout scope.
+    // Duplicating here ensures they work wherever PosKeyboardScope is the
+    // active scope — i.e. when your cash/card buttons are on the POS screen.
+    const SingleActivator(LogicalKeyboardKey.f7):
+        SelectPaymentMethodIntent('cash'),
+    const SingleActivator(LogicalKeyboardKey.f8):
+        SelectPaymentMethodIntent('card'),
   };
 
-  /// Checkout numpad shortcuts
+  // ── FIX 2: Added physical numpad logical keys (right side of keyboard). ────
+  // ── FIX 8: Removed Escape from this map — see FIX 8 note above. ──────────
+  // ── ADDITION 3: F7/F8 payment method shortcuts. ───────────────────────────
   static Map<ShortcutActivator, Intent> numpad = {
+    // Top-row digit keys (above letter keys)
     const SingleActivator(LogicalKeyboardKey.digit0): NumpadKeyIntent('0'),
     const SingleActivator(LogicalKeyboardKey.digit1): NumpadKeyIntent('1'),
     const SingleActivator(LogicalKeyboardKey.digit2): NumpadKeyIntent('2'),
@@ -160,31 +283,70 @@ class PosShortcuts {
     const SingleActivator(LogicalKeyboardKey.digit7): NumpadKeyIntent('7'),
     const SingleActivator(LogicalKeyboardKey.digit8): NumpadKeyIntent('8'),
     const SingleActivator(LogicalKeyboardKey.digit9): NumpadKeyIntent('9'),
-    const SingleActivator(LogicalKeyboardKey.backspace): NumpadKeyIntent('⌫'),
+
+    // Physical numpad keys (right-side number pad) — FIX 2
+    const SingleActivator(LogicalKeyboardKey.numpad0): NumpadKeyIntent('0'),
+    const SingleActivator(LogicalKeyboardKey.numpad1): NumpadKeyIntent('1'),
+    const SingleActivator(LogicalKeyboardKey.numpad2): NumpadKeyIntent('2'),
+    const SingleActivator(LogicalKeyboardKey.numpad3): NumpadKeyIntent('3'),
+    const SingleActivator(LogicalKeyboardKey.numpad4): NumpadKeyIntent('4'),
+    const SingleActivator(LogicalKeyboardKey.numpad5): NumpadKeyIntent('5'),
+    const SingleActivator(LogicalKeyboardKey.numpad6): NumpadKeyIntent('6'),
+    const SingleActivator(LogicalKeyboardKey.numpad7): NumpadKeyIntent('7'),
+    const SingleActivator(LogicalKeyboardKey.numpad8): NumpadKeyIntent('8'),
+    const SingleActivator(LogicalKeyboardKey.numpad9): NumpadKeyIntent('9'),
     const SingleActivator(LogicalKeyboardKey.numpadDecimal):
         NumpadKeyIntent('.'),
+    const SingleActivator(LogicalKeyboardKey.numpadAdd): NumpadKeyIntent('+'),
+
+    // Common keys
+    const SingleActivator(LogicalKeyboardKey.backspace): NumpadKeyIntent('⌫'),
     const SingleActivator(LogicalKeyboardKey.period): NumpadKeyIntent('.'),
-    const SingleActivator(LogicalKeyboardKey.escape): NumpadKeyIntent('ESC'),
+    // ── FIX 8: Escape intentionally NOT mapped here. ──────────────────────
+    // Checkout back-navigation must go through the route's PopScope so the
+    // navigator pops exactly once. Mapping ESC → NumpadKeyIntent('ESC') and
+    // then calling onBack in _handleNumpad caused a double-pop that corrupted
+    // the navigator, preventing the Ready Orders sheet from reopening.
+    // Add a PopScope(onPopInvoked: ...) to your checkout screen/dialog instead.
     const SingleActivator(LogicalKeyboardKey.enter): ConfirmItemIntent(),
     const SingleActivator(LogicalKeyboardKey.numpadEnter): ConfirmItemIntent(),
+
+    // ADDITION 3: Payment method selection — F7 = Cash, F8 = Card
+    const SingleActivator(LogicalKeyboardKey.f7):
+        SelectPaymentMethodIntent('cash'),
+    const SingleActivator(LogicalKeyboardKey.f8):
+        SelectPaymentMethodIntent('card'),
+  };
+
+  /// Kitchen screen shortcuts.
+  static Map<ShortcutActivator, Intent> kitchen = {
+    const SingleActivator(LogicalKeyboardKey.arrowUp):
+        KitchenNavigateIntent(up: true),
+    const SingleActivator(LogicalKeyboardKey.arrowDown):
+        KitchenNavigateIntent(up: false),
+    const SingleActivator(LogicalKeyboardKey.keyE):
+        const KitchenEditItemIntent(),
+    const SingleActivator(LogicalKeyboardKey.delete):
+        const KitchenDeleteItemIntent(),
+    const SingleActivator(LogicalKeyboardKey.enter):
+        const KitchenReadyOrderIntent(),
+    const SingleActivator(LogicalKeyboardKey.numpadEnter):
+        const KitchenReadyOrderIntent(),
   };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GLOBAL HOTKEY REGISTRY  (hotkey_manager — F-keys work even outside focus tree)
-// ═══════════════════════════════════════════════════════════════════════════════════════
+// GLOBAL HOTKEY REGISTRY
+// ═══════════════════════════════════════════════════════════════════════════════
 
-/// Call PosHotkeyRegistry.init() in main() after WidgetsFlutterBinding.
-/// Call PosHotkeyRegistry.register(...) once per screen's initState.
-/// Call PosHotkeyRegistry.unregisterAll() in dispose.
 class PosHotkeyRegistry {
   PosHotkeyRegistry._();
 
   static final List<HotKey> _registered = [];
 
-  /// Must be called in main() before runApp():
-  ///   await PosHotkeyRegistry.init();
+  /// FIX 4: Guard every hotKeyManager call with _isDesktop.
   static Future<void> init() async {
+    if (!_isDesktop) return;
     await hotKeyManager.unregisterAll();
   }
 
@@ -197,6 +359,7 @@ class PosHotkeyRegistry {
     required VoidCallback onF6Kitchen,
     required VoidCallback onCtrlF,
   }) async {
+    if (!_isDesktop) return; // FIX 4: no-op on mobile/web
     await unregisterAll();
 
     final hotkeys = <(HotKey, VoidCallback)>[
@@ -240,16 +403,18 @@ class PosHotkeyRegistry {
   }
 
   static Future<void> unregisterAll() async {
-    for (final hk in _registered) {
+    if (!_isDesktop) return; // FIX 4: no-op on mobile/web
+    final copy = List<HotKey>.from(_registered);
+    _registered.clear();
+    for (final hk in copy) {
       await hotKeyManager.unregister(hk);
     }
-    _registered.clear();
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// UNDO STACK — lightweight cart undo (Ctrl+Z)
-// ═══════════════════════════════════════════════════════════════════════════════════════
+// UNDO STACK
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class CartUndoStack {
   static final CartUndoStack instance = CartUndoStack._();
@@ -264,7 +429,6 @@ class CartUndoStack {
   }
 
   bool get canUndo => _stack.isNotEmpty;
-
   String? get lastDescription =>
       _stack.isEmpty ? null : _stack.last.description;
 
@@ -283,8 +447,8 @@ class _UndoEntry {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// POS KEYBOARD SCOPE  — wraps the POS screen body
-// ═══════════════════════════════════════════════════════════════════════════════════════
+// POS KEYBOARD SCOPE
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class PosKeyboardScope extends StatelessWidget {
   final Widget child;
@@ -301,6 +465,10 @@ class PosKeyboardScope extends StatelessWidget {
   final VoidCallback? onArrowLeft;
   final VoidCallback? onArrowRight;
 
+  // ── FIX 7: Added onSelectPaymentMethod so POS-screen cash/card buttons
+  //    respond to F7/F8 when wrapped by PosKeyboardScope. ──────────────────
+  final ValueChanged<String>? onSelectPaymentMethod;
+
   const PosKeyboardScope({
     super.key,
     required this.child,
@@ -316,6 +484,7 @@ class PosKeyboardScope extends StatelessWidget {
     this.onArrowDown,
     this.onArrowLeft,
     this.onArrowRight,
+    this.onSelectPaymentMethod, // FIX 7
   });
 
   @override
@@ -330,17 +499,15 @@ class PosKeyboardScope extends StatelessWidget {
               return null;
             },
           ),
+
+          // ── FIX 1 ──────────────────────────────────────────────────────────
           ClearSearchIntent: CallbackAction<ClearSearchIntent>(
             onInvoke: (_) {
-              final nav = Navigator.of(context, rootNavigator: false);
-              if (nav.canPop()) {
-                nav.pop();
-              } else {
-                searchBarKey?.currentState?.clear();
-              }
+              searchBarKey?.currentState?.clear();
               return null;
             },
           ),
+
           NextCategoryIntent: CallbackAction<NextCategoryIntent>(
             onInvoke: (_) {
               categoryChipsKey?.currentState?.nextCategory();
@@ -413,9 +580,21 @@ class PosKeyboardScope extends StatelessWidget {
               return null;
             },
           ),
+
+          // ── FIX 6: Only show shortcut help on desktop ─────────────────────
           ShowShortcutsIntent: CallbackAction<ShowShortcutsIntent>(
             onInvoke: (_) {
-              PosShortcutHelp.show(context);
+              if (_isDesktop) {
+                PosShortcutHelp.show(context);
+              }
+              return null;
+            },
+          ),
+
+          // ── FIX 7: Handle F7/F8 payment method selection on POS screen ────
+          SelectPaymentMethodIntent: CallbackAction<SelectPaymentMethodIntent>(
+            onInvoke: (intent) {
+              onSelectPaymentMethod?.call(intent.method);
               return null;
             },
           ),
@@ -431,15 +610,19 @@ class PosKeyboardScope extends StatelessWidget {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CHECKOUT KEYBOARD SCOPE
-// ═══════════════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
-class CheckoutKeyboardScope extends StatelessWidget {
+class CheckoutKeyboardScope extends StatefulWidget {
   final Widget child;
   final TextEditingController? cashController;
   final FocusNode? cashFocusNode;
   final ValueChanged<String>? onCashChanged;
   final VoidCallback? onBack;
   final VoidCallback? onConfirm;
+
+  // ADDITION 3: Callback to switch payment method via keyboard (F7/F8).
+  // Receives 'cash' or 'card' as the method string.
+  final ValueChanged<String>? onSelectPaymentMethod;
 
   const CheckoutKeyboardScope({
     super.key,
@@ -449,28 +632,50 @@ class CheckoutKeyboardScope extends StatelessWidget {
     this.onCashChanged,
     this.onBack,
     this.onConfirm,
+    this.onSelectPaymentMethod, // ADDITION 3
   });
 
+  @override
+  State<CheckoutKeyboardScope> createState() => _CheckoutKeyboardScopeState();
+}
+
+class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.cashFocusNode?.requestFocus();
+    });
+  }
+
+  // ── FIX 8: Removed the ESC → onBack branch entirely. ─────────────────────
+  // ESC is no longer in PosShortcuts.numpad so this method is never called
+  // with key == 'ESC'. Back/dismiss must be handled by the checkout route's
+  // PopScope so the navigator pops exactly once and the Ready Orders sheet
+  // can be reopened normally afterwards.
   void _handleNumpad(String key) {
-    if (key == 'ESC') {
-      onBack?.call();
-      return;
-    }
-    final ctrl = cashController;
+    final ctrl = widget.cashController;
     if (ctrl == null) return;
-    cashFocusNode?.requestFocus();
+
+    // ── FIX 3: only write when cash field is already focused ─────────────────
+    final hasFocus =
+        widget.cashFocusNode == null || widget.cashFocusNode!.hasFocus;
+    if (!hasFocus) return;
+
     final current = ctrl.text;
     late String next;
     if (key == '⌫') {
       next = current.isEmpty ? '' : current.substring(0, current.length - 1);
     } else if (key == '.') {
       next = current.contains('.') ? current : '$current.';
+    } else if (key == '+') {
+      return;
     } else {
       next = current.isEmpty || current == '0' ? key : '$current$key';
     }
     ctrl.text = next;
     ctrl.selection = TextSelection.collapsed(offset: next.length);
-    onCashChanged?.call(next);
+    widget.onCashChanged?.call(next);
   }
 
   @override
@@ -487,14 +692,22 @@ class CheckoutKeyboardScope extends StatelessWidget {
           ),
           ConfirmItemIntent: CallbackAction<ConfirmItemIntent>(
             onInvoke: (_) {
-              onConfirm?.call();
+              widget.onConfirm?.call();
+              return null;
+            },
+          ),
+
+          // ADDITION 3: Handle F7/F8 to select payment method ─────────────────
+          SelectPaymentMethodIntent: CallbackAction<SelectPaymentMethodIntent>(
+            onInvoke: (intent) {
+              widget.onSelectPaymentMethod?.call(intent.method);
               return null;
             },
           ),
         },
         child: Focus(
           autofocus: true,
-          child: child,
+          child: widget.child,
         ),
       ),
     );
@@ -502,8 +715,92 @@ class CheckoutKeyboardScope extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// KITCHEN KEYBOARD SCOPE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class KitchenKeyboardScope extends StatefulWidget {
+  final Widget child;
+  final ValueChanged<bool>? onNavigate;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final VoidCallback? onConfirm;
+  final VoidCallback? onReadyOrder;
+
+  const KitchenKeyboardScope({
+    super.key,
+    required this.child,
+    this.onNavigate,
+    this.onEdit,
+    this.onDelete,
+    this.onConfirm,
+    this.onReadyOrder,
+  });
+
+  @override
+  State<KitchenKeyboardScope> createState() => _KitchenKeyboardScopeState();
+}
+
+class _KitchenKeyboardScopeState extends State<KitchenKeyboardScope> {
+  final FocusNode _focusNode = FocusNode(debugLabel: 'KitchenKeyboardScope');
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _handleKey(FocusNode _, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    final key = event.logicalKey;
+
+    if (key == LogicalKeyboardKey.arrowUp) {
+      widget.onNavigate?.call(true);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      widget.onNavigate?.call(false);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter) {
+      (widget.onReadyOrder ?? widget.onConfirm)?.call();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.keyE) {
+      widget.onEdit?.call();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.delete) {
+      widget.onDelete?.call();
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKey,
+      child: widget.child,
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // FOCUS INDICATOR
-// ═══════════════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class PosFocusIndicator extends StatefulWidget {
   final Widget child;
@@ -576,20 +873,21 @@ class _PosFocusIndicatorState extends State<PosFocusIndicator> {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // POS SEARCH BAR
-// ═══════════════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class PosSearchBar extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final VoidCallback? onClear;
-  final String hintText;
+  // FIX 6: null means "auto" — resolved at build time so _isDesktop (non-const) is safe
+  final String? hintText;
 
   const PosSearchBar({
     super.key,
     required this.controller,
     required this.onChanged,
     this.onClear,
-    this.hintText = 'Search items…  ( / or Ctrl+F )',
+    this.hintText,
   });
 
   @override
@@ -654,7 +952,8 @@ class PosSearchBarState extends State<PosSearchBar> {
         onChanged: widget.onChanged,
         style: const TextStyle(fontSize: 14, color: Color(0xFF111118)),
         decoration: InputDecoration(
-          hintText: widget.hintText,
+          hintText: widget.hintText ??
+              (_isDesktop ? 'Search items…  ( / or Ctrl+F )' : 'Search items…'),
           hintStyle: const TextStyle(color: Color(0xFF9999AE), fontSize: 13),
           prefixIcon: const Icon(Icons.search_rounded,
               color: Color(0xFF6B6B80), size: 18),
@@ -665,7 +964,8 @@ class PosSearchBarState extends State<PosSearchBar> {
                   onPressed: clear,
                   tooltip: 'Clear (Esc)',
                 )
-              : !_focused
+              // FIX 6: only show the '/' key badge on desktop
+              : (!_focused && _isDesktop)
                   ? Padding(
                       padding: const EdgeInsets.only(right: 10),
                       child: _KeyBadge('/'),
@@ -966,10 +1266,6 @@ class _NumpadKeyState extends State<_NumpadKey>
           widget.onPress(widget.label);
         },
         onTapCancel: () => _ctrl.reverse(),
-
-        // IMPORTANT FIX:
-        // Replace ScaleTransition with AnimatedBuilder so we don't re-subscribe
-        // to a potentially disposed Animation during didUpdateWidget windows.
         child: AnimatedBuilder(
           animation: _scale,
           child: AnimatedContainer(
@@ -1091,6 +1387,8 @@ class PosShortcutHelp extends StatelessWidget {
   const PosShortcutHelp({super.key});
 
   static void show(BuildContext context) {
+    // FIX 6: guard at the call site too — safe to call from anywhere
+    if (!_isDesktop) return;
     showDialog(context: context, builder: (_) => const PosShortcutHelp());
   }
 
@@ -1136,6 +1434,19 @@ class PosShortcutHelp extends StatelessWidget {
           ('Backspace', 'Delete last digit'),
           ('Enter', 'Confirm payment'),
           ('Escape', 'Back to POS'),
+          // ADDITION 3: Payment method shortcuts in help dialog
+          ('F7', 'Select Cash payment'),
+          ('F8', 'Select Card payment'),
+        ]
+      ),
+      (
+        'Kitchen',
+        [
+          ('↑ / ↓', 'Navigate order list'),
+          ('E', 'Edit quantity of focused item'),
+          ('Delete', 'Remove focused item'),
+          ('Enter / Numpad ↵', 'Mark order as Ready'),
+          ('Escape', 'Go back'),
         ]
       ),
     ];
@@ -1144,86 +1455,91 @@ class PosShortcutHelp extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       backgroundColor: const Color(0xFFFFFFFF),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: const BoxConstraints(maxWidth: 560),
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEEEDFE),
-                      borderRadius: BorderRadius.circular(10),
+          // ── FIX 5: wrap in SingleChildScrollView to prevent vertical overflow
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEEDFE),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.keyboard_rounded,
+                          color: Color(0xFF534AB7), size: 18),
                     ),
-                    child: const Icon(Icons.keyboard_rounded,
-                        color: Color(0xFF534AB7), size: 18),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text('Keyboard Shortcuts',
+                    const SizedBox(width: 12),
+                    const Text('Keyboard Shortcuts',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF111118))),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      tooltip: 'Close (Esc)',
+                      icon: const Icon(Icons.close_rounded,
+                          color: Color(0xFF9999AE), size: 18),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 24,
+                  runSpacing: 16,
+                  children: groups.map((group) {
+                    return SizedBox(
+                      width: 220,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(group.$1,
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF534AB7),
+                                  letterSpacing: 0.5)),
+                          const SizedBox(height: 8),
+                          ...group.$2.map((s) => Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // ── FIX 5: constrained badge ──────────
+                                    _KeyBadge(s.$1),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(s.$2,
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF6B6B80))),
+                                    ),
+                                  ],
+                                ),
+                              )),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                const Center(
+                  child: Text('Press  ?  anytime to show this',
                       style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF111118))),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    tooltip: 'Close (Esc)',
-                    icon: const Icon(Icons.close_rounded,
-                        color: Color(0xFF9999AE), size: 18),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Wrap(
-                spacing: 24,
-                runSpacing: 16,
-                children: groups.map((group) {
-                  return SizedBox(
-                    width: 220,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(group.$1,
-                            style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF534AB7),
-                                letterSpacing: 0.5)),
-                        const SizedBox(height: 8),
-                        ...group.$2.map((s) => Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: Row(
-                                children: [
-                                  _KeyBadge(s.$1),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(s.$2,
-                                        style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFF6B6B80))),
-                                  ),
-                                ],
-                              ),
-                            )),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              Center(
-                child: Text('Press  ?  anytime to show this',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: const Color(0xFF9999AE),
-                        fontStyle: FontStyle.italic)),
-              ),
-            ],
+                          fontSize: 11,
+                          color: Color(0xFF9999AE),
+                          fontStyle: FontStyle.italic)),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1231,26 +1547,32 @@ class PosShortcutHelp extends StatelessWidget {
   }
 }
 
+// ── FIX 5: _KeyBadge now has maxWidth + ellipsis to prevent horizontal overflow
 class _KeyBadge extends StatelessWidget {
   final String label;
   const _KeyBadge(this.label);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F0F2),
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: const Color(0xFFCCCCD4), width: 0.5),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF111118),
-          fontFamily: 'monospace',
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 130),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F0F2),
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: const Color(0xFFCCCCD4), width: 0.5),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF111118),
+            fontFamily: 'monospace',
+          ),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
         ),
       ),
     );

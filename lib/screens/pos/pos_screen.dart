@@ -1,5 +1,8 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +17,10 @@ import '../../services/pocketbase/product_service.dart';
 import '../../widgets/app_navigation.dart';
 import '../../widgets/receipt_dialog.dart';
 import '../../widgets/responsive_layout.dart';
+
+// ─── Platform helper (mirrors the one in pos_keyboard_system.dart) ─────────────
+bool get _isDesktop =>
+    !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
 
 // ─── Category → Unsplash image URL ────────────────────────────────────────────
 class _CategoryImages {
@@ -103,6 +110,9 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   int _focusedProductIndex = -1;
   List<Product> _lastFilteredProducts = [];
 
+  // ── FIX 2: guard against multiple overlapping Ready Orders sheets ─────────
+  bool _readyOrdersSheetOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -111,7 +121,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
 
-    // Register global F-key hotkeys
+    // Register global F-key hotkeys (desktop only — guarded inside registry)
     _registerHotkeys();
   }
 
@@ -331,9 +341,13 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                         fontSize: 13, color: NovaColors.textSecondary),
                   ),
                   const SizedBox(height: 20),
+                  // ── FIX 1: only allow digit input — blocks /  .  '  letters etc.
                   TextField(
                     keyboardType: TextInputType.number,
                     autofocus: true,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
                     onChanged: (value) => qty = int.tryParse(value) ?? 1,
                     onSubmitted: (_) => Navigator.pop(dialogContext, qty),
                     style: const TextStyle(
@@ -415,14 +429,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── FIX: use OrderRecordSnapshot.docs and doc.data() correctly ────────────
-  //
-  // Previously this crashed silently because snapshot.data was typed as
-  // dynamic and .docs/.data() calls were Firestore-style guesses.
-  // Now we cast explicitly to OrderRecordSnapshot so the compiler catches
-  // any future API changes, and we call doc.data() which is defined on
-  // OrderRecordDocument to return a Map<String, dynamic>.
-
   int _readyOrderCount(AsyncSnapshot<OrderRecordSnapshot> snapshot) {
     if (!snapshot.hasData) return 0;
     return snapshot.data!.docs
@@ -484,7 +490,11 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     );
   }
 
+  // ── FIX 2: prevent multiple overlapping Ready Orders sheets ───────────────
   void _showReadyOrdersSheet(BuildContext context) {
+    if (_readyOrdersSheetOpen) return;
+    _readyOrdersSheetOpen = true;
+
     final rootContext = context;
     showModalBottomSheet<void>(
       context: context,
@@ -559,7 +569,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                               ],
                             ),
                           ),
-                          // ── FIX: typed StreamBuilder ─────────────────────
                           StreamBuilder<OrderRecordSnapshot>(
                             stream: _orderService?.getOrders(),
                             builder: (context, snapshot) {
@@ -596,7 +605,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                     ),
                     const SizedBox(height: 12),
                     Expanded(
-                      // ── FIX: typed StreamBuilder + correct doc.data() ───
                       child: StreamBuilder<OrderRecordSnapshot>(
                         stream: _orderService?.getOrders(),
                         builder: (context, snapshot) {
@@ -627,7 +635,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                             return _emptyOrdersView();
                           }
 
-                          // ── collect + sort ready orders ──────────────────
                           final readyDocs = snapshot.data!.docs.where((doc) {
                             return doc.data()['status'] == 'ready';
                           }).toList();
@@ -718,7 +725,10 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      // ── FIX 2: reset flag when sheet is closed (any way — swipe, tap, etc.)
+      if (mounted) setState(() => _readyOrdersSheetOpen = false);
+    });
   }
 
   Widget _emptyOrdersView() {
@@ -818,13 +828,14 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                         height: 0.5, color: NovaColors.borderTertiary),
                   ),
                   actions: [
-                    IconButton(
-                      tooltip: 'Keyboard Shortcuts (?)',
-                      onPressed: () => PosShortcutHelp.show(context),
-                      icon: const Icon(Icons.keyboard_rounded,
-                          color: NovaColors.textSecondary, size: 20),
-                    ),
-                    // ── FIX: typed StreamBuilder ─────────────────────────
+                    // ── Only show keyboard shortcut button on desktop ──
+                    if (_isDesktop)
+                      IconButton(
+                        tooltip: 'Keyboard Shortcuts (?)',
+                        onPressed: () => PosShortcutHelp.show(context),
+                        icon: const Icon(Icons.keyboard_rounded,
+                            color: NovaColors.textSecondary, size: 20),
+                      ),
                     StreamBuilder<OrderRecordSnapshot>(
                       stream: _orderService?.getOrders(),
                       builder: (context, snapshot) {
@@ -1089,7 +1100,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
-                                  // ── FIX: typed StreamBuilder ─────────
                                   child: StreamBuilder<OrderRecordSnapshot>(
                                     stream: _orderService?.getOrders(),
                                     builder: (context, snapshot) {

@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/keyboard/pos_keyboard_system.dart';
 import '../../core/theme/cafe_colors.dart';
 import '../../core/theme/nova_theme.dart';
 import '../../providers/auth_provider.dart';
@@ -125,6 +126,13 @@ class _KitchenScreenState extends State<KitchenScreen>
   final Set<String> _hiddenOrderIds = <String>{};
   final List<String> _visibleOrderIds = [];
 
+  // ── Keyboard navigation state ─────────────────────────────────────────────
+  /// Index of the currently keyboard-focused order card (0-based).
+  int _focusedIndex = 0;
+
+  /// Live snapshot of docs currently shown — kept in sync inside StreamBuilder.
+  List<OrderRecordDocument> _currentDocs = [];
+
   Stream<OrderRecordSnapshot>? _ordersStream;
   late AnimationController _pulseController;
 
@@ -152,6 +160,48 @@ class _KitchenScreenState extends State<KitchenScreen>
   void dispose() {
     _pulseController.dispose();
     super.dispose();
+  }
+
+  // ── Keyboard helpers ──────────────────────────────────────────────────────
+
+  void _navigateOrders(bool up) {
+    if (_currentDocs.isEmpty) return;
+    setState(() {
+      _focusedIndex = (up ? _focusedIndex - 1 : _focusedIndex + 1)
+          .clamp(0, _currentDocs.length - 1);
+    });
+  }
+
+  /// Mark the currently focused order as ready (Enter key).
+  void _markFocusedReady() {
+    if (_currentDocs.isEmpty) return;
+    if (_focusedIndex < 0 || _focusedIndex >= _currentDocs.length) return;
+    final doc = _currentDocs[_focusedIndex];
+    final status = doc.data()['status']?.toString() ?? 'pending';
+    // Only mark if still pending — silently ignore if already ready.
+    if (status == 'pending') {
+      _service.updateStatus(doc.id, 'ready');
+      // Optionally show a snackbar for confirmation feedback.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded,
+                  color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                'Order #${(doc.data()['orderNumber'] as num?)?.toInt() ?? ''} marked Ready',
+              ),
+            ],
+          ),
+          backgroundColor: CafeColors.olive,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   @override
@@ -241,180 +291,203 @@ class _KitchenScreenState extends State<KitchenScreen>
           body: AppNavigationShell(
             auth: auth,
             currentRoute: '/kitchen',
-            child: ResponsiveCenter(
-              child: Column(
-                children: [
-                  // ── Metric cards ───────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: StreamBuilder<Map<String, int>>(
-                      stream: _reportService.getOrderStatusStats(),
-                      builder: (context, snapshot) {
-                        final stats = snapshot.data ??
-                            {'pending': 0, 'ready': 0, 'completed': 0};
-                        return Row(
-                          children: [
-                            Expanded(
-                              child: _MetricCard(
-                                title: 'Pending',
-                                value: '${stats['pending']}',
-                                icon: Icons.hourglass_top_rounded,
-                                color: const Color(0xFFFF4D1C),
-                                bgColor: const Color(0xFFFFEDE8),
+            // ── Wrap entire body with KitchenKeyboardScope ─────────────────
+            child: KitchenKeyboardScope(
+              onNavigate: _navigateOrders,
+              onReadyOrder: _markFocusedReady,
+              child: ResponsiveCenter(
+                child: Column(
+                  children: [
+                    // ── Metric cards ─────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.only(top: 14),
+                      child: StreamBuilder<Map<String, int>>(
+                        stream: _reportService.getOrderStatusStats(),
+                        builder: (context, snapshot) {
+                          final stats = snapshot.data ??
+                              {'pending': 0, 'ready': 0, 'completed': 0};
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: _MetricCard(
+                                  title: 'Pending',
+                                  value: '${stats['pending']}',
+                                  icon: Icons.hourglass_top_rounded,
+                                  color: const Color(0xFFFF4D1C),
+                                  bgColor: const Color(0xFFFFEDE8),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _MetricCard(
-                                title: 'Ready',
-                                value: '${stats['ready']}',
-                                icon: Icons.check_circle_outline_rounded,
-                                color: CafeColors.olive,
-                                bgColor: CafeColors.oliveLight,
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _MetricCard(
+                                  title: 'Ready',
+                                  value: '${stats['ready']}',
+                                  icon: Icons.check_circle_outline_rounded,
+                                  color: CafeColors.olive,
+                                  bgColor: CafeColors.oliveLight,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _MetricCard(
-                                title: 'Done',
-                                value: '${stats['completed']}',
-                                icon: Icons.task_alt_rounded,
-                                color: const Color(0xFF6B7280),
-                                bgColor: const Color(0xFFF3F4F6),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _MetricCard(
+                                  title: 'Done',
+                                  value: '${stats['completed']}',
+                                  icon: Icons.task_alt_rounded,
+                                  color: const Color(0xFF6B7280),
+                                  bgColor: const Color(0xFFF3F4F6),
+                                ),
                               ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // ── Section header ─────────────────────────────────
-                  Row(
-                    children: [
-                      Container(
-                        width: 4,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [CafeColors.flame, CafeColors.amber],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                          ),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text('Active Orders',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: CafeColors.charcoal)),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                            color: CafeColors.creme,
-                            borderRadius: BorderRadius.circular(20)),
-                        child: const Text('Live',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: CafeColors.flame)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // ── Orders ─────────────────────────────────────────
-                  Expanded(
-                    child: StreamBuilder<OrderRecordSnapshot>(
-                      stream: _ordersStream,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                                ConnectionState.waiting &&
-                            !snapshot.hasData) {
-                          return const Center(
-                              child: CircularProgressIndicator(
-                                  color: CafeColors.flame));
-                        }
-                        if (snapshot.hasError) {
-                          return Center(
-                              child: Text('Error: ${snapshot.error}'));
-                        }
-
-                        final docs = snapshot.hasData
-                            ? snapshot.data!.docs.where((doc) {
-                                final data = doc.data();
-                                final status =
-                                    data['status']?.toString() ?? 'pending';
-                                return !_hiddenOrderIds.contains(doc.id) &&
-                                    (status == 'pending' || status == 'ready');
-                              }).toList()
-                            : <OrderRecordDocument>[];
-
-                        _visibleOrderIds.clear();
-                        for (final doc in docs) _visibleOrderIds.add(doc.id);
-
-                        if (docs.isEmpty) return _emptyView();
-
-                        return LayoutBuilder(builder: (context, constraints) {
-                          final columns = constraints.maxWidth > 900
-                              ? 3
-                              : constraints.maxWidth > 580
-                                  ? 2
-                                  : 1;
-
-                          Widget buildCard(int index) {
-                            final doc = docs[index];
-                            final data = doc.data();
-                            final items = List<Map<String, dynamic>>.from(
-                                data['items'] ?? []);
-                            final status =
-                                data['status']?.toString() ?? 'pending';
-                            final orderNumber =
-                                (data['orderNumber'] as num?)?.toInt() ?? 0;
-                            final tableNumber = data['tableNumber']?.toString();
-                            final createdAt = data['createdAt'] as DateTime?;
-                            final orderType =
-                                data['orderType']?.toString() ?? 'takeaway';
-
-                            return _KitchenOrderCard(
-                              docId: doc.id,
-                              orderNumber: orderNumber,
-                              status: status,
-                              orderType: orderType,
-                              tableNumber: tableNumber,
-                              items: items,
-                              createdAt: createdAt,
-                              onMarkReady: () =>
-                                  _service.updateStatus(doc.id, 'ready'),
-                            );
-                          }
-
-                          // Mobile & single column: plain list
-                          if (columns == 1) {
-                            return ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(0, 2, 0, 100),
-                              itemCount: docs.length,
-                              itemBuilder: (_, i) => buildCard(i),
-                            );
-                          }
-
-                          // Desktop/tablet: masonry-friendly — use ListView of Rows
-                          // so each card shrinks to its content with no fixed aspect ratio
-                          return _MasonryGrid(
-                            columns: columns,
-                            count: docs.length,
-                            builder: buildCard,
+                            ],
                           );
-                        });
-                      },
+                        },
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+
+                    // ── Section header ─────────────────────────────────
+                    Row(
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [CafeColors.flame, CafeColors.amber],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('Active Orders',
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: CafeColors.charcoal)),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                              color: CafeColors.creme,
+                              borderRadius: BorderRadius.circular(20)),
+                          child: const Text('Live',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: CafeColors.flame)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // ── Orders ─────────────────────────────────────────
+                    Expanded(
+                      child: StreamBuilder<OrderRecordSnapshot>(
+                        stream: _ordersStream,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                                  ConnectionState.waiting &&
+                              !snapshot.hasData) {
+                            return const Center(
+                                child: CircularProgressIndicator(
+                                    color: CafeColors.flame));
+                          }
+                          if (snapshot.hasError) {
+                            return Center(
+                                child: Text('Error: ${snapshot.error}'));
+                          }
+
+                          final docs = snapshot.hasData
+                              ? snapshot.data!.docs.where((doc) {
+                                  final data = doc.data();
+                                  final status =
+                                      data['status']?.toString() ?? 'pending';
+                                  return !_hiddenOrderIds.contains(doc.id) &&
+                                      (status == 'pending' ||
+                                          status == 'ready');
+                                }).toList()
+                              : <OrderRecordDocument>[];
+
+                          // Keep a live reference so keyboard callbacks can act on them.
+                          _currentDocs = docs;
+
+                          _visibleOrderIds.clear();
+                          for (final doc in docs) _visibleOrderIds.add(doc.id);
+
+                          // Clamp focused index in case orders disappear.
+                          if (_focusedIndex >= docs.length && docs.isNotEmpty) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) {
+                                setState(() {
+                                  _focusedIndex = (docs.length - 1)
+                                      .clamp(0, docs.length - 1);
+                                });
+                              }
+                            });
+                          }
+
+                          if (docs.isEmpty) return _emptyView();
+
+                          return LayoutBuilder(builder: (context, constraints) {
+                            final columns = constraints.maxWidth > 900
+                                ? 3
+                                : constraints.maxWidth > 580
+                                    ? 2
+                                    : 1;
+
+                            Widget buildCard(int index) {
+                              final doc = docs[index];
+                              final data = doc.data();
+                              final items = List<Map<String, dynamic>>.from(
+                                  data['items'] ?? []);
+                              final status =
+                                  data['status']?.toString() ?? 'pending';
+                              final orderNumber =
+                                  (data['orderNumber'] as num?)?.toInt() ?? 0;
+                              final tableNumber =
+                                  data['tableNumber']?.toString();
+                              final createdAt = data['createdAt'] as DateTime?;
+                              final orderType =
+                                  data['orderType']?.toString() ?? 'takeaway';
+
+                              return _KitchenOrderCard(
+                                docId: doc.id,
+                                orderNumber: orderNumber,
+                                status: status,
+                                orderType: orderType,
+                                tableNumber: tableNumber,
+                                items: items,
+                                createdAt: createdAt,
+                                // Highlight the keyboard-focused card.
+                                isKeyboardFocused: index == _focusedIndex,
+                                onMarkReady: () =>
+                                    _service.updateStatus(doc.id, 'ready'),
+                              );
+                            }
+
+                            // Mobile & single column: plain list
+                            if (columns == 1) {
+                              return ListView.builder(
+                                padding:
+                                    const EdgeInsets.fromLTRB(0, 2, 0, 100),
+                                itemCount: docs.length,
+                                itemBuilder: (_, i) => buildCard(i),
+                              );
+                            }
+
+                            return _MasonryGrid(
+                              columns: columns,
+                              count: docs.length,
+                              builder: buildCard,
+                            );
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -444,6 +517,7 @@ class _KitchenScreenState extends State<KitchenScreen>
                           for (final id in _visibleOrderIds) {
                             _hiddenOrderIds.add(id);
                           }
+                          _focusedIndex = 0;
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -516,7 +590,7 @@ class _KitchenScreenState extends State<KitchenScreen>
   }
 }
 
-// ─── Masonry-style grid: cards shrink to their own content height ─────────────
+// ─── Masonry-style grid ───────────────────────────────────────────────────────
 class _MasonryGrid extends StatelessWidget {
   final int columns;
   final int count;
@@ -530,7 +604,6 @@ class _MasonryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Distribute indices into columns top-to-bottom, left-to-right
     final cols = List.generate(columns, (_) => <int>[]);
     for (var i = 0; i < count; i++) {
       cols[i % columns].add(i);
@@ -624,6 +697,9 @@ class _KitchenOrderCard extends StatelessWidget {
   final DateTime? createdAt;
   final VoidCallback onMarkReady;
 
+  /// When true, this card is highlighted as the keyboard-focused order.
+  final bool isKeyboardFocused;
+
   const _KitchenOrderCard({
     required this.docId,
     required this.orderNumber,
@@ -633,6 +709,7 @@ class _KitchenOrderCard extends StatelessWidget {
     required this.items,
     required this.createdAt,
     required this.onMarkReady,
+    this.isKeyboardFocused = false,
   });
 
   bool get isPending => status == 'pending';
@@ -648,21 +725,36 @@ class _KitchenOrderCard extends StatelessWidget {
     final statusBg =
         isPending ? const Color(0xFFFFEDE8) : CafeColors.oliveLight;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
       // margin only bottom — card height = content height, nothing extra
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: statusColor.withOpacity(0.15), width: 1),
+        border: Border.all(
+          // Keyboard-focused cards get a prominent violet border.
+          color: isKeyboardFocused
+              ? const Color(0xFF534AB7)
+              : statusColor.withOpacity(0.15),
+          width: isKeyboardFocused ? 2 : 1,
+        ),
         boxShadow: [
-          BoxShadow(
+          if (isKeyboardFocused)
+            const BoxShadow(
+              color: Color(0x33534AB7),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+              spreadRadius: 1,
+            )
+          else
+            BoxShadow(
               color: statusColor.withOpacity(0.06),
               blurRadius: 8,
-              offset: const Offset(0, 3)),
+              offset: const Offset(0, 3),
+            ),
         ],
       ),
-      // intrinsic height — wraps content exactly
       child: IntrinsicHeight(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -671,7 +763,9 @@ class _KitchenOrderCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.04),
+                color: isKeyboardFocused
+                    ? const Color(0xFFEEEDFE)
+                    : statusColor.withOpacity(0.04),
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(14)),
               ),

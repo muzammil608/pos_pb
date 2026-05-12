@@ -10,8 +10,6 @@ import '../../services/pocketbase/report_service.dart';
 import '../../widgets/app_navigation.dart';
 import '../../widgets/responsive_layout.dart';
 
-// ─── Vibrant Café Color Palette ───────────────────────────────────────────────
-
 class OrdersReportScreen extends StatefulWidget {
   const OrdersReportScreen({super.key});
 
@@ -65,7 +63,6 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
     };
   }
 
-  // ─── Period Selector Widget ───────────────────────────────────────────────
   Widget _buildPeriodSelector() {
     return Container(
       decoration: BoxDecoration(
@@ -146,13 +143,15 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
         final userName = auth.user?.displayName ?? userEmail.split('@').first;
         final photoUrl = auth.user?.photoURL;
 
+        final columns = ResponsiveLayout.cardColumns(
+          MediaQuery.of(context).size.width,
+        );
+
         return Scaffold(
           backgroundColor: NovaColors.bgTertiary,
           drawer: AppNavigationShell.isDesktop(context)
               ? null
               : AppNavigationDrawer(auth: auth, currentRoute: '/orders'),
-
-          // ─── AppBar ────────────────────────────────────────────────────
           appBar: PreferredSize(
             preferredSize: const Size.fromHeight(64),
             child: Container(
@@ -200,215 +199,167 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
               ),
             ),
           ),
-
-          // ─── Body ──────────────────────────────────────────────────────
           body: AppNavigationShell(
             auth: auth,
             currentRoute: '/orders',
             child: ResponsiveCenter(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(0, 20, 0, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ─── Orders Stream ────────────────────────────────────────
-                    StreamBuilder<List<Map<String, dynamic>>>(
-                      stream: _reportService.getOrdersByPeriod(_ordersPeriod),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(48),
-                              child: CircularProgressIndicator(
-                                  color: CafeColors.flame),
+              child: StreamBuilder<List<Map<String, dynamic>>>(
+                stream: _reportService.getOrdersByPeriod(_ordersPeriod),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(
+                      child: CircularProgressIndicator(color: CafeColors.flame),
+                    );
+                  }
+
+                  final orders = snapshot.data!;
+                  final grandTotal = orders.fold<double>(
+                    0.0,
+                    (sum, order) =>
+                        sum + ((order['total'] as num?)?.toDouble() ?? 0.0),
+                  );
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ══════════════════════════════════════════════════
+                      // FIXED — Summary card, period selector, label
+                      // ══════════════════════════════════════════════════
+
+                      const SizedBox(height: 20),
+
+                      // ─── Summary Card ─────────────────────────────────
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: CafeColors.headerGradient,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: CafeColors.flame.withOpacity(0.28),
+                              blurRadius: 14,
+                              offset: const Offset(0, 5),
                             ),
-                          );
-                        }
-
-                        final orders = snapshot.data!;
-                        final grandTotal = orders.fold<double>(
-                          0.0,
-                          (sum, order) =>
-                              sum +
-                              ((order['total'] as num?)?.toDouble() ?? 0.0),
-                        );
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(22),
+                        child: Row(
                           children: [
-                            // ─── Summary Card ───────────────────────────────
-                            Container(
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                gradient: CafeColors.headerGradient,
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: CafeColors.flame.withOpacity(0.28),
-                                    blurRadius: 14,
-                                    offset: const Offset(0, 5),
-                                  ),
-                                ],
-                              ),
-                              padding: const EdgeInsets.all(22),
-                              child: Row(
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '${_periodTitle(_ordersPeriod)} Total',
-                                          style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Rs ${grandTotal.toStringAsFixed(0)}',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 32,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: -0.5,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Colors.white.withOpacity(0.2),
-                                            borderRadius:
-                                                BorderRadius.circular(20),
-                                          ),
-                                          child: Text(
-                                            '${orders.length} order${orders.length == 1 ? '' : 's'}',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                  Text(
+                                    '${_periodTitle(_ordersPeriod)} Total',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.all(14),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: const Icon(
-                                      Icons.summarize_rounded,
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Rs ${grandTotal.toStringAsFixed(0)}',
+                                    style: const TextStyle(
                                       color: Colors.white,
-                                      size: 32,
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      '${orders.length} order${orders.length == 1 ? '' : 's'}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-
-                            const SizedBox(height: 14),
-
-                            // ─── Period Selector (below summary card) ────────
-                            _buildPeriodSelector(),
-
-                            const SizedBox(height: 20),
-
-                            // ─── Section Label ──────────────────────────────
-                            Row(
-                              children: [
-                                Container(
-                                  width: 4,
-                                  height: 18,
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        CafeColors.flame,
-                                        CafeColors.amber
-                                      ],
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                    ),
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Icon(Icons.list_alt_rounded,
-                                    size: 17, color: CafeColors.flame),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  'Order List',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    color: CafeColors.charcoal,
-                                  ),
-                                ),
-                              ],
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.summarize_rounded,
+                                color: Colors.white,
+                                size: 32,
+                              ),
                             ),
+                          ],
+                        ),
+                      ),
 
-                            const SizedBox(height: 12),
+                      const SizedBox(height: 14),
 
-                            // ─── Orders List ────────────────────────────────
-                            if (orders.isEmpty)
-                              _emptyView(_ordersPeriod)
-                            else
-                              LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final columns = ResponsiveLayout.cardColumns(
-                                    constraints.maxWidth,
-                                  );
+                      // ─── Period Selector ──────────────────────────────
+                      _buildPeriodSelector(),
 
-                                  Widget buildOrderCard(int index) {
-                                    final order = orders[index];
-                                    final orderNumber = order['orderNumber']
-                                            ?.toString() ??
-                                        order['id'].toString().substring(0, 6);
-                                    final total =
-                                        (order['total'] as num?)?.toDouble() ??
-                                            0.0;
-                                    final status =
-                                        order['status']?.toString() ??
-                                            'unknown';
-                                    final orderType =
-                                        order['orderType']?.toString() ??
-                                            'takeaway';
-                                    final createdAt =
-                                        order['createdAtDate'] as DateTime;
+                      const SizedBox(height: 20),
 
-                                    return _OrderCard(
-                                      orderNumber: orderNumber,
-                                      total: total,
-                                      status: status,
-                                      orderType: orderType,
-                                      createdAt: createdAt,
-                                      formattedDate:
-                                          _formatOrderDate(createdAt),
-                                      statusColor: _statusColor(status),
-                                      statusBg: _statusBg(status),
-                                    );
-                                  }
+                      // ─── Section Label ────────────────────────────────
+                      Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [CafeColors.flame, CafeColors.amber],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.list_alt_rounded,
+                              size: 17, color: CafeColors.flame),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Order List',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: CafeColors.charcoal,
+                            ),
+                          ),
+                        ],
+                      ),
 
-                                  if (columns == 1) {
-                                    return Column(
-                                      children: List.generate(
-                                        orders.length,
-                                        buildOrderCard,
-                                      ),
-                                    );
-                                  }
+                      const SizedBox(height: 12),
 
-                                  return GridView.builder(
-                                    shrinkWrap: true,
-                                    physics:
-                                        const NeverScrollableScrollPhysics(),
+                      // ══════════════════════════════════════════════════
+                      // SCROLLABLE — only the order cards scroll
+                      // ══════════════════════════════════════════════════
+
+                      Expanded(
+                        child: orders.isEmpty
+                            ? _emptyView(_ordersPeriod)
+                            : columns == 1
+                                // ─── Single-column ────────────────────
+                                ? ListView.builder(
+                                    padding: const EdgeInsets.only(bottom: 32),
+                                    itemCount: orders.length,
+                                    itemBuilder: (context, index) =>
+                                        _buildOrderCard(orders[index]),
+                                  )
+                                // ─── Multi-column grid ─────────────────
+                                : GridView.builder(
+                                    padding: const EdgeInsets.only(bottom: 32),
                                     gridDelegate:
                                         SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: columns,
@@ -418,16 +369,12 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
                                     ),
                                     itemCount: orders.length,
                                     itemBuilder: (context, index) =>
-                                        buildOrderCard(index),
-                                  );
-                                },
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                ),
+                                        _buildOrderCard(orders[index]),
+                                  ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -436,46 +383,64 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
     );
   }
 
+  Widget _buildOrderCard(Map<String, dynamic> order) {
+    final orderNumber = order['orderNumber']?.toString() ??
+        order['id'].toString().substring(0, 6);
+    final total = (order['total'] as num?)?.toDouble() ?? 0.0;
+    final status = order['status']?.toString() ?? 'unknown';
+    final orderType = order['orderType']?.toString() ?? 'takeaway';
+    final createdAt = order['createdAtDate'] as DateTime;
+
+    return _OrderCard(
+      orderNumber: orderNumber,
+      total: total,
+      status: status,
+      orderType: orderType,
+      createdAt: createdAt,
+      formattedDate: _formatOrderDate(createdAt),
+      statusColor: _statusColor(status),
+      statusBg: _statusBg(status),
+    );
+  }
+
   Widget _emptyView(String period) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: CafeColors.creme,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.receipt_long_rounded,
-                  size: 40, color: CafeColors.flame),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: CafeColors.creme,
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 14),
-            Text(
-              'No ${period.toLowerCase()} orders',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: CafeColors.charcoal,
-              ),
+            child: const Icon(Icons.receipt_long_rounded,
+                size: 40, color: CafeColors.flame),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'No ${period.toLowerCase()} orders',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: CafeColors.charcoal,
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Orders will appear here once placed',
-              style: TextStyle(
-                fontSize: 13,
-                color: CafeColors.charcoal.withOpacity(0.45),
-              ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Orders will appear here once placed',
+            style: TextStyle(
+              fontSize: 13,
+              color: CafeColors.charcoal.withOpacity(0.45),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ─── Order Card ────────────────────────────────────────────────────────────────
+// ─── Order Card ───────────────────────────────────────────────────────────────
 class _OrderCard extends StatelessWidget {
   final String orderNumber;
   final double total;
@@ -516,7 +481,7 @@ class _OrderCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Row(
           children: [
-            // ─── Icon Badge ───────────────────────────────────────────────
+            // ─── Icon Badge ─────────────────────────────────────────────
             Container(
               width: 44,
               height: 44,
@@ -529,7 +494,7 @@ class _OrderCard extends StatelessWidget {
             ),
             const SizedBox(width: 12),
 
-            // ─── Info ─────────────────────────────────────────────────────
+            // ─── Info ───────────────────────────────────────────────────
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -574,7 +539,6 @@ class _OrderCard extends StatelessWidget {
                   const SizedBox(height: 7),
                   Row(
                     children: [
-                      // Order type chip
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 3),
@@ -592,7 +556,6 @@ class _OrderCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      // Status chip
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 3),
