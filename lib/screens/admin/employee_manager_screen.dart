@@ -112,100 +112,168 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            Future<void> createEmployee() async {
+              final name = _nameController.text.trim();
+              final email = _emailController.text.trim();
+              final password = _passwordController.text.trim();
+
+              if (name.isEmpty || email.isEmpty || password.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please fill all fields'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              if (password.length < 6) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Password must be at least 6 characters'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              setDialogState(() => _isCreating = true);
+
+              final auth = Provider.of<AuthProvider>(context, listen: false);
+              final result = await auth.createEmployee(
+                email: email,
+                password: password,
+                name: name,
+                role: _selectedRole,
+              );
+
+              setDialogState(() => _isCreating = false);
+              if (!dialogContext.mounted) return;
+              Navigator.pop(dialogContext);
+              if (!context.mounted) return;
+
+              final success = result['success'] == true;
+              final errorMsg = result['error']?.toString();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    success
+                        ? 'Employee created successfully'
+                        : errorMsg ?? 'Failed to create employee',
+                  ),
+                  backgroundColor: success ? CafeColors.olive : Colors.red,
+                ),
+              );
+            }
+
             return Dialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24)),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              gradient: CafeColors.headerGradient,
-                              borderRadius: BorderRadius.circular(12),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 460,
+                  maxHeight: MediaQuery.of(context).size.height * 0.86,
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(
+                    MediaQuery.of(context).size.width < 380 ? 16 : 24,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                gradient: CafeColors.headerGradient,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.person_add_rounded,
+                                  color: Colors.white, size: 20),
                             ),
-                            child: const Icon(Icons.person_add_rounded,
-                                color: Colors.white, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Add Employee',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: CafeColors.charcoal,
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Add Employee',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: CafeColors.charcoal,
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      _styledField(
-                        controller: _nameController,
-                        label: 'Full Name',
-                        icon: Icons.person_outline,
-                      ),
-                      const SizedBox(height: 12),
-                      _styledField(
-                        controller: _emailController,
-                        label: 'Email',
-                        icon: Icons.email_outlined,
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 12),
-                      _styledField(
-                        controller: _passwordController,
-                        label: 'Password',
-                        icon: Icons.lock_outline,
-                        obscureText: true,
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _selectedRole,
-                        decoration: InputDecoration(
-                          labelText: 'Role',
-                          labelStyle: TextStyle(
-                              color: CafeColors.flame.withOpacity(0.8)),
-                          prefixIcon: const Icon(Icons.badge_outlined,
-                              color: CafeColors.flame, size: 20),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                                color: CafeColors.flame.withOpacity(0.2)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                                color: CafeColors.flame, width: 2),
-                          ),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(
-                              vertical: 14, horizontal: 12),
+                          ],
                         ),
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'cashier', child: Text('Cashier')),
-                          DropdownMenuItem(
-                              value: 'kitchen', child: Text('Kitchen')),
-                        ],
-                        onChanged: (value) => setDialogState(
-                            () => _selectedRole = value ?? 'cashier'),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
+                        const SizedBox(height: 20),
+                        _styledField(
+                          controller: _nameController,
+                          label: 'Full Name',
+                          icon: Icons.person_outline,
+                        ),
+                        const SizedBox(height: 12),
+                        _styledField(
+                          controller: _emailController,
+                          label: 'Email',
+                          icon: Icons.email_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        const SizedBox(height: 12),
+                        _styledField(
+                          controller: _passwordController,
+                          label: 'Password',
+                          icon: Icons.lock_outline,
+                          obscureText: true,
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: _selectedRole,
+                          decoration: InputDecoration(
+                            labelText: 'Role',
+                            labelStyle: TextStyle(
+                                color: CafeColors.flame.withOpacity(0.8)),
+                            prefixIcon: const Icon(Icons.badge_outlined,
+                                color: CafeColors.flame, size: 20),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                  color: CafeColors.flame.withOpacity(0.2)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                  color: CafeColors.flame, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                                vertical: 14, horizontal: 12),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'cashier', child: Text('Cashier')),
+                            DropdownMenuItem(
+                                value: 'kitchen', child: Text('Kitchen')),
+                          ],
+                          onChanged: (value) => setDialogState(
+                              () => _selectedRole = value ?? 'cashier'),
+                        ),
+                        const SizedBox(height: 24),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final compact = constraints.maxWidth < 340;
+                            final cancelButton = OutlinedButton(
                               onPressed: () => Navigator.pop(dialogContext),
                               style: OutlinedButton.styleFrom(
                                 padding:
@@ -217,90 +285,14 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
                               ),
                               child: const Text('Cancel',
                                   style: TextStyle(color: CafeColors.flame)),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DecoratedBox(
+                            );
+                            final createButton = DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: CafeColors.headerGradient,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: ElevatedButton(
-                                onPressed: _isCreating
-                                    ? null
-                                    : () async {
-                                        final name =
-                                            _nameController.text.trim();
-                                        final email =
-                                            _emailController.text.trim();
-                                        final password =
-                                            _passwordController.text.trim();
-
-                                        if (name.isEmpty ||
-                                            email.isEmpty ||
-                                            password.isEmpty) {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                  'Please fill all fields'),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                          return;
-                                        }
-                                        if (password.length < 6) {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                  'Password must be at least 6 characters'),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                          return;
-                                        }
-
-                                        setDialogState(
-                                            () => _isCreating = true);
-
-                                        final auth = Provider.of<AuthProvider>(
-                                            context,
-                                            listen: false);
-                                        final result =
-                                            await auth.createEmployee(
-                                          email: email,
-                                          password: password,
-                                          name: name,
-                                          role: _selectedRole,
-                                        );
-
-                                        setDialogState(
-                                            () => _isCreating = false);
-                                        if (!dialogContext.mounted) return;
-                                        Navigator.pop(dialogContext);
-                                        if (!context.mounted) return;
-
-                                        final bool success =
-                                            result['success'] == true;
-                                        final String? errorMsg =
-                                            result['error']?.toString();
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              success
-                                                  ? 'Employee created successfully'
-                                                  : errorMsg ??
-                                                      'Failed to create employee',
-                                            ),
-                                            backgroundColor: success
-                                                ? CafeColors.olive
-                                                : Colors.red,
-                                          ),
-                                        );
-                                      },
+                                onPressed: _isCreating ? null : createEmployee,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.transparent,
                                   shadowColor: Colors.transparent,
@@ -322,11 +314,30 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
                                             color: Colors.white,
                                             fontWeight: FontWeight.w700)),
                               ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            );
+
+                            if (compact) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  cancelButton,
+                                  const SizedBox(height: 10),
+                                  createButton,
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              children: [
+                                Expanded(child: cancelButton),
+                                const SizedBox(width: 12),
+                                Expanded(child: createButton),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

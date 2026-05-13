@@ -26,6 +26,175 @@ String itemEmoji(String name) {
   return '🍴';
 }
 
+class _EditQuantityDialog extends StatefulWidget {
+  final String itemName;
+  final int initialQty;
+  final InputDecoration fieldDecoration;
+
+  const _EditQuantityDialog({
+    required this.itemName,
+    required this.initialQty,
+    required this.fieldDecoration,
+  });
+
+  @override
+  State<_EditQuantityDialog> createState() => _EditQuantityDialogState();
+}
+
+class _EditQuantityDialogState extends State<_EditQuantityDialog> {
+  late final TextEditingController _qtyController;
+
+  @override
+  void initState() {
+    super.initState();
+    _qtyController = TextEditingController(
+      text: widget.initialQty.toString(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _qtyController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final qty = int.tryParse(_qtyController.text.trim());
+    if (qty == null || qty <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a valid quantity greater than 0.'),
+        ),
+      );
+      return;
+    }
+    Navigator.pop(context, qty);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: NovaColors.bgPrimary,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 330;
+            final cancelButton = OutlinedButton(
+              onPressed: () => Navigator.pop(context),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                side: const BorderSide(color: NovaColors.borderSecondary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: NovaColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            );
+            final saveButton = ElevatedButton(
+              onPressed: _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: NovaColors.violet,
+                shadowColor: Colors.transparent,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Save',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            );
+
+            return Padding(
+              padding: EdgeInsets.all(compact ? 16 : 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: NovaColors.violetLight,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.edit_rounded,
+                          color: NovaColors.violet,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Edit ${widget.itemName}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: NovaColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  TextField(
+                    controller: _qtyController,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    onSubmitted: (_) => _save(),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: NovaColors.textPrimary,
+                    ),
+                    decoration: widget.fieldDecoration,
+                  ),
+                  const SizedBox(height: 18),
+                  if (compact)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        cancelButton,
+                        const SizedBox(height: 10),
+                        saveButton,
+                      ],
+                    )
+                  else
+                    Row(
+                      children: [
+                        Expanded(child: cancelButton),
+                        const SizedBox(width: 10),
+                        Expanded(child: saveButton),
+                      ],
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
 Color itemBgColor(String name) {
   const colors = [
     NovaColors.violetLight,
@@ -64,11 +233,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _paymentMethod = 'cash';
   double _tenderedAmount = 0.0;
   bool _isSubmitting = false;
+  int _focusedCartIndex = 0;
 
   final FocusNode _cashFocus = FocusNode();
   final FocusNode _checkoutShortcutFocus =
       FocusNode(debugLabel: 'CheckoutShortcuts');
   final TextEditingController _cashController = TextEditingController();
+  final Map<String, GlobalKey> _cartItemKeys = {};
 
   @override
   void initState() {
@@ -111,6 +282,168 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } else {
       _cashFocus.unfocus();
       _focusCheckoutShortcuts();
+    }
+  }
+
+  int _safeCartIndex(CartProvider cart) {
+    if (cart.items.isEmpty) return 0;
+    return _focusedCartIndex.clamp(0, cart.items.length - 1);
+  }
+
+  void _focusCartShortcuts() {
+    _cashFocus.unfocus();
+    _checkoutShortcutFocus.requestFocus();
+  }
+
+  void _selectCartItem(int index) {
+    setState(() => _focusedCartIndex = index);
+    _focusCartShortcuts();
+  }
+
+  void _moveFocusedCartItem(CartProvider cart, int direction) {
+    if (cart.items.isEmpty) return;
+    final next = (_safeCartIndex(cart) + direction).clamp(
+      0,
+      cart.items.length - 1,
+    );
+    setState(() => _focusedCartIndex = next);
+    _focusCartShortcuts();
+  }
+
+  Future<void> _editFocusedCartItem(
+      BuildContext context, CartProvider cart) async {
+    if (cart.items.isEmpty) return;
+    _focusCartShortcuts();
+    await _showCartItemActions(context, cart, cart.items[_safeCartIndex(cart)]);
+  }
+
+  Future<void> _deleteCartItem(
+      CartProvider cart, Map<String, dynamic> item) async {
+    if (cart.items.isEmpty) return;
+    final index = cart.items.indexWhere(
+      (cartItem) => cartItem['cartDocId'] == item['cartDocId'],
+    );
+    final cartDocId = item['cartDocId'] as String? ?? '';
+    if (cartDocId.isEmpty || index < 0) return;
+
+    await cart.removeItem(cartDocId);
+    setState(() {
+      if (cart.items.isEmpty) {
+        _focusedCartIndex = 0;
+      } else {
+        _focusedCartIndex = index.clamp(0, cart.items.length - 1);
+      }
+    });
+    _focusCartShortcuts();
+  }
+
+  Future<void> _deleteFocusedCartItem(CartProvider cart) async {
+    if (cart.items.isEmpty) return;
+    await _deleteCartItem(cart, cart.items[_safeCartIndex(cart)]);
+  }
+
+  Future<void> _editCartItemQuantity(
+    BuildContext context,
+    CartProvider cart,
+    Map<String, dynamic> item,
+  ) async {
+    _focusCartShortcuts();
+    await _showEditItemDialog(context, cart, item);
+  }
+
+  Future<void> _openProductBottomSheet(BuildContext context) async {
+    _focusCartShortcuts();
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const ProductListBottomSheet(),
+    );
+    if (mounted) _focusCartShortcuts();
+  }
+
+  Future<void> _showCartItemActions(
+    BuildContext context,
+    CartProvider cart,
+    Map<String, dynamic> item,
+  ) async {
+    final cartDocId = item['cartDocId'] as String? ?? '';
+    final key = _cartItemKeys[cartDocId];
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final target = key?.currentContext?.findRenderObject() as RenderBox?;
+
+    RelativeRect position;
+    if (overlay != null && target != null) {
+      final topLeft = target.localToGlobal(Offset.zero, ancestor: overlay);
+      final bottomRight = target.localToGlobal(
+        target.size.bottomRight(Offset.zero),
+        ancestor: overlay,
+      );
+      position = RelativeRect.fromRect(
+        Rect.fromPoints(topLeft, bottomRight),
+        Offset.zero & overlay.size,
+      );
+    } else {
+      final size = MediaQuery.of(context).size;
+      position = RelativeRect.fromLTRB(
+        size.width - 220,
+        size.height * 0.45,
+        16,
+        size.height * 0.25,
+      );
+    }
+
+    _focusCartShortcuts();
+    final value = await showMenu<String>(
+      context: context,
+      position: position,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      items: [
+        const PopupMenuItem(
+          value: 'add',
+          child: Row(children: [
+            Icon(Icons.add_circle_outline, color: NovaColors.violet, size: 16),
+            SizedBox(width: 10),
+            Text('Add More',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          ]),
+        ),
+        const PopupMenuItem(
+          value: 'edit',
+          child: Row(children: [
+            Icon(Icons.edit_outlined, color: NovaColors.amber, size: 16),
+            SizedBox(width: 10),
+            Text('Edit Qty',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          ]),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          enabled: cartDocId.isNotEmpty,
+          child: const Row(children: [
+            Icon(Icons.delete_outline, color: NovaColors.danger, size: 16),
+            SizedBox(width: 10),
+            Text('Remove',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: NovaColors.danger)),
+          ]),
+        ),
+      ],
+    );
+
+    if (!mounted || !context.mounted || value == null) {
+      _focusCartShortcuts();
+      return;
+    }
+    if (value == 'add') {
+      await _openProductBottomSheet(context);
+    } else if (value == 'edit') {
+      await _editCartItemQuantity(context, cart, item);
+    } else if (value == 'delete') {
+      await _deleteCartItem(cart, item);
     }
   }
 
@@ -251,122 +584,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     CartProvider cart,
     Map<String, dynamic> item,
   ) async {
-    final qtyController = TextEditingController(
-      text: ((item['qty'] as num?)?.toInt() ?? 1).toString(),
-    );
-
-    await showDialog<bool?>(
+    final newQty = await showDialog<int?>(
       context: context,
-      builder: (dialogContext) {
-        return Dialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          backgroundColor: NovaColors.bgPrimary,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: NovaColors.violetLight,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.edit_rounded,
-                          color: NovaColors.violet, size: 18),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Edit ${item['name']}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: NovaColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: qtyController,
-                  keyboardType: TextInputType.number,
-                  autofocus: true,
-                  style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: NovaColors.textPrimary),
-                  decoration: _fieldDecoration('Quantity',
-                      icon: Icons.format_list_numbered),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(dialogContext, false),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          side: const BorderSide(
-                              color: NovaColors.borderSecondary),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text('Cancel',
-                            style: TextStyle(
-                                color: NovaColors.textSecondary,
-                                fontWeight: FontWeight.w500)),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          final newQty =
-                              int.tryParse(qtyController.text.trim());
-                          if (newQty == null || newQty <= 0) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'Enter a valid quantity greater than 0.'),
-                              ),
-                            );
-                            Navigator.pop(dialogContext, false);
-                            return;
-                          }
-                          cart.updateItemQuantity(
-                              item['cartDocId'] as String, newQty);
-                          Navigator.pop(dialogContext, true);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: NovaColors.violet,
-                          shadowColor: Colors.transparent,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text('Save',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      builder: (dialogContext) => _EditQuantityDialog(
+        itemName: item['name']?.toString() ?? 'Item',
+        initialQty: (item['qty'] as num?)?.toInt() ?? 1,
+        fieldDecoration: _fieldDecoration(
+          'Quantity',
+          icon: Icons.format_list_numbered,
+        ),
+      ),
     );
 
-    qtyController.dispose();
+    if (newQty != null && newQty > 0) {
+      await cart.updateItemQuantity(item['cartDocId'] as String, newQty);
+    }
+    if (mounted) {
+      _focusCartShortcuts();
+    }
   }
 
   @override
@@ -449,6 +684,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               },
               onBack: _navigateBackToPos,
               onConfirm: () => _placeOrder(context, cart),
+              onEditFocusedItem: () => _editFocusedCartItem(context, cart),
+              onDeleteFocusedItem: () => _deleteFocusedCartItem(cart),
+              onArrowUp: () => _moveFocusedCartItem(cart, -1),
+              onArrowDown: () => _moveFocusedCartItem(cart, 1),
               onSelectPaymentMethod: _selectPaymentMethod,
               child: AppNavigationShell(
                 auth: auth,
@@ -872,181 +1111,201 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     ((item['lineTotal']) as num?)?.toDouble() ??
                                         (price.toDouble() * qty);
                                 final name = item['name']?.toString() ?? 'Item';
+                                final isFocused = i == _safeCartIndex(cart) &&
+                                    cart.items.isNotEmpty;
+                                final itemKey = _cartItemKeys.putIfAbsent(
+                                  cartDocId,
+                                  GlobalKey.new,
+                                );
 
-                                return Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 8),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 40,
-                                        height: 40,
-                                        decoration: BoxDecoration(
-                                          color: itemBgColor(name),
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            itemEmoji(name),
-                                            style:
-                                                const TextStyle(fontSize: 18),
+                                return InkWell(
+                                  key: itemKey,
+                                  borderRadius: BorderRadius.circular(10),
+                                  onTap: () => _selectCartItem(i),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 140),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isFocused
+                                          ? NovaColors.violetLight
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: isFocused
+                                            ? NovaColors.violet
+                                            : Colors.transparent,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: itemBgColor(name),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              itemEmoji(name),
+                                              style:
+                                                  const TextStyle(fontSize: 18),
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              name,
-                                              style: const TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w500,
-                                                color: NovaColors.textPrimary,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 3),
-                                            Row(
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 6,
-                                                      vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color:
-                                                        NovaColors.violetLight,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            5),
-                                                  ),
-                                                  child: Text(
-                                                    '×$qty',
-                                                    style: const TextStyle(
-                                                        fontSize: 10,
-                                                        color:
-                                                            NovaColors.violet,
-                                                        fontWeight:
-                                                            FontWeight.w600),
-                                                  ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                name,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: NovaColors.textPrimary,
                                                 ),
-                                                const SizedBox(width: 6),
-                                                Expanded(
-                                                  child: Text(
-                                                    'Rs ${price.toStringAsFixed(0)} each',
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                      color: NovaColors
-                                                          .textTertiary,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: isFocused
+                                                          ? NovaColors.bgPrimary
+                                                          : NovaColors
+                                                              .violetLight,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              5),
+                                                    ),
+                                                    child: Text(
+                                                      '×$qty',
+                                                      style: const TextStyle(
+                                                          fontSize: 10,
+                                                          color:
+                                                              NovaColors.violet,
+                                                          fontWeight:
+                                                              FontWeight.w600),
                                                     ),
                                                   ),
-                                                ),
-                                              ],
+                                                  const SizedBox(width: 6),
+                                                  Expanded(
+                                                    child: Text(
+                                                      'Rs ${price.toStringAsFixed(0)} each',
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        fontSize: 11,
+                                                        color: NovaColors
+                                                            .textTertiary,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                              maxWidth: 72),
+                                          child: FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerRight,
+                                            child: Text(
+                                              'Rs ${lineTotal.toStringAsFixed(0)}',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: NovaColors.textPrimary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        PopupMenuButton<String>(
+                                          icon: const Icon(
+                                              Icons.more_vert_rounded,
+                                              color: NovaColors.textTertiary,
+                                              size: 16),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(
+                                              minWidth: 32),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10)),
+                                          onSelected: (value) {
+                                            _selectCartItem(i);
+                                            if (value == 'add') {
+                                              _openProductBottomSheet(context);
+                                            } else if (value == 'edit') {
+                                              _editCartItemQuantity(
+                                                  context, cart, item);
+                                            } else if (value == 'delete' &&
+                                                cartDocId.isNotEmpty) {
+                                              _deleteCartItem(cart, item);
+                                            }
+                                          },
+                                          itemBuilder: (_) => [
+                                            const PopupMenuItem(
+                                              value: 'add',
+                                              child: Row(children: [
+                                                Icon(Icons.add_circle_outline,
+                                                    color: NovaColors.violet,
+                                                    size: 16),
+                                                SizedBox(width: 10),
+                                                Text('Add More',
+                                                    style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight:
+                                                            FontWeight.w500)),
+                                              ]),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'edit',
+                                              child: Row(children: [
+                                                Icon(Icons.edit_outlined,
+                                                    color: NovaColors.amber,
+                                                    size: 16),
+                                                SizedBox(width: 10),
+                                                Text('Edit Qty',
+                                                    style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight:
+                                                            FontWeight.w500)),
+                                              ]),
+                                            ),
+                                            PopupMenuItem(
+                                              value: 'delete',
+                                              enabled: cartDocId.isNotEmpty,
+                                              child: const Row(children: [
+                                                Icon(Icons.delete_outline,
+                                                    color: NovaColors.danger,
+                                                    size: 16),
+                                                SizedBox(width: 10),
+                                                Text('Remove',
+                                                    style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                        color:
+                                                            NovaColors.danger)),
+                                              ]),
                                             ),
                                           ],
                                         ),
-                                      ),
-                                      ConstrainedBox(
-                                        constraints:
-                                            const BoxConstraints(maxWidth: 72),
-                                        child: FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          alignment: Alignment.centerRight,
-                                          child: Text(
-                                            'Rs ${lineTotal.toStringAsFixed(0)}',
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: NovaColors.textPrimary,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      PopupMenuButton<String>(
-                                        icon: const Icon(
-                                            Icons.more_vert_rounded,
-                                            color: NovaColors.textTertiary,
-                                            size: 16),
-                                        padding: EdgeInsets.zero,
-                                        constraints:
-                                            const BoxConstraints(minWidth: 32),
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(10)),
-                                        onSelected: (value) {
-                                          if (value == 'add') {
-                                            showModalBottomSheet(
-                                              context: context,
-                                              isScrollControlled: true,
-                                              backgroundColor:
-                                                  Colors.transparent,
-                                              builder: (context) =>
-                                                  const ProductListBottomSheet(),
-                                            );
-                                          } else if (value == 'edit') {
-                                            _showEditItemDialog(
-                                                context, cart, item);
-                                          } else if (value == 'delete' &&
-                                              cartDocId.isNotEmpty) {
-                                            cart.removeItem(cartDocId);
-                                          }
-                                        },
-                                        itemBuilder: (_) => [
-                                          const PopupMenuItem(
-                                            value: 'add',
-                                            child: Row(children: [
-                                              Icon(Icons.add_circle_outline,
-                                                  color: NovaColors.violet,
-                                                  size: 16),
-                                              SizedBox(width: 10),
-                                              Text('Add More',
-                                                  style: TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.w500)),
-                                            ]),
-                                          ),
-                                          const PopupMenuItem(
-                                            value: 'edit',
-                                            child: Row(children: [
-                                              Icon(Icons.edit_outlined,
-                                                  color: NovaColors.amber,
-                                                  size: 16),
-                                              SizedBox(width: 10),
-                                              Text('Edit Qty',
-                                                  style: TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.w500)),
-                                            ]),
-                                          ),
-                                          PopupMenuItem(
-                                            value: 'delete',
-                                            enabled: cartDocId.isNotEmpty,
-                                            child: const Row(children: [
-                                              Icon(Icons.delete_outline,
-                                                  color: NovaColors.danger,
-                                                  size: 16),
-                                              SizedBox(width: 10),
-                                              Text('Remove',
-                                                  style: TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                      color:
-                                                          NovaColors.danger)),
-                                            ]),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 );
                               },

@@ -53,6 +53,10 @@ class DeleteItemIntent extends Intent {
   const DeleteItemIntent();
 }
 
+class EditItemIntent extends Intent {
+  const EditItemIntent();
+}
+
 class UndoCartIntent extends Intent {
   const UndoCartIntent();
 }
@@ -466,6 +470,10 @@ class CheckoutKeyboardScope extends StatefulWidget {
   final ValueChanged<String>? onCashChanged;
   final VoidCallback? onBack;
   final VoidCallback? onConfirm;
+  final VoidCallback? onEditFocusedItem;
+  final VoidCallback? onDeleteFocusedItem;
+  final VoidCallback? onArrowUp;
+  final VoidCallback? onArrowDown;
 
   final ValueChanged<String>? onSelectPaymentMethod;
 
@@ -478,6 +486,10 @@ class CheckoutKeyboardScope extends StatefulWidget {
     this.onCashChanged,
     this.onBack,
     this.onConfirm,
+    this.onEditFocusedItem,
+    this.onDeleteFocusedItem,
+    this.onArrowUp,
+    this.onArrowDown,
     this.onSelectPaymentMethod,
   });
 
@@ -505,16 +517,40 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
 
   bool _handleHardwareKey(KeyEvent event) {
     if (!mounted || event is! KeyDownEvent) return false;
+    if (ModalRoute.of(context)?.isCurrent != true) return false;
 
     final logicalKey = event.logicalKey;
+    final isTextEditing =
+        FocusManager.instance.primaryFocus?.context?.widget is EditableText;
     final isBackToPos = logicalKey == LogicalKeyboardKey.f10 ||
         (logicalKey == LogicalKeyboardKey.arrowLeft &&
             HardwareKeyboard.instance.isAltPressed);
 
-    if (!isBackToPos) return false;
+    if (isBackToPos) {
+      _goBackOnce();
+      return true;
+    }
 
-    _goBackOnce();
-    return true;
+    if (isTextEditing) return false;
+
+    if (logicalKey == LogicalKeyboardKey.arrowUp) {
+      widget.onArrowUp?.call();
+      return true;
+    }
+    if (logicalKey == LogicalKeyboardKey.arrowDown) {
+      widget.onArrowDown?.call();
+      return true;
+    }
+    if (logicalKey == LogicalKeyboardKey.keyE) {
+      widget.onEditFocusedItem?.call();
+      return true;
+    }
+    if (logicalKey == LogicalKeyboardKey.delete) {
+      widget.onDeleteFocusedItem?.call();
+      return true;
+    }
+
+    return false;
   }
 
   void _goBackOnce() {
@@ -562,6 +598,38 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
           ConfirmItemIntent: CallbackAction<ConfirmItemIntent>(
             onInvoke: (_) {
               widget.onConfirm?.call();
+              return null;
+            },
+          ),
+          EditItemIntent: CallbackAction<EditItemIntent>(
+            onInvoke: (_) {
+              if (!(widget.cashFocusNode?.hasFocus ?? false)) {
+                widget.onEditFocusedItem?.call();
+              }
+              return null;
+            },
+          ),
+          DeleteItemIntent: CallbackAction<DeleteItemIntent>(
+            onInvoke: (_) {
+              if (!(widget.cashFocusNode?.hasFocus ?? false)) {
+                widget.onDeleteFocusedItem?.call();
+              }
+              return null;
+            },
+          ),
+          ArrowUpIntent: CallbackAction<ArrowUpIntent>(
+            onInvoke: (_) {
+              if (!(widget.cashFocusNode?.hasFocus ?? false)) {
+                widget.onArrowUp?.call();
+              }
+              return null;
+            },
+          ),
+          ArrowDownIntent: CallbackAction<ArrowDownIntent>(
+            onInvoke: (_) {
+              if (!(widget.cashFocusNode?.hasFocus ?? false)) {
+                widget.onArrowDown?.call();
+              }
               return null;
             },
           ),
