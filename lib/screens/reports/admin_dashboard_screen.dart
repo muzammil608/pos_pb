@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/pocketbase/report_service.dart';
@@ -12,7 +10,6 @@ import '../../services/pocketbase/auth_service.dart';
 import '../../widgets/app_navigation.dart';
 import '../../widgets/responsive_layout.dart';
 
-// ─── Admin Dashboard Screen ────────────────────────────────────────────────────
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -22,7 +19,7 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   late final ReportService _reportService;
-  bool _seeded = false; // guard — runs only once per session
+  bool _seeded = false;
 
   @override
   void didChangeDependencies() {
@@ -30,14 +27,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     _reportService = ReportService(auth.ownerId);
 
-    // ── ONE-TIME SEED ──────────────────────────────────────────────────────
-    // Reads assets/products.json and inserts into PocketBase.
-    // Skips automatically if products already exist for this owner.
-    // Remove this block once you've seeded successfully.
     if (!_seeded && auth.ownerId.isNotEmpty) {
       _seeded = true;
       final seeder = ProductSeeder(
-        authService: AuthService(), // ✅ uses initPb() internally — safe
+        authService: AuthService(),
         ownerId: auth.ownerId,
       );
       seeder.seed().then((count) {
@@ -54,7 +47,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         }
       });
     }
-    // ── END SEED ───────────────────────────────────────────────────────────
   }
 
   @override
@@ -159,9 +151,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SHARED DASHBOARD CONTENT
-// ═══════════════════════════════════════════════════════════════════════════════
 class _DashboardContent extends StatelessWidget {
   final AuthProvider auth;
   final ReportService reportService;
@@ -178,7 +167,6 @@ class _DashboardContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ─── Revenue Stat Cards Row ────────────────────────────────────
         StreamBuilder<double>(
           stream: reportService.getTodayRevenue(),
           builder: (context, snapshot) {
@@ -266,9 +254,7 @@ class _DashboardContent extends StatelessWidget {
             );
           },
         ),
-
         SizedBox(height: isDesktop ? 16 : 16),
-
         if (isDesktop)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -336,7 +322,6 @@ class _DashboardContent extends StatelessWidget {
   }
 }
 
-// ─── Stat Card ─────────────────────────────────────────────────────────────────
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -417,7 +402,6 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ─── Order Status Cards ────────────────────────────────────────────────────────
 class _OrderStatusCards extends StatelessWidget {
   final ReportService reportService;
 
@@ -483,7 +467,6 @@ class _OrderStatusCards extends StatelessWidget {
   }
 }
 
-// ─── Order Breakdown Card ──────────────────────────────────────────────────────
 class _OrderBreakdownCard extends StatelessWidget {
   final AuthProvider auth;
   final bool isDesktop;
@@ -501,7 +484,6 @@ class _OrderBreakdownCard extends StatelessWidget {
   }
 }
 
-// ─── Quick Actions Row ─────────────────────────────────────────────────────────
 class _QuickActionsRow extends StatelessWidget {
   final bool isDesktop;
 
@@ -537,7 +519,6 @@ class _QuickActionsRow extends StatelessWidget {
   }
 }
 
-// ─── Section Header ────────────────────────────────────────────────────────────
 class _SectionHeader extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -563,7 +544,6 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ─── Status Card Data ──────────────────────────────────────────────────────────
 class _StatusCardData {
   final String key;
   final int value;
@@ -582,7 +562,6 @@ class _StatusCardData {
   });
 }
 
-// ─── Status Card ───────────────────────────────────────────────────────────────
 class _StatusCard extends StatelessWidget {
   final _StatusCardData data;
 
@@ -630,7 +609,6 @@ class _StatusCard extends StatelessWidget {
   }
 }
 
-// ─── Quick Action Card ─────────────────────────────────────────────────────────
 class _QuickActionCard extends StatelessWidget {
   final IconData icon;
   final String label;

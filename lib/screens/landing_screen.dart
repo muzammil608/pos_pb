@@ -76,8 +76,6 @@ class _LandingScreenState extends State<LandingScreen> {
       return const LoginScreen();
     }
 
-    // If user exists but userData/role is missing for some reason,
-    // show a readable screen instead of spinning forever.
     if (auth.userData == null) {
       return Scaffold(
         body: Center(

@@ -20,7 +20,6 @@ import 'core/theme/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // hotkey_manager is desktop-only — skip on mobile & web
   if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
     await PosHotkeyRegistry.init();
   }

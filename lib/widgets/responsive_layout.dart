@@ -53,15 +53,6 @@ class ResponsiveCenter extends StatelessWidget {
         final horizontal =
             ResponsiveLayout.horizontalPadding(constraints.maxWidth);
 
-        // FIX: LayoutBuilder provides bounded width but UNBOUNDED height.
-        // Any Column > Expanded descendant would get infinite height and
-        // overflow with a ~99941px error. By wrapping in a SizedBox with
-        // the finite height from the parent (when available), we give
-        // Expanded children a real axis to expand into.
-        //
-        // If maxHeight is still infinite (e.g. inside a ListView), we
-        // leave height unconstrained — callers in that context must not
-        // use Expanded inside this widget.
         final boundedHeight =
             constraints.maxHeight.isFinite ? constraints.maxHeight : null;
 

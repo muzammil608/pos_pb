@@ -4,9 +4,6 @@ import 'package:flutter/material.dart';
 import '../core/theme/nova_theme.dart';
 import '../services/pocketbase/report_service.dart';
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// STATUS DONUT CHART
-// ═══════════════════════════════════════════════════════════════════════════════
 class StatusDonutChart extends StatefulWidget {
   final String ownerId;
   final bool compact;
@@ -200,7 +197,6 @@ class _StatusDonutChartState extends State<StatusDonutChart>
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // HEADER
                       Row(
                         children: [
                           Container(
@@ -249,10 +245,7 @@ class _StatusDonutChartState extends State<StatusDonutChart>
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 14),
-
-                      // CHART + LEGEND
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
@@ -303,8 +296,6 @@ class _StatusDonutChartState extends State<StatusDonutChart>
                                     ),
                                   ),
                                 ),
-
-                                // CENTER LABEL
                                 AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 200),
                                   child: Column(
@@ -342,10 +333,7 @@ class _StatusDonutChartState extends State<StatusDonutChart>
                               ],
                             ),
                           ),
-
                           const SizedBox(width: 12),
-
-                          // LEGEND
                           Expanded(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -441,7 +429,6 @@ class _StatusDonutChartState extends State<StatusDonutChart>
                           ),
                         ],
                       ),
-
                       if (widget.showSegmentBar && total > 0) ...[
                         const SizedBox(height: 12),
                         _SegmentBar(
@@ -547,9 +534,6 @@ class _CompactDonutCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SEGMENT BAR
-// ═══════════════════════════════════════════════════════════════════════════════
 class _SegmentBar extends StatelessWidget {
   final List<int> values;
   final int total;
@@ -630,9 +614,6 @@ class _SegmentBar extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// META MODEL
-// ═══════════════════════════════════════════════════════════════════════════════
 class _DonutMeta {
   final String label;
   final String colorKey;
@@ -645,9 +626,6 @@ class _DonutMeta {
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// BACKWARD COMPAT
-// ═══════════════════════════════════════════════════════════════════════════════
 class StatusBarChart extends StatelessWidget {
   final double height;
   final String ownerId;

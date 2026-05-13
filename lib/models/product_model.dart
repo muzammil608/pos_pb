@@ -21,7 +21,6 @@ class Product {
     this.ownerId,
   });
 
-  /// Get the icon for this product (custom or default based on category)
   IconData get icon {
     if (iconCodePoint != null) {
       return IconHelper.fromCodePoint(iconCodePoint!);
@@ -29,7 +28,6 @@ class Product {
     return IconHelper.getDefaultIcon(category);
   }
 
-  /// Create from PocketBase RecordModel
   factory Product.fromRecord(RecordModel record, {String? pbBaseUrl}) {
     final rawName = record.getStringValue('name');
     final rawCategory = record.getStringValue('category');
@@ -40,7 +38,6 @@ class Product {
     final String category =
         rawCategory.trim().isEmpty ? 'Other' : rawCategory.trim();
 
-    // Handle icon code point
     int? parsedIconCodePoint;
     final iconRaw = record.data['iconCodePoint'];
     if (iconRaw != null) {
@@ -51,7 +48,6 @@ class Product {
       }
     }
 
-    // Build image URL from PocketBase file field
     String? imageUrl;
     final imageField = record.getStringValue('image');
     if (imageField.isNotEmpty && pbBaseUrl != null) {
@@ -72,7 +68,6 @@ class Product {
     );
   }
 
-  /// Legacy: Create from plain Map (kept for compatibility)
   factory Product.fromMap(Map<String, dynamic> data, String id) {
     final rawName = data['name'] ?? data['productName'] ?? data['title'];
     final rawPrice = data['price'] ?? data['unitPrice'] ?? data['amount'];

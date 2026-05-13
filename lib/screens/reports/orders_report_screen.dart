@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -222,13 +220,7 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ══════════════════════════════════════════════════
-                      // FIXED — Summary card, period selector, label
-                      // ══════════════════════════════════════════════════
-
                       const SizedBox(height: 20),
-
-                      // ─── Summary Card ─────────────────────────────────
                       Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
@@ -302,15 +294,9 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 14),
-
-                      // ─── Period Selector ──────────────────────────────
                       _buildPeriodSelector(),
-
                       const SizedBox(height: 20),
-
-                      // ─── Section Label ────────────────────────────────
                       Row(
                         children: [
                           Container(
@@ -339,25 +325,17 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 12),
-
-                      // ══════════════════════════════════════════════════
-                      // SCROLLABLE — only the order cards scroll
-                      // ══════════════════════════════════════════════════
-
                       Expanded(
                         child: orders.isEmpty
                             ? _emptyView(_ordersPeriod)
                             : columns == 1
-                                // ─── Single-column ────────────────────
                                 ? ListView.builder(
                                     padding: const EdgeInsets.only(bottom: 32),
                                     itemCount: orders.length,
                                     itemBuilder: (context, index) =>
                                         _buildOrderCard(orders[index]),
                                   )
-                                // ─── Multi-column grid ─────────────────
                                 : GridView.builder(
                                     padding: const EdgeInsets.only(bottom: 32),
                                     gridDelegate:
@@ -440,7 +418,6 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
   }
 }
 
-// ─── Order Card ───────────────────────────────────────────────────────────────
 class _OrderCard extends StatelessWidget {
   final String orderNumber;
   final double total;
@@ -481,7 +458,6 @@ class _OrderCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Row(
           children: [
-            // ─── Icon Badge ─────────────────────────────────────────────
             Container(
               width: 44,
               height: 44,
@@ -493,8 +469,6 @@ class _OrderCard extends StatelessWidget {
                   color: CafeColors.flame, size: 22),
             ),
             const SizedBox(width: 12),
-
-            // ─── Info ───────────────────────────────────────────────────
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

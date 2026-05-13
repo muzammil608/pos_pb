@@ -10,9 +10,6 @@ class PocketBaseService {
   static String get _baseUrl {
     if (_configuredUrl.isNotEmpty) return _configuredUrl;
 
-    // Fallback to local dev for quick running.
-    // (127.0.0.1 works for Android emulator; on physical devices you must
-    // pass POCKETBASE_URL.)
     return 'http://127.0.0.1:8090';
   }
 

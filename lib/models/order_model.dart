@@ -34,7 +34,6 @@ class Order {
   });
 
   factory Order.fromRecord(RecordModel record) {
-    // Items stored as JSON array in PocketBase
     List<Map<String, dynamic>> items = [];
     final rawItems = record.data['items'];
     if (rawItems is List) {

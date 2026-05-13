@@ -18,7 +18,6 @@ class AuthProvider extends ChangeNotifier {
   String _currentUid = 'guest';
   String _ownerId = '';
 
-  // Used by ProductSeeder (expects synchronous PocketBase access).
   PocketBase? _pb;
 
   AuthProvider() {
@@ -39,8 +38,6 @@ class AuthProvider extends ChangeNotifier {
   bool get isCashier => role == 'cashier';
   bool get isKitchen => role == 'kitchen';
 
-  /// PocketBase instance for services that need direct access.
-  /// Must only be accessed after initialization completes.
   PocketBase get pb {
     final value = _pb;
     if (value == null) {
@@ -54,24 +51,21 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Initialize PocketBase client (so `pb` is usable synchronously later).
       _pb = await _authService.initPb();
 
       final current = await _authService.currentUser;
       _user = current;
 
-      // Role-derived fields
       _role = current?.role ?? '';
       _currentUid = current?.uid ?? 'guest';
       _ownerId = current?.effectiveAdminId ?? '';
 
-      // Optional: keep a copy of userData if some screens expect it.
       _userData = current;
 
       _isRoleLoaded = true;
     } catch (e) {
       debugPrint('[AuthProvider] init error: $e');
-      _isRoleLoaded = true; // allow app to show LoginScreen
+      _isRoleLoaded = true;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -83,13 +77,11 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _initMaybe(); // ensures pb is ready
+      await _initMaybe();
       final user = await _authService.login(email, password);
       _setUser(user);
-      return null; // success => no errors
+      return null;
     } catch (e) {
-      // Map provider/POCKETBASE errors to AuthLoginResult if needed.
-      // Current UI only checks for null vs non-null.
       return AuthLoginResult(
         emailError: 'Login failed.',
         passwordError: e.toString(),
@@ -108,7 +100,7 @@ class AuthProvider extends ChangeNotifier {
       await _initMaybe();
       final user = await _authService.loginWithGoogle();
       _setUser(user);
-      return null; // success
+      return null;
     } catch (e) {
       return e.toString();
     } finally {
@@ -127,12 +119,11 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Used by some admin screens.
   bool _started = false;
   Future<void> _initMaybe() async {
     if (_started) return;
     _started = true;
-    // Wait for init to complete.
+
     while (!_isRoleLoaded) {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }

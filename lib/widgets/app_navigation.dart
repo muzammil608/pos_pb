@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -115,7 +113,6 @@ class AppNavigationDrawer extends StatelessWidget {
   final AuthProvider auth;
   final String currentRoute;
 
-  // Role badge colors
   Color _roleBgColor(String role) {
     switch (role.toLowerCase()) {
       case 'admin':
@@ -156,7 +153,6 @@ class AppNavigationDrawer extends StatelessWidget {
             ),
             child: Row(
               children: [
-                // Logo
                 Container(
                   width: 56,
                   height: 56,
@@ -272,7 +268,6 @@ class AppNavigationDrawer extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Avatar + info row
                 Row(
                   children: [
                     AppUserAvatar(
@@ -307,7 +302,6 @@ class AppNavigationDrawer extends StatelessWidget {
                         ],
                       ),
                     ),
-                    // Role chip
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
@@ -327,7 +321,6 @@ class AppNavigationDrawer extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                // Logout button
                 DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(

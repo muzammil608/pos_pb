@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Original colors restored - login screen colors preserved
   static const Color primary = Color(0xFFFFD61E);
   static const Color secondary = Color(0xFFFFB900);
   static const Color surface = Color(0x66FFFFFF);

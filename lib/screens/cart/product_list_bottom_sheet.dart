@@ -6,9 +6,9 @@ import '../../../services/pocketbase/product_service.dart';
 
 class _CafeColors {
   static const Color flame = Color(0xFFFF4D1C);
-  // static const Color amber = Color(0xFFFFA724);
+
   static const Color espresso = Color(0xFF1E0F00);
-  // static const Color latte = Color(0xFFFFF3E8);
+
   static const Color creme = Color(0xFFFFE4C4);
   static const Color charcoal = Color(0xFF2C2C2C);
 
@@ -134,7 +134,6 @@ class ProductListBottomSheet extends StatelessWidget {
             child: StreamBuilder(
               stream: productService.streamProducts,
               builder: (context, snapshot) {
-                // Loading
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 48),
@@ -147,7 +146,6 @@ class ProductListBottomSheet extends StatelessWidget {
                   );
                 }
 
-                // Empty / error
                 if (snapshot.hasError ||
                     !snapshot.hasData ||
                     snapshot.data!.isEmpty) {

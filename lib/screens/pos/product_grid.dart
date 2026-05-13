@@ -33,7 +33,6 @@ class ProductGrid extends StatelessWidget {
               final isMobile = constraints.maxWidth < 600;
 
               if (isMobile) {
-                // ── Mobile: 2-row horizontal scroll with fixed card size ──
                 const double cardWidth = 110.0;
                 const double spacing = 10.0;
 
@@ -41,7 +40,7 @@ class ProductGrid extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, // 2 rows
+                    crossAxisCount: 2,
                     mainAxisExtent: cardWidth,
                     crossAxisSpacing: spacing,
                     mainAxisSpacing: spacing,
@@ -58,7 +57,6 @@ class ProductGrid extends StatelessWidget {
                 );
               }
 
-              // ── Desktop / tablet: vertical scroll ──
               return GridView.builder(
                 padding: const EdgeInsets.all(12),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -86,7 +84,6 @@ class ProductGrid extends StatelessWidget {
   }
 }
 
-// ─── Product Card ──────────────────────────────────────────────────────────────
 class _ProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback onTap;

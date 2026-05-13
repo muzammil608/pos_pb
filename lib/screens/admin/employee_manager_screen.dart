@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/cafe_colors.dart';
@@ -124,7 +122,6 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header
                       Row(
                         children: [
                           Container(
@@ -169,7 +166,6 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
                         obscureText: true,
                       ),
                       const SizedBox(height: 12),
-                      // Role dropdown
                       DropdownButtonFormField<String>(
                         value: _selectedRole,
                         decoration: InputDecoration(
@@ -206,7 +202,6 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
                             () => _selectedRole = value ?? 'cashier'),
                       ),
                       const SizedBox(height: 24),
-                      // Action buttons
                       Row(
                         children: [
                           Expanded(
@@ -789,7 +784,6 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        // Add employee button
                         Container(
                           width: 50,
                           height: 50,
@@ -845,7 +839,6 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
                               role.contains(_searchQuery);
                         }).toList();
 
-                        // Empty states
                         if (employees.isEmpty) {
                           return _emptyStateView(
                             icon: Icons.people_outline_rounded,
@@ -1006,7 +999,6 @@ class _EmployeeCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            // Gradient avatar
             Container(
               width: 46,
               height: 46,
@@ -1026,7 +1018,6 @@ class _EmployeeCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 14),
-            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1048,7 +1039,6 @@ class _EmployeeCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
-                  // Role badge
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1068,7 +1058,6 @@ class _EmployeeCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Action buttons
             Column(
               children: [
                 _ActionIconButton(

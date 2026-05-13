@@ -1,5 +1,3 @@
-// ignore_for_file: curly_braces_in_flow_control_structures, deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/keyboard/pos_keyboard_system.dart';
@@ -11,7 +9,6 @@ import '../../services/pocketbase/report_service.dart';
 import '../../widgets/app_navigation.dart';
 import '../../widgets/responsive_layout.dart';
 
-// ─── Category → Unsplash image URL ────────────────────────────────────────────
 class _CategoryImages {
   static const Map<String, String> _images = {
     'dairy':
@@ -78,7 +75,6 @@ class _CategoryImages {
   }
 }
 
-// ─── Tiny item thumbnail ───────────────────────────────────────────────────────
 class _ItemThumb extends StatelessWidget {
   final Map<String, dynamic> item;
   const _ItemThumb({required this.item});
@@ -110,7 +106,6 @@ class _ItemThumb extends StatelessWidget {
   }
 }
 
-// ─── Kitchen Screen ────────────────────────────────────────────────────────────
 class KitchenScreen extends StatefulWidget {
   const KitchenScreen({super.key});
 
@@ -126,11 +121,8 @@ class _KitchenScreenState extends State<KitchenScreen>
   final Set<String> _hiddenOrderIds = <String>{};
   final List<String> _visibleOrderIds = [];
 
-  // ── Keyboard navigation state ─────────────────────────────────────────────
-  /// Index of the currently keyboard-focused order card (0-based).
   int _focusedIndex = 0;
 
-  /// Live snapshot of docs currently shown — kept in sync inside StreamBuilder.
   List<OrderRecordDocument> _currentDocs = [];
 
   Stream<OrderRecordSnapshot>? _ordersStream;
@@ -162,8 +154,6 @@ class _KitchenScreenState extends State<KitchenScreen>
     super.dispose();
   }
 
-  // ── Keyboard helpers ──────────────────────────────────────────────────────
-
   void _navigateOrders(bool up) {
     if (_currentDocs.isEmpty) return;
     setState(() {
@@ -172,16 +162,15 @@ class _KitchenScreenState extends State<KitchenScreen>
     });
   }
 
-  /// Mark the currently focused order as ready (Enter key).
   void _markFocusedReady() {
     if (_currentDocs.isEmpty) return;
     if (_focusedIndex < 0 || _focusedIndex >= _currentDocs.length) return;
     final doc = _currentDocs[_focusedIndex];
     final status = doc.data()['status']?.toString() ?? 'pending';
-    // Only mark if still pending — silently ignore if already ready.
+
     if (status == 'pending') {
       _service.updateStatus(doc.id, 'ready');
-      // Optionally show a snackbar for confirmation feedback.
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -201,6 +190,15 @@ class _KitchenScreenState extends State<KitchenScreen>
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
+    }
+  }
+
+  void _navigateBackToPos() {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+    } else {
+      navigator.pushReplacementNamed('/pos');
     }
   }
 
@@ -291,14 +289,13 @@ class _KitchenScreenState extends State<KitchenScreen>
           body: AppNavigationShell(
             auth: auth,
             currentRoute: '/kitchen',
-            // ── Wrap entire body with KitchenKeyboardScope ─────────────────
             child: KitchenKeyboardScope(
               onNavigate: _navigateOrders,
               onReadyOrder: _markFocusedReady,
+              onBack: auth.isAdmin ? _navigateBackToPos : null,
               child: ResponsiveCenter(
                 child: Column(
                   children: [
-                    // ── Metric cards ─────────────────────────────────────
                     Padding(
                       padding: const EdgeInsets.only(top: 14),
                       child: StreamBuilder<Map<String, int>>(
@@ -343,8 +340,6 @@ class _KitchenScreenState extends State<KitchenScreen>
                       ),
                     ),
                     const SizedBox(height: 12),
-
-                    // ── Section header ─────────────────────────────────
                     Row(
                       children: [
                         Container(
@@ -381,8 +376,6 @@ class _KitchenScreenState extends State<KitchenScreen>
                       ],
                     ),
                     const SizedBox(height: 8),
-
-                    // ── Orders ─────────────────────────────────────────
                     Expanded(
                       child: StreamBuilder<OrderRecordSnapshot>(
                         stream: _ordersStream,
@@ -410,13 +403,13 @@ class _KitchenScreenState extends State<KitchenScreen>
                                 }).toList()
                               : <OrderRecordDocument>[];
 
-                          // Keep a live reference so keyboard callbacks can act on them.
                           _currentDocs = docs;
 
                           _visibleOrderIds.clear();
-                          for (final doc in docs) _visibleOrderIds.add(doc.id);
+                          for (final doc in docs) {
+                            _visibleOrderIds.add(doc.id);
+                          }
 
-                          // Clamp focused index in case orders disappear.
                           if (_focusedIndex >= docs.length && docs.isNotEmpty) {
                             WidgetsBinding.instance.addPostFrameCallback((_) {
                               if (mounted) {
@@ -460,14 +453,12 @@ class _KitchenScreenState extends State<KitchenScreen>
                                 tableNumber: tableNumber,
                                 items: items,
                                 createdAt: createdAt,
-                                // Highlight the keyboard-focused card.
                                 isKeyboardFocused: index == _focusedIndex,
                                 onMarkReady: () =>
                                     _service.updateStatus(doc.id, 'ready'),
                               );
                             }
 
-                            // Mobile & single column: plain list
                             if (columns == 1) {
                               return ListView.builder(
                                 padding:
@@ -491,7 +482,6 @@ class _KitchenScreenState extends State<KitchenScreen>
               ),
             ),
           ),
-          // Clear History FAB — admin only
           floatingActionButton: auth.isAdmin
               ? Container(
                   decoration: BoxDecoration(
@@ -590,7 +580,6 @@ class _KitchenScreenState extends State<KitchenScreen>
   }
 }
 
-// ─── Masonry-style grid ───────────────────────────────────────────────────────
 class _MasonryGrid extends StatelessWidget {
   final int columns;
   final int count;
@@ -632,7 +621,6 @@ class _MasonryGrid extends StatelessWidget {
   }
 }
 
-// ─── Metric Card ──────────────────────────────────────────────────────────────
 class _MetricCard extends StatelessWidget {
   final String title;
   final String value;
@@ -686,7 +674,6 @@ class _MetricCard extends StatelessWidget {
   }
 }
 
-// ─── Kitchen Order Card ───────────────────────────────────────────────────────
 class _KitchenOrderCard extends StatelessWidget {
   final String docId;
   final int orderNumber;
@@ -697,7 +684,6 @@ class _KitchenOrderCard extends StatelessWidget {
   final DateTime? createdAt;
   final VoidCallback onMarkReady;
 
-  /// When true, this card is highlighted as the keyboard-focused order.
   final bool isKeyboardFocused;
 
   const _KitchenOrderCard({
@@ -727,13 +713,11 @@ class _KitchenOrderCard extends StatelessWidget {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
-      // margin only bottom — card height = content height, nothing extra
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          // Keyboard-focused cards get a prominent violet border.
           color: isKeyboardFocused
               ? const Color(0xFF534AB7)
               : statusColor.withOpacity(0.15),
@@ -759,7 +743,6 @@ class _KitchenOrderCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Header ──────────────────────────────────────────────
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
@@ -830,8 +813,6 @@ class _KitchenOrderCard extends StatelessWidget {
                 ],
               ),
             ),
-
-            // ── Items ────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
               child: Column(
@@ -877,8 +858,6 @@ class _KitchenOrderCard extends StatelessWidget {
                 }).toList(),
               ),
             ),
-
-            // ── Footer ───────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
               child: isPending

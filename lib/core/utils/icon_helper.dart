@@ -21,7 +21,6 @@ class IconHelper {
     Icons.set_meal,
   ];
 
-  /// Map categories to default icons
   static IconData getDefaultIcon(String category) {
     final lower = category.toLowerCase();
 

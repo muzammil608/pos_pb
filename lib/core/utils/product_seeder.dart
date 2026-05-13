@@ -1,8 +1,3 @@
-// lib/core/utils/product_seeder.dart
-//
-// ONE-TIME USE: Seeds products from assets/products.json into PocketBase.
-// Safe to leave in — skips automatically if products already exist.
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,7 +31,6 @@ class ProductSeeder {
     try {
       final PocketBase pb = await _authService.initPb();
 
-      // 1. Skip if already seeded — uses 'ownerId' to match ProductService filter
       final existing = await pb.collection('products').getList(
             filter: 'ownerId = "$ownerId"',
             perPage: 1,
@@ -47,11 +41,9 @@ class ProductSeeder {
         return 0;
       }
 
-      // 2. Load JSON from assets
       final raw = await rootBundle.loadString('assets/products.json');
       final List<dynamic> items = jsonDecode(raw);
 
-      // 3. Insert using 'ownerId' — matches ProductService filter
       int count = 0;
       for (final item in items) {
         await pb.collection('products').create(body: {
@@ -59,7 +51,7 @@ class ProductSeeder {
           'price': (item['price'] as num).toDouble(),
           'category': _capitalize(item['type']?.toString() ?? 'Other'),
           'iconCodePoint': _iconForType(item['type']?.toString() ?? ''),
-          'ownerId': ownerId, // ✅ matches ProductService filter
+          'ownerId': ownerId,
           'description': item['description'] ?? '',
         });
         count++;

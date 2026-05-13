@@ -1,9 +1,6 @@
-// ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-// import '../../core/theme/app_theme.dart';
 import '../../core/utils/icon_helper.dart';
 import '../../models/product_model.dart';
 import '../../core/theme/cafe_colors.dart';
@@ -74,7 +71,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Handle bar
                           Center(
                             child: Container(
                               width: 40,
@@ -86,8 +82,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-
-                          // Sheet header
                           Row(
                             children: [
                               Container(
@@ -117,7 +111,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             ],
                           ),
                           const SizedBox(height: 20),
-
                           _StyledField(
                             controller: nameController,
                             label: 'Product Name',
@@ -129,7 +122,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 : null,
                           ),
                           const SizedBox(height: 12),
-
                           _StyledField(
                             controller: priceController,
                             label: 'Price',
@@ -148,7 +140,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             },
                           ),
                           const SizedBox(height: 12),
-
                           _StyledField(
                             controller: categoryController,
                             label: 'Category',
@@ -167,7 +158,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 : null,
                           ),
                           const SizedBox(height: 16),
-
                           const Text(
                             'Choose Icon',
                             style: TextStyle(
@@ -177,7 +167,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
-
                           SizedBox(
                             height: 56,
                             child: ListView.separated(
@@ -220,8 +209,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             ),
                           ),
                           const SizedBox(height: 24),
-
-                          // Save button
                           Consumer<ProductProvider>(
                             builder: (context, provider, _) {
                               return SizedBox(
@@ -626,7 +613,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        // Add button
                         GestureDetector(
                           onTap: () => _showProductForm(context),
                           child: Container(
@@ -753,8 +739,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 ),
                               ),
                             const SizedBox(height: 8),
-
-                            // Count label
                             Padding(
                               padding: EdgeInsets.zero,
                               child: Row(
@@ -788,8 +772,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
-
-                            // Product list
                             Expanded(
                               child: filtered.isEmpty
                                   ? _noResultsView()
@@ -1057,7 +1039,6 @@ class _ProductCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
-            // Icon badge
             Container(
               width: 48,
               height: 48,
@@ -1068,7 +1049,6 @@ class _ProductCard extends StatelessWidget {
               child: Icon(product.icon, color: CafeColors.flame, size: 24),
             ),
             const SizedBox(width: 12),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1101,7 +1081,6 @@ class _ProductCard extends StatelessWidget {
                 ],
               ),
             ),
-
             Text(
               'Rs ${product.price.toStringAsFixed(0)}',
               style: const TextStyle(
@@ -1111,7 +1090,6 @@ class _ProductCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-
             IconButton(
               icon: Container(
                 padding: const EdgeInsets.all(6),
@@ -1127,7 +1105,6 @@ class _ProductCard extends StatelessWidget {
               constraints: const BoxConstraints(),
               padding: const EdgeInsets.symmetric(horizontal: 4),
             ),
-
             IconButton(
               icon: Container(
                 padding: const EdgeInsets.all(6),

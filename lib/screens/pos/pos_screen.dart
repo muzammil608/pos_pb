@@ -1,5 +1,3 @@
-// ignore_for_file: curly_braces_in_flow_control_structures
-
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -18,11 +16,9 @@ import '../../widgets/app_navigation.dart';
 import '../../widgets/receipt_dialog.dart';
 import '../../widgets/responsive_layout.dart';
 
-// ─── Platform helper (mirrors the one in pos_keyboard_system.dart) ─────────────
 bool get _isDesktop =>
     !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
 
-// ─── Category → Unsplash image URL ────────────────────────────────────────────
 class _CategoryImages {
   static const Map<String, String> _images = {
     'dairy':
@@ -82,7 +78,6 @@ class _CategoryImages {
   }
 }
 
-// ─── POS Screen ────────────────────────────────────────────────────────────────
 class PosScreen extends StatefulWidget {
   const PosScreen({super.key});
 
@@ -94,7 +89,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   ProductService? _productService;
   OrderService? _orderService;
 
-  // ── Keyboard system keys ──────────────────────────────────────────────────
   final TextEditingController _searchController = TextEditingController();
   final GlobalKey<PosSearchBarState> _searchBarKey =
       GlobalKey<PosSearchBarState>();
@@ -106,11 +100,9 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   String _searchQuery = '';
   String _selectedCategory = 'All';
 
-  // Track focused product index for arrow-key navigation
   int _focusedProductIndex = -1;
   List<Product> _lastFilteredProducts = [];
 
-  // ── FIX 2: guard against multiple overlapping Ready Orders sheets ─────────
   bool _readyOrdersSheetOpen = false;
 
   @override
@@ -121,7 +113,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
 
-    // Register global F-key hotkeys (desktop only — guarded inside registry)
     _registerHotkeys();
   }
 
@@ -186,8 +177,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // ── Arrow-key navigation helpers ──────────────────────────────────────────
-
   void _onArrowDown() {
     if (_lastFilteredProducts.isEmpty) return;
     setState(() {
@@ -214,7 +203,9 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
 
   void _onConfirmFocusedItem() {
     if (_focusedProductIndex < 0 ||
-        _focusedProductIndex >= _lastFilteredProducts.length) return;
+        _focusedProductIndex >= _lastFilteredProducts.length) {
+      return;
+    }
     final product = _lastFilteredProducts[_focusedProductIndex];
     _addProductWithQtyDialog(product);
   }
@@ -258,8 +249,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     });
     cart.clear();
   }
-
-  // ── Qty dialog ────────────────────────────────────────────────────────────
 
   Future<void> _addProductWithQtyDialog(Product product) async {
     final qty = await _showQtyDialog(context, product.name, product.price);
@@ -341,7 +330,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                         fontSize: 13, color: NovaColors.textSecondary),
                   ),
                   const SizedBox(height: 20),
-                  // ── FIX 1: only allow digit input — blocks /  .  '  letters etc.
                   TextField(
                     keyboardType: TextInputType.number,
                     autofocus: true,
@@ -490,245 +478,246 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── FIX 2: prevent multiple overlapping Ready Orders sheets ───────────────
-  void _showReadyOrdersSheet(BuildContext context) {
+  Future<void> _showReadyOrdersSheet(BuildContext context) async {
     if (_readyOrdersSheetOpen) return;
     _readyOrdersSheetOpen = true;
 
     final rootContext = context;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return Align(
-          alignment: Alignment.bottomCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 920),
-            child: Container(
-              height: MediaQuery.of(sheetContext).size.height * 0.85,
-              decoration: const BoxDecoration(
-                color: NovaColors.bgSecondary,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: SafeArea(
-                child: Column(
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.only(top: 10, bottom: 2),
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: NovaColors.borderSecondary,
-                        borderRadius: BorderRadius.circular(2),
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          return Align(
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 920),
+              child: Container(
+                height: MediaQuery.of(sheetContext).size.height * 0.85,
+                decoration: const BoxDecoration(
+                  color: NovaColors.bgSecondary,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: SafeArea(
+                  child: Column(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(top: 10, bottom: 2),
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: NovaColors.borderSecondary,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                    ),
-                    Container(
-                      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: NovaColors.bgPrimary,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: NovaColors.borderTertiary, width: 0.5),
+                      Container(
+                        margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: NovaColors.bgPrimary,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: NovaColors.borderTertiary, width: 0.5),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: NovaColors.tealLight,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  color: NovaColors.teal,
+                                  size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Ready to Collect',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: NovaColors.textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Tap Print & Complete to close order',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: NovaColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            StreamBuilder<OrderRecordSnapshot>(
+                              stream: _orderService?.getOrders(),
+                              builder: (context, snapshot) {
+                                if (_orderService == null) {
+                                  return const SizedBox.shrink();
+                                }
+                                if (snapshot.hasError ||
+                                    snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                  return const SizedBox.shrink();
+                                }
+                                final count = _readyOrderCount(snapshot);
+                                if (count == 0) return const SizedBox.shrink();
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: NovaColors.tealLight,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    '$count',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: NovaColors.teal,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: NovaColors.tealLight,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                                Icons.check_circle_outline_rounded,
-                                color: NovaColors.teal,
-                                size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Ready to Collect',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: NovaColors.textPrimary,
-                                  ),
-                                ),
-                                Text(
-                                  'Tap Print & Complete to close order',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: NovaColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          StreamBuilder<OrderRecordSnapshot>(
-                            stream: _orderService?.getOrders(),
-                            builder: (context, snapshot) {
-                              if (_orderService == null) {
-                                return const SizedBox.shrink();
-                              }
-                              if (snapshot.hasError ||
-                                  snapshot.connectionState ==
-                                      ConnectionState.waiting) {
-                                return const SizedBox.shrink();
-                              }
-                              final count = _readyOrderCount(snapshot);
-                              if (count == 0) return const SizedBox.shrink();
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: NovaColors.tealLight,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: StreamBuilder<OrderRecordSnapshot>(
+                          stream: _orderService?.getOrders(),
+                          builder: (context, snapshot) {
+                            if (_orderService == null) {
+                              return const Center(
+                                child: CircularProgressIndicator(
+                                    color: NovaColors.violet),
+                              );
+                            }
+                            if (snapshot.hasError) {
+                              return Center(
                                 child: Text(
-                                  '$count',
+                                  'Error: ${snapshot.error}',
                                   style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: NovaColors.teal,
-                                  ),
+                                      color: NovaColors.textSecondary),
                                 ),
                               );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: StreamBuilder<OrderRecordSnapshot>(
-                        stream: _orderService?.getOrders(),
-                        builder: (context, snapshot) {
-                          if (_orderService == null) {
-                            return const Center(
-                              child: CircularProgressIndicator(
-                                  color: NovaColors.violet),
-                            );
-                          }
-                          if (snapshot.hasError) {
-                            return Center(
-                              child: Text(
-                                'Error: ${snapshot.error}',
-                                style: const TextStyle(
-                                    color: NovaColors.textSecondary),
-                              ),
-                            );
-                          }
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(
-                                  color: NovaColors.violet),
-                            );
-                          }
-                          if (!snapshot.hasData ||
-                              snapshot.data!.docs.isEmpty) {
-                            return _emptyOrdersView();
-                          }
+                            }
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Center(
+                                child: CircularProgressIndicator(
+                                    color: NovaColors.violet),
+                              );
+                            }
+                            if (!snapshot.hasData ||
+                                snapshot.data!.docs.isEmpty) {
+                              return _emptyOrdersView();
+                            }
 
-                          final readyDocs = snapshot.data!.docs.where((doc) {
-                            return doc.data()['status'] == 'ready';
-                          }).toList();
+                            final readyDocs = snapshot.data!.docs.where((doc) {
+                              return doc.data()['status'] == 'ready';
+                            }).toList();
 
-                          readyDocs.sort((a, b) {
-                            final aDate = a.data()['createdAt'] as DateTime?;
-                            final bDate = b.data()['createdAt'] as DateTime?;
-                            final aMs = aDate?.millisecondsSinceEpoch ?? 0;
-                            final bMs = bDate?.millisecondsSinceEpoch ?? 0;
-                            return bMs.compareTo(aMs);
-                          });
+                            readyDocs.sort((a, b) {
+                              final aDate = a.data()['createdAt'] as DateTime?;
+                              final bDate = b.data()['createdAt'] as DateTime?;
+                              final aMs = aDate?.millisecondsSinceEpoch ?? 0;
+                              final bMs = bDate?.millisecondsSinceEpoch ?? 0;
+                              return bMs.compareTo(aMs);
+                            });
 
-                          if (readyDocs.isEmpty) return _emptyOrdersView();
+                            if (readyDocs.isEmpty) return _emptyOrdersView();
 
-                          return Shortcuts(
-                            shortcuts: const {
-                              SingleActivator(LogicalKeyboardKey.enter):
-                                  ConfirmItemIntent(),
-                              SingleActivator(LogicalKeyboardKey.numpadEnter):
-                                  ConfirmItemIntent(),
-                            },
-                            child: Actions(
-                              actions: {
-                                ConfirmItemIntent:
-                                    CallbackAction<ConfirmItemIntent>(
-                                  onInvoke: (_) {
-                                    _completeReadyOrder(
-                                      sheetContext: sheetContext,
-                                      rootContext: rootContext,
-                                      doc: readyDocs.first,
-                                    );
-                                    return null;
-                                  },
-                                ),
+                            return Shortcuts(
+                              shortcuts: const {
+                                SingleActivator(LogicalKeyboardKey.enter):
+                                    ConfirmItemIntent(),
+                                SingleActivator(LogicalKeyboardKey.numpadEnter):
+                                    ConfirmItemIntent(),
                               },
-                              child: Focus(
-                                autofocus: true,
-                                child: ListView.builder(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                                  itemCount: readyDocs.length,
-                                  itemBuilder: (context, index) {
-                                    final doc = readyDocs[index];
-                                    final data = doc.data();
-
-                                    final orderType =
-                                        data['orderType']?.toString() ??
-                                            'takeaway';
-                                    final customerName =
-                                        data['customerName']?.toString().trim();
-                                    final orderLabel =
-                                        '#${data['orderNumber'] ?? doc.id.substring(0, 6)}';
-                                    final items =
-                                        List<Map<String, dynamic>>.from(
-                                      (data['items'] as List? ?? []).map(
-                                        (item) => Map<String, dynamic>.from(
-                                            item as Map),
-                                      ),
-                                    );
-
-                                    return _ReadyOrderCard(
-                                      orderLabel: orderLabel,
-                                      orderType: orderType,
-                                      customerName: customerName,
-                                      items: items,
-                                      total:
-                                          (data['total'] as num?)?.toDouble() ??
-                                              0,
-                                      index: index,
-                                      onComplete: () => _completeReadyOrder(
+                              child: Actions(
+                                actions: {
+                                  ConfirmItemIntent:
+                                      CallbackAction<ConfirmItemIntent>(
+                                    onInvoke: (_) {
+                                      _completeReadyOrder(
                                         sheetContext: sheetContext,
                                         rootContext: rootContext,
-                                        doc: doc,
-                                      ),
-                                    );
-                                  },
+                                        doc: readyDocs.first,
+                                      );
+                                      return null;
+                                    },
+                                  ),
+                                },
+                                child: Focus(
+                                  autofocus: true,
+                                  child: ListView.builder(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 0, 16, 24),
+                                    itemCount: readyDocs.length,
+                                    itemBuilder: (context, index) {
+                                      final doc = readyDocs[index];
+                                      final data = doc.data();
+
+                                      final orderType =
+                                          data['orderType']?.toString() ??
+                                              'takeaway';
+                                      final customerName = data['customerName']
+                                          ?.toString()
+                                          .trim();
+                                      final orderLabel =
+                                          '#${data['orderNumber'] ?? doc.id.substring(0, 6)}';
+                                      final items =
+                                          List<Map<String, dynamic>>.from(
+                                        (data['items'] as List? ?? []).map(
+                                          (item) => Map<String, dynamic>.from(
+                                              item as Map),
+                                        ),
+                                      );
+
+                                      return _ReadyOrderCard(
+                                        orderLabel: orderLabel,
+                                        orderType: orderType,
+                                        customerName: customerName,
+                                        items: items,
+                                        total: (data['total'] as num?)
+                                                ?.toDouble() ??
+                                            0,
+                                        index: index,
+                                        onComplete: () => _completeReadyOrder(
+                                          sheetContext: sheetContext,
+                                          rootContext: rootContext,
+                                          doc: doc,
+                                        ),
+                                      );
+                                    },
+                                  ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      },
-    ).whenComplete(() {
-      // ── FIX 2: reset flag when sheet is closed (any way — swipe, tap, etc.)
+          );
+        },
+      );
+    } finally {
       if (mounted) setState(() => _readyOrdersSheetOpen = false);
-    });
+    }
   }
 
   Widget _emptyOrdersView() {
@@ -828,7 +817,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                         height: 0.5, color: NovaColors.borderTertiary),
                   ),
                   actions: [
-                    // ── Only show keyboard shortcut button on desktop ──
                     if (_isDesktop)
                       IconButton(
                         tooltip: 'Keyboard Shortcuts (?)',
@@ -905,6 +893,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
               searchBarKey: _searchBarKey,
               categoryChipsKey: _categoryChipsKey,
               onCheckout: _onCheckout,
+              onReadyOrders: () => _showReadyOrdersSheet(context),
               onKitchen: _onKitchen,
               onClearCart: _onClearCart,
               onDeleteFocusedItem: _onDeleteFocusedItem,
@@ -947,7 +936,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                           ),
                         ),
                         const SizedBox(height: 10),
-
                         if (allProducts.isNotEmpty)
                           PosCategoryChips(
                             key: _categoryChipsKey,
@@ -957,7 +945,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                                 setState(() => _selectedCategory = cat),
                           ),
                         const SizedBox(height: 10),
-
                         Expanded(
                           child: () {
                             if (snapshot.connectionState ==
@@ -1060,8 +1047,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                             );
                           }(),
                         ),
-
-                        // ── Bottom action bar ──────────────────────────
                         SafeArea(
                           top: false,
                           child: Container(
@@ -1136,7 +1121,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   }
 }
 
-// ─── Product Image Widget ──────────────────────────────────────────────────────
 class _ProductImage extends StatelessWidget {
   final Product product;
   final double? width;
@@ -1197,7 +1181,6 @@ class _ProductImage extends StatelessWidget {
   }
 }
 
-// ─── Product List Tile (mobile) ────────────────────────────────────────────────
 class _ProductListTile extends StatefulWidget {
   final Product product;
   final VoidCallback onTap;
@@ -1356,7 +1339,6 @@ class _ProductListTileState extends State<_ProductListTile>
   }
 }
 
-// ─── Product Card (desktop/tablet grid) ───────────────────────────────────────
 class _ProductCard extends StatefulWidget {
   final Product product;
   final VoidCallback onTap;
@@ -1501,7 +1483,6 @@ class _ProductCardState extends State<_ProductCard>
   }
 }
 
-// ─── Bottom Bar Button ─────────────────────────────────────────────────────────
 class _BottomBarButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final IconData icon;
@@ -1599,7 +1580,6 @@ class _BottomBarButton extends StatelessWidget {
   }
 }
 
-// ─── Ready Order Card ──────────────────────────────────────────────────────────
 class _ReadyOrderCard extends StatelessWidget {
   final String orderLabel;
   final String orderType;

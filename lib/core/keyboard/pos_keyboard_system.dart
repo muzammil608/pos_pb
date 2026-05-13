@@ -1,88 +1,3 @@
-// lib/core/keyboard/pos_keyboard_system.dart
-//
-// High-ROI POS keyboard system.
-// Packages: hotkey_manager (F-keys + global shortcuts), flutter built-ins
-// (Shortcuts/Actions/Focus) for navigation, Enter, Escape, Delete, arrows.
-//
-// ── FIXES IN THIS VERSION ──────────────────────────────────────────────────
-//
-// FIX 1 — ESC corrupts nav state and blocks Ready Orders sheet from reopening.
-//   Root cause: ClearSearchIntent's onInvoke called nav.pop() whenever
-//   canPop() was true, which consumed the bottom-sheet route. The next ESC
-//   then popped a screen-level route, leaving the navigator in a broken state
-//   so _showReadyOrdersSheet could never push again.
-//   Fix: ClearSearchIntent now ONLY clears the search bar text. It never
-//   touches the navigator. Bottom sheets and dialogs handle their own ESC
-//   dismiss via Flutter's built-in PopScope / barrierDismissible behaviour.
-//
-// FIX 2 — Physical numpad keys (right side, Numpad0–Numpad9) ignored in cash field.
-//   Root cause: PosShortcuts.numpad only mapped LogicalKeyboardKey.digit0–9.
-//   Physical numpad keys produce LogicalKeyboardKey.numpad0–numpad9 which are
-//   completely different logical codes that were never in the map.
-//   Fix: Added all numpad logical keys (numpad0–numpad9, numpadDecimal, etc.)
-//   to the shortcut map alongside the existing top-row digit entries.
-//
-// FIX 3 — Top-row digit keys wrote to cash field even when it was not focused.
-//   Root cause: CheckoutKeyboardScope._handleNumpad called
-//   cashFocusNode?.requestFocus() unconditionally before writing, so pressing
-//   any digit anywhere always stole focus and wrote to the cash field —
-//   including while typing in the Customer Name text field.
-//   Fix: _handleNumpad now writes only when cashFocusNode.hasFocus is already
-//   true. Focus is never stolen. The cash field works normally once the user
-//   clicks or Tabs into it.
-//
-// FIX 4 — MissingPluginException on Android/iOS.
-//   hotkey_manager is a desktop-only plugin (Windows, macOS, Linux).
-//   All hotKeyManager calls are now guarded by _isDesktop so the app runs
-//   safely on mobile without crashing.
-//
-// FIX 5 — RenderFlex overflow in PosShortcutHelp on small screens.
-//   _KeyBadge now has a maxWidth constraint + TextOverflow.ellipsis.
-//   The dialog body is wrapped in SingleChildScrollView to handle vertical
-//   overflow on small viewports.
-//
-// FIX 6 — Keyboard shortcut button + dialog shown on mobile.
-//   ShowShortcutsIntent is now guarded by _isDesktop so pressing '?' on a
-//   physical keyboard connected to a phone does nothing.
-//   The AppBar button is hidden on mobile — callers should also guard it
-//   (see pos_screen.dart).
-//
-// FIX 7 — F7/F8 not working on POS screen cash/card buttons.
-//   Root cause: SelectPaymentMethodIntent (F7/F8) was only registered in
-//   CheckoutKeyboardScope's numpad shortcut map and Actions. When the
-//   cash/card buttons live on the POS screen, PosKeyboardScope never saw
-//   those intents — posScreen map had no F7/F8 entries and PosKeyboardScope
-//   had no SelectPaymentMethodIntent action handler.
-//   Fix: Added F7/F8 to PosShortcuts.posScreen and wired
-//   SelectPaymentMethodIntent + onSelectPaymentMethod callback into
-//   PosKeyboardScope.
-//
-// FIX 8 — Double-ESC breaks navigator state so F2 Ready Orders sheet won't open.
-//   Root cause: PosShortcuts.numpad mapped Escape → NumpadKeyIntent('ESC'),
-//   and _handleNumpad called widget.onBack?.call() for that key. When
-//   CheckoutKeyboardScope was anywhere in the widget tree it intercepted every
-//   ESC — including ESCs meant to dismiss a bottom sheet — and called onBack
-//   which popped an extra route. A second ESC left the navigator in a broken
-//   state where _showReadyOrdersSheet could no longer push.
-//   Fix: Removed Escape from PosShortcuts.numpad entirely. Removed the ESC
-//   branch from _handleNumpad. Checkout back-navigation is now handled solely
-//   by PopScope / WillPopScope on the checkout route (barrierDismissible) so
-//   no double-pop is possible.
-//
-// ADDITION 1 — CheckoutKeyboardScope auto-focuses cash field on mount.
-//   Uses addPostFrameCallback so the focus system is ready before requesting.
-//
-// ADDITION 2 — Kitchen screen keyboard intents + KitchenKeyboardScope widget.
-//   Wrap your kitchen screen body with KitchenKeyboardScope and supply the
-//   five callbacks (onNavigate, onEdit, onDelete, onConfirm, onReadyOrder).
-//   Shortcuts: ↑/↓ navigate, E edit, Delete remove, Enter = Mark Ready.
-//
-// ADDITION 3 — SelectPaymentMethodIntent for checkout payment method selection.
-//   F7 = Cash, F8 = Card. Now works from BOTH PosKeyboardScope and
-//   CheckoutKeyboardScope. Wire onSelectPaymentMethod on whichever scope
-//   wraps your cash/card buttons.
-// ──────────────────────────────────────────────────────────────────────────
-
 import 'dart:async';
 import 'dart:io';
 
@@ -91,17 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PLATFORM HELPER
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// True only on desktop platforms that support hotkey_manager.
 bool get _isDesktop =>
     !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// INTENT DEFINITIONS
-// ═══════════════════════════════════════════════════════════════════════════════
 
 class FocusSearchIntent extends Intent {
   const FocusSearchIntent();
@@ -121,6 +27,10 @@ class PrevCategoryIntent extends Intent {
 
 class CheckoutIntent extends Intent {
   const CheckoutIntent();
+}
+
+class ReadyOrdersIntent extends Intent {
+  const ReadyOrdersIntent();
 }
 
 class KitchenIntent extends Intent {
@@ -168,68 +78,47 @@ class NumpadKeyIntent extends Intent {
   const NumpadKeyIntent(this.key);
 }
 
-// ── ADDITION 3: Payment method selection intent ───────────────────────────────
+class CheckoutBackIntent extends Intent {
+  const CheckoutBackIntent();
+}
 
-/// Selects a payment method on the checkout screen.
-/// [method] is 'cash' or 'card' (or any other method string your app supports).
-/// Triggered by F7 (cash) and F8 (card).
-/// FIX 7: Now also registered in PosKeyboardScope so buttons on the POS
-/// screen respond to F7/F8 without needing CheckoutKeyboardScope in the tree.
 class SelectPaymentMethodIntent extends Intent {
   final String method;
   const SelectPaymentMethodIntent(this.method);
 }
 
-// ── Kitchen-specific intents ──────────────────────────────────────────────────
-
-/// Navigate up/down through the kitchen order list.
 class KitchenNavigateIntent extends Intent {
   final bool up;
   const KitchenNavigateIntent({required this.up});
 }
 
-/// Open the edit-quantity dialog for the focused kitchen order item.
 class KitchenEditItemIntent extends Intent {
   const KitchenEditItemIntent();
 }
 
-/// Delete / remove the focused kitchen order item.
 class KitchenDeleteItemIntent extends Intent {
   const KitchenDeleteItemIntent();
 }
 
-/// Called when Enter is pressed (legacy confirm — kept for compatibility).
 class KitchenConfirmItemIntent extends Intent {
   const KitchenConfirmItemIntent();
 }
 
-/// Mark the focused kitchen order as READY (Enter key on kitchen screen).
 class KitchenReadyOrderIntent extends Intent {
   const KitchenReadyOrderIntent();
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SHORTCUT MAPS
-// ═══════════════════════════════════════════════════════════════════════════════
-
 class PosShortcuts {
-  /// POS screen shortcuts (handled by Shortcuts widget + Actions).
   static Map<ShortcutActivator, Intent> posScreen = {
-    // Search
     const SingleActivator(LogicalKeyboardKey.keyF, control: true):
         const FocusSearchIntent(),
     const SingleActivator(LogicalKeyboardKey.slash): const FocusSearchIntent(),
-
-    // Clear / cancel — FIX 1: handler no longer calls nav.pop()
     const SingleActivator(LogicalKeyboardKey.escape): const ClearSearchIntent(),
-
-    // Category navigation
     const SingleActivator(LogicalKeyboardKey.arrowRight, control: true):
         const NextCategoryIntent(),
     const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true):
         const PrevCategoryIntent(),
-
-    // Cart
+    const SingleActivator(LogicalKeyboardKey.f2): const ReadyOrdersIntent(),
     const SingleActivator(LogicalKeyboardKey.enter, control: true):
         const CheckoutIntent(),
     const SingleActivator(LogicalKeyboardKey.keyK, control: true):
@@ -238,14 +127,10 @@ class PosShortcuts {
         const ClearCartIntent(),
     const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
         const UndoCartIntent(),
-
-    // Item actions
     const SingleActivator(LogicalKeyboardKey.enter): const ConfirmItemIntent(),
     const SingleActivator(LogicalKeyboardKey.delete): const DeleteItemIntent(),
     const SingleActivator(LogicalKeyboardKey.numpadEnter):
         const ConfirmItemIntent(),
-
-    // Arrow navigation
     const SingleActivator(LogicalKeyboardKey.arrowUp): const ArrowUpIntent(),
     const SingleActivator(LogicalKeyboardKey.arrowDown):
         const ArrowDownIntent(),
@@ -253,26 +138,15 @@ class PosShortcuts {
         const ArrowLeftIntent(),
     const SingleActivator(LogicalKeyboardKey.arrowRight):
         const ArrowRightIntent(),
-
-    // Help
     const SingleActivator(LogicalKeyboardKey.slash, shift: true):
         const ShowShortcutsIntent(),
-
-    // ── FIX 7: Payment method selection on the POS screen (F7/F8) ────────────
-    // These are also in PosShortcuts.numpad for the checkout scope.
-    // Duplicating here ensures they work wherever PosKeyboardScope is the
-    // active scope — i.e. when your cash/card buttons are on the POS screen.
     const SingleActivator(LogicalKeyboardKey.f7):
         SelectPaymentMethodIntent('cash'),
     const SingleActivator(LogicalKeyboardKey.f8):
         SelectPaymentMethodIntent('card'),
   };
 
-  // ── FIX 2: Added physical numpad logical keys (right side of keyboard). ────
-  // ── FIX 8: Removed Escape from this map — see FIX 8 note above. ──────────
-  // ── ADDITION 3: F7/F8 payment method shortcuts. ───────────────────────────
   static Map<ShortcutActivator, Intent> numpad = {
-    // Top-row digit keys (above letter keys)
     const SingleActivator(LogicalKeyboardKey.digit0): NumpadKeyIntent('0'),
     const SingleActivator(LogicalKeyboardKey.digit1): NumpadKeyIntent('1'),
     const SingleActivator(LogicalKeyboardKey.digit2): NumpadKeyIntent('2'),
@@ -283,8 +157,6 @@ class PosShortcuts {
     const SingleActivator(LogicalKeyboardKey.digit7): NumpadKeyIntent('7'),
     const SingleActivator(LogicalKeyboardKey.digit8): NumpadKeyIntent('8'),
     const SingleActivator(LogicalKeyboardKey.digit9): NumpadKeyIntent('9'),
-
-    // Physical numpad keys (right-side number pad) — FIX 2
     const SingleActivator(LogicalKeyboardKey.numpad0): NumpadKeyIntent('0'),
     const SingleActivator(LogicalKeyboardKey.numpad1): NumpadKeyIntent('1'),
     const SingleActivator(LogicalKeyboardKey.numpad2): NumpadKeyIntent('2'),
@@ -298,27 +170,19 @@ class PosShortcuts {
     const SingleActivator(LogicalKeyboardKey.numpadDecimal):
         NumpadKeyIntent('.'),
     const SingleActivator(LogicalKeyboardKey.numpadAdd): NumpadKeyIntent('+'),
-
-    // Common keys
     const SingleActivator(LogicalKeyboardKey.backspace): NumpadKeyIntent('⌫'),
     const SingleActivator(LogicalKeyboardKey.period): NumpadKeyIntent('.'),
-    // ── FIX 8: Escape intentionally NOT mapped here. ──────────────────────
-    // Checkout back-navigation must go through the route's PopScope so the
-    // navigator pops exactly once. Mapping ESC → NumpadKeyIntent('ESC') and
-    // then calling onBack in _handleNumpad caused a double-pop that corrupted
-    // the navigator, preventing the Ready Orders sheet from reopening.
-    // Add a PopScope(onPopInvoked: ...) to your checkout screen/dialog instead.
     const SingleActivator(LogicalKeyboardKey.enter): ConfirmItemIntent(),
     const SingleActivator(LogicalKeyboardKey.numpadEnter): ConfirmItemIntent(),
-
-    // ADDITION 3: Payment method selection — F7 = Cash, F8 = Card
+    const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true):
+        CheckoutBackIntent(),
+    const SingleActivator(LogicalKeyboardKey.f10): CheckoutBackIntent(),
     const SingleActivator(LogicalKeyboardKey.f7):
         SelectPaymentMethodIntent('cash'),
     const SingleActivator(LogicalKeyboardKey.f8):
         SelectPaymentMethodIntent('card'),
   };
 
-  /// Kitchen screen shortcuts.
   static Map<ShortcutActivator, Intent> kitchen = {
     const SingleActivator(LogicalKeyboardKey.arrowUp):
         KitchenNavigateIntent(up: true),
@@ -335,16 +199,11 @@ class PosShortcuts {
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// GLOBAL HOTKEY REGISTRY
-// ═══════════════════════════════════════════════════════════════════════════════
-
 class PosHotkeyRegistry {
   PosHotkeyRegistry._();
 
   static final List<HotKey> _registered = [];
 
-  /// FIX 4: Guard every hotKeyManager call with _isDesktop.
   static Future<void> init() async {
     if (!_isDesktop) return;
     await hotKeyManager.unregisterAll();
@@ -359,7 +218,7 @@ class PosHotkeyRegistry {
     required VoidCallback onF6Kitchen,
     required VoidCallback onCtrlF,
   }) async {
-    if (!_isDesktop) return; // FIX 4: no-op on mobile/web
+    if (!_isDesktop) return;
     await unregisterAll();
 
     final hotkeys = <(HotKey, VoidCallback)>[
@@ -403,7 +262,7 @@ class PosHotkeyRegistry {
   }
 
   static Future<void> unregisterAll() async {
-    if (!_isDesktop) return; // FIX 4: no-op on mobile/web
+    if (!_isDesktop) return;
     final copy = List<HotKey>.from(_registered);
     _registered.clear();
     for (final hk in copy) {
@@ -411,10 +270,6 @@ class PosHotkeyRegistry {
     }
   }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// UNDO STACK
-// ═══════════════════════════════════════════════════════════════════════════════
 
 class CartUndoStack {
   static final CartUndoStack instance = CartUndoStack._();
@@ -446,15 +301,12 @@ class _UndoEntry {
   _UndoEntry(this.description, this.undoFn);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// POS KEYBOARD SCOPE
-// ═══════════════════════════════════════════════════════════════════════════════
-
 class PosKeyboardScope extends StatelessWidget {
   final Widget child;
   final GlobalKey<PosSearchBarState>? searchBarKey;
   final GlobalKey<PosCategoryChipsState>? categoryChipsKey;
   final VoidCallback? onCheckout;
+  final VoidCallback? onReadyOrders;
   final VoidCallback? onKitchen;
   final VoidCallback? onClearCart;
   final VoidCallback? onDeleteFocusedItem;
@@ -465,8 +317,6 @@ class PosKeyboardScope extends StatelessWidget {
   final VoidCallback? onArrowLeft;
   final VoidCallback? onArrowRight;
 
-  // ── FIX 7: Added onSelectPaymentMethod so POS-screen cash/card buttons
-  //    respond to F7/F8 when wrapped by PosKeyboardScope. ──────────────────
   final ValueChanged<String>? onSelectPaymentMethod;
 
   const PosKeyboardScope({
@@ -475,6 +325,7 @@ class PosKeyboardScope extends StatelessWidget {
     this.searchBarKey,
     this.categoryChipsKey,
     this.onCheckout,
+    this.onReadyOrders,
     this.onKitchen,
     this.onClearCart,
     this.onDeleteFocusedItem,
@@ -484,7 +335,7 @@ class PosKeyboardScope extends StatelessWidget {
     this.onArrowDown,
     this.onArrowLeft,
     this.onArrowRight,
-    this.onSelectPaymentMethod, // FIX 7
+    this.onSelectPaymentMethod,
   });
 
   @override
@@ -499,15 +350,12 @@ class PosKeyboardScope extends StatelessWidget {
               return null;
             },
           ),
-
-          // ── FIX 1 ──────────────────────────────────────────────────────────
           ClearSearchIntent: CallbackAction<ClearSearchIntent>(
             onInvoke: (_) {
               searchBarKey?.currentState?.clear();
               return null;
             },
           ),
-
           NextCategoryIntent: CallbackAction<NextCategoryIntent>(
             onInvoke: (_) {
               categoryChipsKey?.currentState?.nextCategory();
@@ -523,6 +371,12 @@ class PosKeyboardScope extends StatelessWidget {
           CheckoutIntent: CallbackAction<CheckoutIntent>(
             onInvoke: (_) {
               onCheckout?.call();
+              return null;
+            },
+          ),
+          ReadyOrdersIntent: CallbackAction<ReadyOrdersIntent>(
+            onInvoke: (_) {
+              onReadyOrders?.call();
               return null;
             },
           ),
@@ -580,8 +434,6 @@ class PosKeyboardScope extends StatelessWidget {
               return null;
             },
           ),
-
-          // ── FIX 6: Only show shortcut help on desktop ─────────────────────
           ShowShortcutsIntent: CallbackAction<ShowShortcutsIntent>(
             onInvoke: (_) {
               if (_isDesktop) {
@@ -590,8 +442,6 @@ class PosKeyboardScope extends StatelessWidget {
               return null;
             },
           ),
-
-          // ── FIX 7: Handle F7/F8 payment method selection on POS screen ────
           SelectPaymentMethodIntent: CallbackAction<SelectPaymentMethodIntent>(
             onInvoke: (intent) {
               onSelectPaymentMethod?.call(intent.method);
@@ -608,20 +458,15 @@ class PosKeyboardScope extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// CHECKOUT KEYBOARD SCOPE
-// ═══════════════════════════════════════════════════════════════════════════════
-
 class CheckoutKeyboardScope extends StatefulWidget {
   final Widget child;
   final TextEditingController? cashController;
   final FocusNode? cashFocusNode;
+  final FocusNode? shortcutFocusNode;
   final ValueChanged<String>? onCashChanged;
   final VoidCallback? onBack;
   final VoidCallback? onConfirm;
 
-  // ADDITION 3: Callback to switch payment method via keyboard (F7/F8).
-  // Receives 'cash' or 'card' as the method string.
   final ValueChanged<String>? onSelectPaymentMethod;
 
   const CheckoutKeyboardScope({
@@ -629,10 +474,11 @@ class CheckoutKeyboardScope extends StatefulWidget {
     required this.child,
     this.cashController,
     this.cashFocusNode,
+    this.shortcutFocusNode,
     this.onCashChanged,
     this.onBack,
     this.onConfirm,
-    this.onSelectPaymentMethod, // ADDITION 3
+    this.onSelectPaymentMethod,
   });
 
   @override
@@ -640,24 +486,47 @@ class CheckoutKeyboardScope extends StatefulWidget {
 }
 
 class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
+  bool _backInProgress = false;
+
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) widget.cashFocusNode?.requestFocus();
     });
   }
 
-  // ── FIX 8: Removed the ESC → onBack branch entirely. ─────────────────────
-  // ESC is no longer in PosShortcuts.numpad so this method is never called
-  // with key == 'ESC'. Back/dismiss must be handled by the checkout route's
-  // PopScope so the navigator pops exactly once and the Ready Orders sheet
-  // can be reopened normally afterwards.
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
+    super.dispose();
+  }
+
+  bool _handleHardwareKey(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return false;
+
+    final logicalKey = event.logicalKey;
+    final isBackToPos = logicalKey == LogicalKeyboardKey.f10 ||
+        (logicalKey == LogicalKeyboardKey.arrowLeft &&
+            HardwareKeyboard.instance.isAltPressed);
+
+    if (!isBackToPos) return false;
+
+    _goBackOnce();
+    return true;
+  }
+
+  void _goBackOnce() {
+    if (_backInProgress) return;
+    _backInProgress = true;
+    widget.onBack?.call();
+  }
+
   void _handleNumpad(String key) {
     final ctrl = widget.cashController;
     if (ctrl == null) return;
 
-    // ── FIX 3: only write when cash field is already focused ─────────────────
     final hasFocus =
         widget.cashFocusNode == null || widget.cashFocusNode!.hasFocus;
     if (!hasFocus) return;
@@ -696,8 +565,12 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
               return null;
             },
           ),
-
-          // ADDITION 3: Handle F7/F8 to select payment method ─────────────────
+          CheckoutBackIntent: CallbackAction<CheckoutBackIntent>(
+            onInvoke: (_) {
+              _goBackOnce();
+              return null;
+            },
+          ),
           SelectPaymentMethodIntent: CallbackAction<SelectPaymentMethodIntent>(
             onInvoke: (intent) {
               widget.onSelectPaymentMethod?.call(intent.method);
@@ -706,6 +579,7 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
           ),
         },
         child: Focus(
+          focusNode: widget.shortcutFocusNode,
           autofocus: true,
           child: widget.child,
         ),
@@ -714,10 +588,6 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// KITCHEN KEYBOARD SCOPE
-// ═══════════════════════════════════════════════════════════════════════════════
-
 class KitchenKeyboardScope extends StatefulWidget {
   final Widget child;
   final ValueChanged<bool>? onNavigate;
@@ -725,6 +595,7 @@ class KitchenKeyboardScope extends StatefulWidget {
   final VoidCallback? onDelete;
   final VoidCallback? onConfirm;
   final VoidCallback? onReadyOrder;
+  final VoidCallback? onBack;
 
   const KitchenKeyboardScope({
     super.key,
@@ -734,6 +605,7 @@ class KitchenKeyboardScope extends StatefulWidget {
     this.onDelete,
     this.onConfirm,
     this.onReadyOrder,
+    this.onBack,
   });
 
   @override
@@ -742,10 +614,12 @@ class KitchenKeyboardScope extends StatefulWidget {
 
 class _KitchenKeyboardScopeState extends State<KitchenKeyboardScope> {
   final FocusNode _focusNode = FocusNode(debugLabel: 'KitchenKeyboardScope');
+  bool _backInProgress = false;
 
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
@@ -753,14 +627,42 @@ class _KitchenKeyboardScopeState extends State<KitchenKeyboardScope> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     _focusNode.dispose();
     super.dispose();
+  }
+
+  bool _isBackToPosKey(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.f10 ||
+        (key == LogicalKeyboardKey.arrowLeft &&
+            HardwareKeyboard.instance.isAltPressed);
+  }
+
+  bool _handleHardwareKey(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return false;
+    if (!_isBackToPosKey(event.logicalKey)) return false;
+    if (widget.onBack == null) return false;
+
+    _goBackOnce();
+    return true;
+  }
+
+  void _goBackOnce() {
+    if (_backInProgress) return;
+    _backInProgress = true;
+    widget.onBack?.call();
   }
 
   KeyEventResult _handleKey(FocusNode _, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     final key = event.logicalKey;
+
+    if (_isBackToPosKey(key)) {
+      if (widget.onBack == null) return KeyEventResult.ignored;
+      _goBackOnce();
+      return KeyEventResult.handled;
+    }
 
     if (key == LogicalKeyboardKey.arrowUp) {
       widget.onNavigate?.call(true);
@@ -797,10 +699,6 @@ class _KitchenKeyboardScopeState extends State<KitchenKeyboardScope> {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// FOCUS INDICATOR
-// ═══════════════════════════════════════════════════════════════════════════════
 
 class PosFocusIndicator extends StatefulWidget {
   final Widget child;
@@ -871,15 +769,11 @@ class _PosFocusIndicatorState extends State<PosFocusIndicator> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// POS SEARCH BAR
-// ═══════════════════════════════════════════════════════════════════════════════
-
 class PosSearchBar extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final VoidCallback? onClear;
-  // FIX 6: null means "auto" — resolved at build time so _isDesktop (non-const) is safe
+
   final String? hintText;
 
   const PosSearchBar({
@@ -964,7 +858,6 @@ class PosSearchBarState extends State<PosSearchBar> {
                   onPressed: clear,
                   tooltip: 'Clear (Esc)',
                 )
-              // FIX 6: only show the '/' key badge on desktop
               : (!_focused && _isDesktop)
                   ? Padding(
                       padding: const EdgeInsets.only(right: 10),
@@ -978,10 +871,6 @@ class PosSearchBarState extends State<PosSearchBar> {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// CATEGORY CHIPS
-// ═══════════════════════════════════════════════════════════════════════════════
 
 class PosCategoryChips extends StatefulWidget {
   final List<String> categories;
@@ -1136,10 +1025,6 @@ class _CategoryChipState extends State<_CategoryChip> {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// NUMERIC KEYPAD
-// ═══════════════════════════════════════════════════════════════════════════════
 
 class PosNumericKeypad extends StatelessWidget {
   final TextEditingController controller;
@@ -1379,15 +1264,10 @@ class _QuickAmountButtonState extends State<_QuickAmountButton> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SHORTCUT HELP OVERLAY
-// ═══════════════════════════════════════════════════════════════════════════════
-
 class PosShortcutHelp extends StatelessWidget {
   const PosShortcutHelp({super.key});
 
   static void show(BuildContext context) {
-    // FIX 6: guard at the call site too — safe to call from anywhere
     if (!_isDesktop) return;
     showDialog(context: context, builder: (_) => const PosShortcutHelp());
   }
@@ -1433,8 +1313,7 @@ class PosShortcutHelp extends StatelessWidget {
           ('0–9 / Numpad', 'Enter cash amount'),
           ('Backspace', 'Delete last digit'),
           ('Enter', 'Confirm payment'),
-          ('Escape', 'Back to POS'),
-          // ADDITION 3: Payment method shortcuts in help dialog
+          ('F10 / Alt+←', 'Back to POS'),
           ('F7', 'Select Cash payment'),
           ('F8', 'Select Card payment'),
         ]
@@ -1446,7 +1325,7 @@ class PosShortcutHelp extends StatelessWidget {
           ('E', 'Edit quantity of focused item'),
           ('Delete', 'Remove focused item'),
           ('Enter / Numpad ↵', 'Mark order as Ready'),
-          ('Escape', 'Go back'),
+          ('F10 / Alt+←', 'Back to POS'),
         ]
       ),
     ];
@@ -1458,7 +1337,6 @@ class PosShortcutHelp extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 560),
         child: Padding(
           padding: const EdgeInsets.all(24),
-          // ── FIX 5: wrap in SingleChildScrollView to prevent vertical overflow
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1513,7 +1391,6 @@ class PosShortcutHelp extends StatelessWidget {
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // ── FIX 5: constrained badge ──────────
                                     _KeyBadge(s.$1),
                                     const SizedBox(width: 8),
                                     Expanded(
@@ -1547,7 +1424,6 @@ class PosShortcutHelp extends StatelessWidget {
   }
 }
 
-// ── FIX 5: _KeyBadge now has maxWidth + ellipsis to prevent horizontal overflow
 class _KeyBadge extends StatelessWidget {
   final String label;
   const _KeyBadge(this.label);

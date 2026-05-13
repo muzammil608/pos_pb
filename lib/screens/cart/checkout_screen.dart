@@ -1,7 +1,3 @@
-// lib/screens/pos/checkout_screen.dart
-
-// ignore_for_file: curly_braces_in_flow_control_structures, use_build_context_synchronously
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/keyboard/pos_keyboard_system.dart';
@@ -12,8 +8,6 @@ import '../../services/pocketbase/order_service.dart';
 import '../../widgets/app_navigation.dart';
 import '../../widgets/responsive_layout.dart';
 import 'product_list_bottom_sheet.dart';
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 String itemEmoji(String name) {
   final n = name.toLowerCase();
@@ -43,14 +37,9 @@ Color itemBgColor(String name) {
   return colors[name.codeUnitAt(0) % colors.length];
 }
 
-// ─── FIX: compare rounded integer amounts to avoid floating-point mismatch.
-//     e.g. tendered=20.0, total=20.0 could drift to 20.0 < 20.000000001 → blocked.
-//     Rounding to nearest integer (Rs are whole numbers) eliminates this entirely.
 bool _cashIsInsufficient(double tendered, double total) {
   return tendered.round() < total.round();
 }
-
-// ─── Screen ────────────────────────────────────────────────────────────────────
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -77,34 +66,83 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _isSubmitting = false;
 
   final FocusNode _cashFocus = FocusNode();
+  final FocusNode _checkoutShortcutFocus =
+      FocusNode(debugLabel: 'CheckoutShortcuts');
   final TextEditingController _cashController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _cashFocus.addListener(_onCashFocusChange);
+    _focusCashTendered();
   }
 
   void _onCashFocusChange() {
     if (mounted) setState(() {});
   }
 
+  void _focusCashTendered() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _paymentMethod != 'cash') return;
+      _cashFocus.requestFocus();
+    });
+  }
+
+  void _focusCheckoutShortcuts() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _paymentMethod != 'card') return;
+      _checkoutShortcutFocus.requestFocus();
+    });
+  }
+
+  void _selectPaymentMethod(String method) {
+    if (method != 'cash' && method != 'card') return;
+
+    setState(() {
+      _paymentMethod = method;
+      if (method != 'cash') {
+        _cashController.clear();
+        _tenderedAmount = 0.0;
+      }
+    });
+
+    if (method == 'cash') {
+      _focusCashTendered();
+    } else {
+      _cashFocus.unfocus();
+      _focusCheckoutShortcuts();
+    }
+  }
+
+  void _navigateBackToPos() {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+    } else {
+      navigator.pushReplacementNamed('/pos');
+    }
+  }
+
   @override
   void dispose() {
     _cashFocus.removeListener(_onCashFocusChange);
     _cashFocus.dispose();
+    _checkoutShortcutFocus.dispose();
     _cashController.dispose();
     super.dispose();
   }
 
-  // ─── Place Order ─────────────────────────────────────────────────────────────
-  // Single source of truth — called by both the button and Enter key.
-
   Future<void> _placeOrder(BuildContext context, CartProvider cart) async {
-    if (cart.items.isEmpty) return;
+    if (cart.items.isEmpty) {
+      return;
+    }
     if (_paymentMethod == 'cash' &&
-        _cashIsInsufficient(_tenderedAmount, cart.total)) return;
-    if (_isSubmitting) return;
+        _cashIsInsufficient(_tenderedAmount, cart.total)) {
+      return;
+    }
+    if (_isSubmitting) {
+      return;
+    }
 
     if (_orderType == 'dine_in' &&
         (_tableNumber == null || _tableNumber!.isEmpty)) {
@@ -149,12 +187,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         change: changeAmount,
       );
 
-      if (!mounted) return;
+      if (!context.mounted) {
+        return;
+      }
 
       cart.clear();
       Navigator.pushNamedAndRemoveUntil(context, '/pos', (route) => false);
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) {
+        return;
+      }
 
       final errorMsg = e.toString().toLowerCase().contains('network') ||
               e.toString().toLowerCase().contains('internet') ||
@@ -173,8 +215,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     }
   }
-
-  // ─────────────────────────────────────────────────────────────────────────────
 
   InputDecoration _fieldDecoration(String label, {IconData? icon}) {
     return InputDecoration(
@@ -402,15 +442,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           builder: (context, cart, _) {
             return CheckoutKeyboardScope(
               cashController: _cashController,
-              // FIX: pass cashFocusNode so CheckoutKeyboardScope can guard digit
-              // key presses — only writes to cash field when it actually has focus.
-              // Without this, left-side number keys wrote to cash unconditionally.
               cashFocusNode: _cashFocus,
+              shortcutFocusNode: _checkoutShortcutFocus,
               onCashChanged: (value) {
                 setState(() => _tenderedAmount = double.tryParse(value) ?? 0.0);
               },
-              onBack: () => Navigator.pop(context),
+              onBack: _navigateBackToPos,
               onConfirm: () => _placeOrder(context, cart),
+              onSelectPaymentMethod: _selectPaymentMethod,
               child: AppNavigationShell(
                 auth: auth,
                 currentRoute: '/checkout',
@@ -421,7 +460,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     final keyboardInset =
                         MediaQuery.of(context).viewInsets.bottom;
 
-                    // ── Order Details panel ───────────────────────────────────
                     final topForm = Container(
                       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                       decoration: BoxDecoration(
@@ -584,15 +622,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                                     TextOverflow.ellipsis),
                                           ),
                                         ],
-                                        onChanged: (value) {
-                                          setState(() {
-                                            _paymentMethod = value ?? 'cash';
-                                            if (value != 'cash') {
-                                              _cashController.clear();
-                                              _tenderedAmount = 0.0;
-                                            }
-                                          });
-                                        },
+                                        onChanged: (value) =>
+                                            _selectPaymentMethod(
+                                                value ?? 'cash'),
                                       ),
                                     ),
                                   ],
@@ -602,6 +634,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   TextField(
                                     focusNode: _cashFocus,
                                     controller: _cashController,
+                                    autofocus: true,
                                     keyboardType:
                                         const TextInputType.numberWithOptions(
                                             decimal: true),
@@ -623,7 +656,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                           fontWeight: FontWeight.w600),
                                     ),
                                   ),
-                                  // FIX: use _cashIsInsufficient for warning
                                   if (_tenderedAmount > 0 &&
                                       _cashIsInsufficient(
                                           _tenderedAmount, cart.total))
@@ -652,7 +684,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 14, vertical: 10),
                                     decoration: BoxDecoration(
-                                      // FIX: use _cashIsInsufficient for colour
                                       color: !_cashIsInsufficient(
                                               _tenderedAmount, cart.total)
                                           ? NovaColors.tealLight
@@ -716,7 +747,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     );
 
-                    // ── Cart items panel ──────────────────────────────────────
                     final cartSection = Container(
                       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                       decoration: BoxDecoration(
@@ -1060,8 +1090,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               },
                             ),
                           ),
-
-                          // ── Bottom bar ────────────────────────────────────
                           if (!keyboardOpen)
                             Container(
                               decoration: const BoxDecoration(
@@ -1108,9 +1136,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     child: SizedBox(
                                       height: 44,
                                       child: ElevatedButton.icon(
-                                        // FIX: use _cashIsInsufficient so exact
-                                        // match (e.g. Rs 20 tendered, Rs 20 total)
-                                        // enables the button correctly.
                                         onPressed: cart.items.isEmpty ||
                                                 (_paymentMethod == 'cash' &&
                                                     _cashIsInsufficient(

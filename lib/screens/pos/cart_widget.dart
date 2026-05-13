@@ -9,14 +9,8 @@ class CartWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
 
-    // FIX: Do NOT use Column > Expanded > ListView here.
-    // CartWidget is embedded inside parents that may not provide bounded height.
-    // Using Expanded inside an unbounded Column causes the 99941px overflow.
-    // Use shrinkWrap + NeverScrollableScrollPhysics so the ListView sizes to
-    // its content and the parent scroll view handles scrolling.
     return Column(
-      mainAxisSize:
-          MainAxisSize.min, // FIX: don't expand to fill infinite height
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (cart.items.isEmpty)
           const Padding(
@@ -30,9 +24,8 @@ class CartWidget extends StatelessWidget {
           )
         else
           ListView.builder(
-            shrinkWrap: true, // FIX: size to content, not to parent
-            physics:
-                const NeverScrollableScrollPhysics(), // FIX: let parent scroll
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
             itemCount: cart.items.length,
             itemBuilder: (_, i) {
               final item = cart.items[i];

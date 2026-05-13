@@ -20,10 +20,6 @@ class OrderProvider with ChangeNotifier {
       tableNumber: tableNumber,
     );
 
-    // FIX: cart.clear() already calls notifyListeners() on CartProvider.
-    // Do NOT call notifyListeners() here afterward — that causes a second
-    // rebuild while widgets from the first rebuild are already being disposed,
-    // which triggers the "ChangeNotifier used after dispose" crash.
     cart.clear();
   }
 }

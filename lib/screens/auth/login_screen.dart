@@ -385,22 +385,18 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     }
 
-    // ── Desktop: brand panel | vertical divider | login card ──────────────
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 1080),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Brand panel
             Expanded(
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: _buildWideBrandPanel(layout),
               ),
             ),
-
-            // ── Vertical divider — centered between both sides ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
               child: SizedBox(
@@ -423,8 +419,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-
-            // Login card
             Expanded(
               child: Align(
                 alignment: Alignment.centerLeft,
@@ -447,7 +441,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ── Desktop brand panel ─────────────────────────────────────────────────
   Widget _buildWideBrandPanel(_ResponsiveLayout layout) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -458,8 +451,6 @@ class _LoginScreenState extends State<LoginScreen> {
           iconSize: layout.logoIconSize,
         ),
         const SizedBox(height: 24),
-
-        // Main title
         Text(
           'ORION',
           style: TextStyle(
@@ -478,12 +469,8 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: 10),
-
-        // Subtitle pill
         _buildDividerRow('PIZZA RESTAURANT', shrinkWrap: true),
         const SizedBox(height: 28),
-
-        // Tagline
         Text(
           'Built for busy restaurant teams\n— so you can focus on the food,\nnot the paperwork.',
           style: TextStyle(
@@ -497,7 +484,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ── Mobile brand stack ──────────────────────────────────────────────────
   Widget _buildBrandStack(_ResponsiveLayout layout) {
     return Column(
       children: [
@@ -742,7 +728,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ─── Brand Mark ────────────────────────────────────────────────────────────────
 class _BrandMark extends StatelessWidget {
   const _BrandMark({this.outerSize = 118, this.iconSize = 74});
 
@@ -759,7 +744,6 @@ class _BrandMark extends StatelessWidget {
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
-          // Outer glow ring
           Container(
             width: innerSize + 16,
             height: innerSize + 16,
@@ -768,7 +752,6 @@ class _BrandMark extends StatelessWidget {
               color: _LoginColors.flame.withOpacity(0.05),
             ),
           ),
-          // Glass circle
           ClipOval(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -793,7 +776,6 @@ class _BrandMark extends StatelessWidget {
               ),
             ),
           ),
-          // Top gloss
           Positioned(
             top: innerSize * 0.08,
             left: innerSize * 0.22,
@@ -806,7 +788,6 @@ class _BrandMark extends StatelessWidget {
               ),
             ),
           ),
-          // Pizza icon
           Transform.rotate(
             angle: -0.18,
             child: Icon(Icons.local_pizza_rounded,
@@ -818,7 +799,6 @@ class _BrandMark extends StatelessWidget {
   }
 }
 
-// ─── Background Pattern Painter ────────────────────────────────────────────────
 class _FoodPatternPainter extends CustomPainter {
   const _FoodPatternPainter();
 
