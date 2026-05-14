@@ -750,32 +750,31 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
                         Expanded(
                           child: Container(
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: CafeColors.flame.withOpacity(0.08),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
+                              color: NovaColors.bgPrimary,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: NovaColors.borderTertiary,
+                                width: 0.5,
+                              ),
                             ),
                             child: TextField(
                               controller: _searchController,
                               onChanged: (v) => setState(
                                   () => _searchQuery = v.toLowerCase()),
                               style: const TextStyle(
-                                  fontSize: 14, color: CafeColors.charcoal),
+                                  fontSize: 14, color: NovaColors.textPrimary),
                               decoration: InputDecoration(
                                 hintText: 'Search employees...',
-                                hintStyle: TextStyle(
-                                    color: Colors.grey[400], fontSize: 14),
+                                hintStyle: const TextStyle(
+                                    color: NovaColors.textTertiary,
+                                    fontSize: 14),
                                 prefixIcon: const Icon(Icons.search_rounded,
-                                    color: CafeColors.flame, size: 20),
+                                    color: NovaColors.textSecondary, size: 20),
                                 suffixIcon: _searchQuery.isNotEmpty
                                     ? IconButton(
-                                        icon: Icon(Icons.close_rounded,
-                                            color: Colors.grey[500], size: 18),
+                                        icon: const Icon(Icons.close_rounded,
+                                            color: NovaColors.textTertiary,
+                                            size: 18),
                                         onPressed: () {
                                           _searchController.clear();
                                           setState(() => _searchQuery = '');
@@ -783,13 +782,13 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
                                       )
                                     : null,
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
                                 ),
                                 contentPadding:
                                     const EdgeInsets.symmetric(vertical: 14),
                                 filled: true,
-                                fillColor: Colors.white,
+                                fillColor: NovaColors.bgPrimary,
                               ),
                             ),
                           ),

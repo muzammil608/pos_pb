@@ -111,6 +111,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     await _authService.logout();
+    _isRoleLoaded = true;
     _user = null;
     _userData = null;
     _role = '';

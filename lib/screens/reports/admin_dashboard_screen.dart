@@ -349,55 +349,73 @@ class _StatCard extends StatelessWidget {
     if (deltaUp == true) deltaColor = NovaColors.teal;
     if (deltaUp == false) deltaColor = NovaColors.danger;
 
-    return Container(
-      width: fullWidth ? double.infinity : null,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: NovaColors.bgPrimary,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: NovaColors.borderTertiary, width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth > 0 && constraints.maxWidth < 190;
+
+        return Container(
+          width: fullWidth ? double.infinity : null,
+          constraints: const BoxConstraints(minHeight: 118),
+          padding: EdgeInsets.all(compact ? 12 : 16),
+          decoration: BoxDecoration(
+            color: NovaColors.bgPrimary,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: NovaColors.borderTertiary, width: 0.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 15, color: iconColor),
-              const SizedBox(width: 6),
+              Row(
+                children: [
+                  Icon(icon, size: 15, color: iconColor),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: NovaColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              isLoading
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        color: NovaColors.violet,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        value,
+                        style: TextStyle(
+                          fontSize: compact ? 20 : 22,
+                          fontWeight: FontWeight.w500,
+                          color: NovaColors.textPrimary,
+                        ),
+                      ),
+                    ),
+              const SizedBox(height: 6),
               Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: NovaColors.textSecondary,
-                ),
+                delta,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    TextStyle(fontSize: compact ? 11 : 12, color: deltaColor),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          isLoading
-              ? const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                    color: NovaColors.violet,
-                    strokeWidth: 2,
-                  ),
-                )
-              : Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w500,
-                    color: NovaColors.textPrimary,
-                  ),
-                ),
-          const SizedBox(height: 4),
-          Text(
-            delta,
-            style: TextStyle(fontSize: 12, color: deltaColor),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

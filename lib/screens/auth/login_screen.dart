@@ -151,6 +151,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() => _isLoading = false);
+    _navigateForRole(auth.role);
+  }
+
+  void _navigateForRole(String role) {
+    final route = switch (role) {
+      'admin' => '/admin',
+      'cashier' => '/pos',
+      'kitchen' => '/kitchen',
+      _ => '/pos',
+    };
+
+    Navigator.of(context).pushNamedAndRemoveUntil(route, (route) => false);
   }
 
   Future<void> _handleEmailLogin() async {
@@ -510,7 +522,12 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         SizedBox(height: layout.spacingAfterTitle),
-        Center(child: _buildDividerRow('PIZZA RESTAURANT', shrinkWrap: true)),
+        Transform.translate(
+          offset: Offset(0, layout.spacingBeforeCard * 0.55),
+          child: Center(
+            child: _buildDividerRow('PIZZA RESTAURANT', shrinkWrap: true),
+          ),
+        ),
       ],
     );
   }

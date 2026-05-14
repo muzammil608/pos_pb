@@ -8,6 +8,134 @@ import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/pocketbase/product_service.dart';
 
+// ---------------------------------------------------------------------------
+// Category → Unsplash image map (mirrors pos_screen.dart _CategoryImages)
+// ---------------------------------------------------------------------------
+class _CategoryImages {
+  static const Map<String, String> _images = {
+    'dairy':
+        'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&h=300&fit=crop',
+    'fruit':
+        'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&h=300&fit=crop',
+    'vegetable':
+        'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop',
+    'bakery':
+        'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=300&fit=crop',
+    'meat':
+        'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=400&h=300&fit=crop',
+    'vegan':
+        'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop',
+    'drinks':
+        'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&h=300&fit=crop',
+    'coffee':
+        'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=300&fit=crop',
+    'dessert':
+        'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=400&h=300&fit=crop',
+    'pizza':
+        'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop',
+    'burger':
+        'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop',
+    'salad':
+        'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop',
+    'sandwich':
+        'https://images.unsplash.com/photo-1539252554453-80ab65ce3586?w=400&h=300&fit=crop',
+    'soup':
+        'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=300&fit=crop',
+    'pasta':
+        'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=300&fit=crop',
+    'rice':
+        'https://images.unsplash.com/photo-1536304993881-ff86e6a7cf78?w=400&h=300&fit=crop',
+    'seafood':
+        'https://images.unsplash.com/photo-1559737558-2f5a35f4523b?w=400&h=300&fit=crop',
+    'chicken':
+        'https://images.unsplash.com/photo-1598103442097-8b74394b95c1?w=400&h=300&fit=crop',
+    'breakfast':
+        'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400&h=300&fit=crop',
+    'snack':
+        'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=400&h=300&fit=crop',
+  };
+
+  static const String _fallback =
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=300&fit=crop';
+
+  static String forCategory(String category) {
+    final key = category.toLowerCase().trim();
+    if (_images.containsKey(key)) return _images[key]!;
+    for (final entry in _images.entries) {
+      if (key.contains(entry.key) || entry.key.contains(key)) {
+        return entry.value;
+      }
+    }
+    return _fallback;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shared product image widget (mirrors pos_screen.dart _ProductImage)
+// ---------------------------------------------------------------------------
+class _ProductImage extends StatelessWidget {
+  final Product product;
+  final double? width;
+  final double? height;
+  final BorderRadius? borderRadius;
+
+  const _ProductImage({
+    required this.product,
+    this.width,
+    this.height,
+    this.borderRadius,
+  });
+
+  String get _imageUrl => product.imageUrl?.isNotEmpty == true
+      ? product.imageUrl!
+      : _CategoryImages.forCategory(product.category);
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: borderRadius ?? BorderRadius.zero,
+      child: Image.network(
+        _imageUrl,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: width,
+            height: height,
+            color: NovaColors.bgSecondary,
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: NovaColors.violet,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: width,
+            height: height,
+            color: NovaColors.violetLight,
+            child: const Center(
+              child: Icon(Icons.fastfood_rounded,
+                  color: NovaColors.violet, size: 28),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main bottom sheet
+// ---------------------------------------------------------------------------
 class ProductListBottomSheet extends StatefulWidget {
   const ProductListBottomSheet({super.key});
 
@@ -38,38 +166,12 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
     super.dispose();
   }
 
-  String _itemEmoji(String name) {
-    final n = name.toLowerCase();
-    if (n.contains('coffee') || n.contains('espresso') || n.contains('latte')) {
-      return '☕';
-    }
-    if (n.contains('juice') || n.contains('cold') || n.contains('drink')) {
-      return '🧃';
-    }
-    if (n.contains('burger') || n.contains('sandwich')) return '🥪';
-    if (n.contains('pizza')) return '🍕';
-    if (n.contains('cake') || n.contains('dessert') || n.contains('sweet')) {
-      return '🍰';
-    }
-    if (n.contains('salad')) return '🥗';
-    return '🍴';
-  }
-
-  Color _itemBgColor(String name) {
-    const colors = [
-      NovaColors.violetLight,
-      NovaColors.tealLight,
-      NovaColors.amberLight,
-      Color(0xFFFFEEF3),
-      Color(0xFFE8F4FD),
-    ];
-    return colors[name.codeUnitAt(0) % colors.length];
-  }
-
+  // Mirrors ResponsiveLayout.productColumns used in pos_screen.dart
   int _columnCount(double width) {
-    if (width < 340) return 2;
-    if (width < 520) return 3;
-    if (width < 860) return 4;
+    if (width < 380) return 1;
+    if (width < 600) return 1; // list mode handles <600
+    if (width < 900) return 3;
+    if (width < 1200) return 4;
     return 5;
   }
 
@@ -150,6 +252,7 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Drag handle
                 Padding(
                   padding: const EdgeInsets.only(top: 10, bottom: 4),
                   child: Container(
@@ -161,6 +264,7 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                     ),
                   ),
                 ),
+                // Header
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   padding:
@@ -210,6 +314,7 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                // Search bar
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: TextField(
@@ -278,6 +383,7 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                   ),
                 ),
                 const SizedBox(height: 10),
+                // Product grid / list
                 Flexible(
                   child: StreamBuilder<List<Product>>(
                     stream: productService.streamProducts,
@@ -360,6 +466,26 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
 
                       return LayoutBuilder(
                         builder: (context, constraints) {
+                          // ── Mobile: list tiles with image ──────────────
+                          if (constraints.maxWidth < 600) {
+                            _columns = 1;
+                            return ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                              itemCount: _products.length,
+                              itemBuilder: (context, index) {
+                                final product = _products[index];
+                                return _BottomSheetProductTile(
+                                  product: product,
+                                  isFocused: index == _focusedIndex,
+                                  onTap: () => _addProduct(context, product),
+                                  onFocus: () =>
+                                      setState(() => _focusedIndex = index),
+                                );
+                              },
+                            );
+                          }
+
+                          // ── Desktop / tablet: grid cards with image ────
                           _columns = _columnCount(constraints.maxWidth);
                           return GridView.builder(
                             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -368,97 +494,19 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                               crossAxisCount: _columns,
                               mainAxisSpacing: 10,
                               crossAxisSpacing: 10,
-                              childAspectRatio: 1.04,
+                              // Exact same values as pos_screen.dart _ProductCard grid
+                              childAspectRatio:
+                                  constraints.maxWidth < 380 ? 1.35 : 0.78,
                             ),
                             itemCount: _products.length,
                             itemBuilder: (context, index) {
                               final product = _products[index];
-                              final name = product.name;
-                              final isFocused = index == _focusedIndex;
-
-                              return InkWell(
-                                borderRadius: BorderRadius.circular(12),
+                              return _BottomSheetProductGridCard(
+                                product: product,
+                                isFocused: index == _focusedIndex,
                                 onTap: () => _addProduct(context, product),
-                                onFocusChange: (value) {
-                                  if (value) {
-                                    setState(() => _focusedIndex = index);
-                                  }
-                                },
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 140),
-                                  decoration: BoxDecoration(
-                                    color: NovaColors.bgPrimary,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: isFocused
-                                          ? NovaColors.violet
-                                          : NovaColors.borderTertiary,
-                                      width: isFocused ? 1.4 : 0.5,
-                                    ),
-                                    boxShadow: [
-                                      if (isFocused)
-                                        BoxShadow(
-                                          color: NovaColors.violet
-                                              .withOpacity(0.18),
-                                          blurRadius: 14,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                    ],
-                                  ),
-                                  padding: const EdgeInsets.all(8),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 38,
-                                        height: 38,
-                                        decoration: BoxDecoration(
-                                          color: _itemBgColor(name),
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            _itemEmoji(name),
-                                            style:
-                                                const TextStyle(fontSize: 18),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        name,
-                                        textAlign: TextAlign.center,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: NovaColors.textPrimary,
-                                          height: 1.25,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: NovaColors.violetLight,
-                                          borderRadius:
-                                              BorderRadius.circular(7),
-                                        ),
-                                        child: Text(
-                                          'Rs ${product.price.toStringAsFixed(0)}',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: NovaColors.violet,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                onFocus: () =>
+                                    setState(() => _focusedIndex = index),
                               );
                             },
                           );
@@ -476,6 +524,336 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// List tile  (mirrors _ProductListTile from pos_screen.dart)
+// ---------------------------------------------------------------------------
+class _BottomSheetProductTile extends StatefulWidget {
+  final Product product;
+  final bool isFocused;
+  final VoidCallback onTap;
+  final VoidCallback onFocus;
+
+  const _BottomSheetProductTile({
+    required this.product,
+    required this.isFocused,
+    required this.onTap,
+    required this.onFocus,
+  });
+
+  @override
+  State<_BottomSheetProductTile> createState() =>
+      _BottomSheetProductTileState();
+}
+
+class _BottomSheetProductTileState extends State<_BottomSheetProductTile>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 100));
+    _scale = Tween<double>(begin: 1.0, end: 0.97)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _ctrl.forward(),
+      onTapUp: (_) {
+        _ctrl.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _ctrl.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: NovaColors.bgPrimary,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: widget.isFocused
+                  ? NovaColors.violet
+                  : NovaColors.borderTertiary,
+              width: widget.isFocused ? 1.5 : 0.5,
+            ),
+            boxShadow: widget.isFocused
+                ? [
+                    BoxShadow(
+                      color: NovaColors.violet.withValues(alpha: 0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Row(
+            children: [
+              // Product image — 72×72, left-rounded (identical to _ProductListTile)
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.horizontal(left: Radius.circular(12)),
+                child: _ProductImage(
+                  product: widget.product,
+                  width: 72,
+                  height: 72,
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Name + category pill
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      widget.product.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: NovaColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: NovaColors.bgTertiary,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        widget.product.category,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: NovaColors.textTertiary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Price pill + add circle (identical to _ProductListTile)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: NovaColors.violetLight,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Rs ${widget.product.price.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: NovaColors.violet,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 26,
+                      height: 26,
+                      decoration: const BoxDecoration(
+                        color: NovaColors.violetLight,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.add_rounded,
+                          color: NovaColors.violet, size: 15),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Grid card  (mirrors _ProductCard from pos_screen.dart)
+// ---------------------------------------------------------------------------
+class _BottomSheetProductGridCard extends StatefulWidget {
+  final Product product;
+  final bool isFocused;
+  final VoidCallback onTap;
+  final VoidCallback onFocus;
+
+  const _BottomSheetProductGridCard({
+    required this.product,
+    required this.isFocused,
+    required this.onTap,
+    required this.onFocus,
+  });
+
+  @override
+  State<_BottomSheetProductGridCard> createState() =>
+      _BottomSheetProductGridCardState();
+}
+
+class _BottomSheetProductGridCardState
+    extends State<_BottomSheetProductGridCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 100));
+    _scale = Tween<double>(begin: 1.0, end: 0.96)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _ctrl.forward(),
+      onTapUp: (_) {
+        _ctrl.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _ctrl.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            color: NovaColors.bgPrimary,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: widget.isFocused
+                  ? NovaColors.violet
+                  : NovaColors.borderTertiary,
+              width: widget.isFocused ? 1.5 : 0.5,
+            ),
+            boxShadow: widget.isFocused
+                ? [
+                    BoxShadow(
+                      color: NovaColors.violet.withValues(alpha: 0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [],
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onFocusChange: (v) {
+              if (v) widget.onFocus();
+            },
+            onTap: widget.onTap,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Image — top 5 flex (same ratio as _ProductCard)
+                Expanded(
+                  flex: 5,
+                  child: _ProductImage(
+                    product: widget.product,
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(12)),
+                  ),
+                ),
+                // Info — bottom 4 flex
+                Expanded(
+                  flex: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          widget.product.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: NovaColors.textPrimary,
+                            height: 1.2,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: NovaColors.violetLight,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Rs ${widget.product.price.toStringAsFixed(0)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: NovaColors.violet,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              width: 22,
+                              height: 22,
+                              decoration: const BoxDecoration(
+                                color: NovaColors.violetLight,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.add_rounded,
+                                  color: NovaColors.violet, size: 13),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Intent classes (unchanged)
+// ---------------------------------------------------------------------------
 class _SheetMoveIntent extends Intent {
   final int delta;
   const _SheetMoveIntent(this.delta);

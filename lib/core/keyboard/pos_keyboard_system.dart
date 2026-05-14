@@ -992,24 +992,34 @@ class PosCategoryChipsState extends State<PosCategoryChips> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 34,
-      child: ListView.separated(
-        controller: _scroll,
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: widget.categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
-        itemBuilder: (context, index) {
-          final cat = widget.categories[index];
-          final isSelected = widget.selected == cat;
-          return _CategoryChip(
-            label: cat,
-            isSelected: isSelected,
-            onTap: () => widget.onSelected(cat),
-          );
-        },
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 420;
+        final rowHeight = isCompact ? 32.0 : 36.0;
+
+        return SizedBox(
+          height: rowHeight,
+          child: ListView.separated(
+            controller: _scroll,
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 16),
+            itemCount: widget.categories.length,
+            separatorBuilder: (_, __) => SizedBox(width: isCompact ? 4 : 5),
+            itemBuilder: (context, index) {
+              final cat = widget.categories[index];
+              final isSelected = widget.selected == cat;
+              return Center(
+                child: _CategoryChip(
+                  label: cat,
+                  isSelected: isSelected,
+                  isCompact: isCompact,
+                  onTap: () => widget.onSelected(cat),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -1017,9 +1027,14 @@ class PosCategoryChipsState extends State<PosCategoryChips> {
 class _CategoryChip extends StatefulWidget {
   final String label;
   final bool isSelected;
+  final bool isCompact;
   final VoidCallback onTap;
-  const _CategoryChip(
-      {required this.label, required this.isSelected, required this.onTap});
+  const _CategoryChip({
+    required this.label,
+    required this.isSelected,
+    required this.isCompact,
+    required this.onTap,
+  });
   @override
   State<_CategoryChip> createState() => _CategoryChipState();
 }
@@ -1058,7 +1073,10 @@ class _CategoryChipState extends State<_CategoryChip> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          height: widget.isCompact ? 26 : 30,
+          constraints: BoxConstraints(maxWidth: widget.isCompact ? 110 : 145),
+          alignment: Alignment.center,
+          padding: EdgeInsets.symmetric(horizontal: widget.isCompact ? 9 : 12),
           decoration: BoxDecoration(
             color: widget.isSelected
                 ? const Color(0xFF534AB7)
@@ -1082,8 +1100,12 @@ class _CategoryChipState extends State<_CategoryChip> {
           ),
           child: Text(
             widget.label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: widget.isCompact ? 10.5 : 11.5,
+              height: 1.0,
               fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.w400,
               color: widget.isSelected ? Colors.white : const Color(0xFF6B6B80),
             ),

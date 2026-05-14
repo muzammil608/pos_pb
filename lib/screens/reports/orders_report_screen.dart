@@ -334,7 +334,8 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
                                     padding: const EdgeInsets.only(bottom: 32),
                                     itemCount: orders.length,
                                     itemBuilder: (context, index) =>
-                                        _buildOrderCard(orders[index]),
+                                        _buildOrderCard(orders[index],
+                                            inGrid: false),
                                   )
                                 : GridView.builder(
                                     padding: const EdgeInsets.only(bottom: 32),
@@ -343,11 +344,15 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
                                       crossAxisCount: columns,
                                       mainAxisSpacing: 12,
                                       crossAxisSpacing: 12,
-                                      childAspectRatio: 3.8,
+                                      // Fixed pixel height instead of aspect ratio —
+                                      // prevents overflow when card content exceeds
+                                      // the height that a ratio would calculate.
+                                      mainAxisExtent: 120,
                                     ),
                                     itemCount: orders.length,
                                     itemBuilder: (context, index) =>
-                                        _buildOrderCard(orders[index]),
+                                        _buildOrderCard(orders[index],
+                                            inGrid: true),
                                   ),
                       ),
                     ],
@@ -361,7 +366,7 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
     );
   }
 
-  Widget _buildOrderCard(Map<String, dynamic> order) {
+  Widget _buildOrderCard(Map<String, dynamic> order, {bool inGrid = false}) {
     final orderNumber = order['orderNumber']?.toString() ??
         order['id'].toString().substring(0, 6);
     final total = (order['total'] as num?)?.toDouble() ?? 0.0;
@@ -378,6 +383,9 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
       formattedDate: _formatOrderDate(createdAt),
       statusColor: _statusColor(status),
       statusBg: _statusBg(status),
+      // In a GridView the grid itself handles spacing via mainAxisSpacing,
+      // so we remove the card's own bottom margin to avoid double-spacing.
+      inGrid: inGrid,
     );
   }
 
@@ -427,6 +435,7 @@ class _OrderCard extends StatelessWidget {
   final String formattedDate;
   final Color statusColor;
   final Color statusBg;
+  final bool inGrid;
 
   const _OrderCard({
     required this.orderNumber,
@@ -437,12 +446,15 @@ class _OrderCard extends StatelessWidget {
     required this.formattedDate,
     required this.statusColor,
     required this.statusBg,
+    this.inGrid = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      // In ListView mode keep the original bottom margin for spacing between
+      // cards. In GridView mode remove it — mainAxisSpacing handles that.
+      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -472,18 +484,23 @@ class _OrderCard extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
-                      Text(
-                        'Order #$orderNumber',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: CafeColors.charcoal,
+                      Expanded(
+                        child: Text(
+                          'Order #$orderNumber',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: CafeColors.charcoal,
+                          ),
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 8),
                       Text(
                         'Rs ${total.toStringAsFixed(0)}',
                         style: const TextStyle(
@@ -501,11 +518,15 @@ class _OrderCard extends StatelessWidget {
                           size: 11,
                           color: CafeColors.charcoal.withOpacity(0.4)),
                       const SizedBox(width: 3),
-                      Text(
-                        formattedDate,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: CafeColors.charcoal.withOpacity(0.45),
+                      Expanded(
+                        child: Text(
+                          formattedDate,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: CafeColors.charcoal.withOpacity(0.45),
+                          ),
                         ),
                       ),
                     ],

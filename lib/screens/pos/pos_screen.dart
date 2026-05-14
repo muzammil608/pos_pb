@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -7,9 +8,11 @@ import 'package:provider/provider.dart';
 
 import '../../core/keyboard/pos_keyboard_system.dart';
 import '../../core/theme/nova_theme.dart';
+import '../../models/pos_header_slide_model.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
+import '../../services/pos_header_service.dart';
 import '../../services/pocketbase/order_service.dart';
 import '../../services/pocketbase/product_service.dart';
 import '../../widgets/app_navigation.dart';
@@ -88,6 +91,7 @@ class PosScreen extends StatefulWidget {
 class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   ProductService? _productService;
   OrderService? _orderService;
+  PosHeaderService? _posHeaderService;
 
   final TextEditingController _searchController = TextEditingController();
   final GlobalKey<PosSearchBarState> _searchBarKey =
@@ -166,6 +170,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     if (auth.ownerId.isNotEmpty) {
       _productService = ProductService(auth.ownerId);
       _orderService = OrderService(auth.ownerId);
+      _posHeaderService = PosHeaderService(auth.ownerId);
     }
   }
 
@@ -173,6 +178,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   void dispose() {
     _searchController.dispose();
     _pulseController.dispose();
+    _posHeaderService?.dispose();
     PosHotkeyRegistry.unregisterAll();
     super.dispose();
   }
@@ -944,6 +950,13 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                             onSelected: (cat) =>
                                 setState(() => _selectedCategory = cat),
                           ),
+                        if (_posHeaderService != null) ...[
+                          const SizedBox(height: 10),
+                          PosHeaderSlideshow(
+                            service: _posHeaderService!,
+                            canEdit: auth.isAdmin,
+                          ),
+                        ],
                         const SizedBox(height: 10),
                         Expanded(
                           child: () {
@@ -1117,6 +1130,455 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
           ),
         );
       },
+    );
+  }
+}
+
+class PosHeaderSlideshow extends StatefulWidget {
+  final PosHeaderService service;
+  final bool canEdit;
+
+  const PosHeaderSlideshow({
+    super.key,
+    required this.service,
+    required this.canEdit,
+  });
+
+  @override
+  State<PosHeaderSlideshow> createState() => _PosHeaderSlideshowState();
+}
+
+class _PosHeaderSlideshowState extends State<PosHeaderSlideshow> {
+  static const Duration _interval = Duration(seconds: 4);
+
+  Timer? _timer;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(_interval, (_) {
+      if (!mounted) return;
+      setState(() => _index++);
+    });
+  }
+
+  void _goTo(int index) {
+    setState(() => _index = index);
+    _startTimer();
+  }
+
+  Future<void> _editSlides(List<PosHeaderSlide> slides) async {
+    final updated = await showDialog<List<PosHeaderSlide>>(
+      context: context,
+      builder: (_) => _PosHeaderEditorDialog(slides: slides),
+    );
+    if (updated == null || !mounted) return;
+
+    try {
+      await widget.service.saveSlides(updated);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('POS header updated.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not save header. Make sure the ${PosHeaderService.collectionName} collection exists.',
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<PosHeaderSlide>>(
+      stream: widget.service.slidesStream,
+      builder: (context, snapshot) {
+        final slides = snapshot.data ?? PosHeaderSlide.defaults('');
+        final activeSlides = slides.where((slide) => slide.isActive).toList();
+        if (activeSlides.isEmpty) return const SizedBox.shrink();
+
+        final activeIndex = _index % activeSlides.length;
+        final slide = activeSlides[activeIndex];
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 600;
+            final height = isCompact ? 132.0 : 170.0;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  height: height,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: NovaColors.borderTertiary),
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 650),
+                        child: _HeaderSlideView(
+                          key: ValueKey('${slide.id}-$activeIndex'),
+                          slide: slide,
+                          isCompact: isCompact,
+                        ),
+                      ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 10,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            activeSlides.length,
+                            (i) => GestureDetector(
+                              onTap: () => _goTo(i),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                width: i == activeIndex ? 18 : 7,
+                                height: 7,
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(
+                                    i == activeIndex ? 0.95 : 0.45,
+                                  ),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      TweenAnimationBuilder<double>(
+                        key: ValueKey(activeIndex),
+                        tween: Tween(begin: 0, end: 1),
+                        duration: _interval,
+                        builder: (context, value, child) {
+                          return Align(
+                            alignment: Alignment.bottomLeft,
+                            child: FractionallySizedBox(
+                              widthFactor: value,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: Container(
+                          height: 3,
+                          color: const Color(0xFFFF8C00).withOpacity(0.85),
+                        ),
+                      ),
+                      if (widget.canEdit)
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: IconButton.filledTonal(
+                            onPressed: () => _editSlides(slides),
+                            tooltip: 'Edit POS header',
+                            icon: const Icon(Icons.edit_rounded, size: 18),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _HeaderSlideView extends StatelessWidget {
+  final PosHeaderSlide slide;
+  final bool isCompact;
+
+  const _HeaderSlideView({
+    super.key,
+    required this.slide,
+    required this.isCompact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [slide.startColor, slide.middleColor, slide.endColor],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black.withOpacity(0.65),
+                  Colors.black.withOpacity(0.10),
+                ],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: isCompact ? 20 : 32),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: isCompact ? 320 : 520),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isCompact ? 8 : 10,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE84B30),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        slide.badge,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isCompact ? 10 : 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      slide.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isCompact ? 18 : 22,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      slide.subtitle,
+                      maxLines: isCompact ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: isCompact ? 12 : 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PosHeaderEditorDialog extends StatefulWidget {
+  final List<PosHeaderSlide> slides;
+
+  const _PosHeaderEditorDialog({required this.slides});
+
+  @override
+  State<_PosHeaderEditorDialog> createState() => _PosHeaderEditorDialogState();
+}
+
+class _PosHeaderEditorDialogState extends State<_PosHeaderEditorDialog> {
+  late final List<_SlideEditState> _slides;
+
+  @override
+  void initState() {
+    super.initState();
+    _slides = widget.slides.take(4).map(_SlideEditState.new).toList();
+    if (_slides.isEmpty) {
+      _slides.addAll(PosHeaderSlide.defaults('').map(_SlideEditState.new));
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final slide in _slides) {
+      slide.dispose();
+    }
+    super.dispose();
+  }
+
+  List<PosHeaderSlide> _buildSlides() {
+    return [
+      for (var i = 0; i < _slides.length; i++) _slides[i].toSlide(i),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit POS Header'),
+      content: SizedBox(
+        width: 560,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < _slides.length; i++) ...[
+                _SlideEditCard(index: i, state: _slides[i]),
+                if (i != _slides.length - 1) const SizedBox(height: 12),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _buildSlides()),
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class _SlideEditState {
+  final PosHeaderSlide original;
+  late final TextEditingController badge;
+  late final TextEditingController title;
+  late final TextEditingController subtitle;
+  late final TextEditingController startColor;
+  late final TextEditingController middleColor;
+  late final TextEditingController endColor;
+
+  _SlideEditState(this.original) {
+    badge = TextEditingController(text: original.badge);
+    title = TextEditingController(text: original.title);
+    subtitle = TextEditingController(text: original.subtitle);
+    startColor = TextEditingController(text: colorToHex(original.startColor));
+    middleColor = TextEditingController(text: colorToHex(original.middleColor));
+    endColor = TextEditingController(text: colorToHex(original.endColor));
+  }
+
+  PosHeaderSlide toSlide(int index) {
+    return original.copyWith(
+      badge: badge.text.trim(),
+      title: title.text.trim(),
+      subtitle: subtitle.text.trim(),
+      startColor: colorFromHex(startColor.text, original.startColor.value),
+      middleColor: colorFromHex(middleColor.text, original.middleColor.value),
+      endColor: colorFromHex(endColor.text, original.endColor.value),
+      sortOrder: index,
+      isActive: true,
+    );
+  }
+
+  void dispose() {
+    badge.dispose();
+    title.dispose();
+    subtitle.dispose();
+    startColor.dispose();
+    middleColor.dispose();
+    endColor.dispose();
+  }
+}
+
+class _SlideEditCard extends StatelessWidget {
+  final int index;
+  final _SlideEditState state;
+
+  const _SlideEditCard({required this.index, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: NovaColors.borderTertiary),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Slide ${index + 1}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: state.badge,
+              decoration: const InputDecoration(labelText: 'Badge'),
+            ),
+            TextField(
+              controller: state.title,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            TextField(
+              controller: state.subtitle,
+              decoration: const InputDecoration(labelText: 'Subtitle'),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: state.startColor,
+                    decoration: const InputDecoration(labelText: 'Start color'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: state.middleColor,
+                    decoration:
+                        const InputDecoration(labelText: 'Middle color'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: state.endColor,
+                    decoration: const InputDecoration(labelText: 'End color'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
