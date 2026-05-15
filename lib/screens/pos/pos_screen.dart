@@ -454,10 +454,11 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     final tendered = (data['tenderedAmount'] as num?)?.toDouble() ?? total;
     final change = (data['change'] as num?)?.toDouble() ?? 0.0;
     final createdAt = data['createdAt'] as DateTime?;
-    final date = createdAt != null
-        ? '${createdAt.day}/${createdAt.month}/${createdAt.year} '
-            '${createdAt.hour.toString().padLeft(2, '0')}:'
-            '${createdAt.minute.toString().padLeft(2, '0')}'
+    final localCreatedAt = createdAt?.toLocal();
+    final date = localCreatedAt != null
+        ? '${localCreatedAt.day}/${localCreatedAt.month}/${localCreatedAt.year} '
+            '${localCreatedAt.hour.toString().padLeft(2, '0')}:'
+            '${localCreatedAt.minute.toString().padLeft(2, '0')}'
         : '';
     final servedBy = Provider.of<AuthProvider>(rootContext, listen: false).role;
 
@@ -1150,6 +1151,7 @@ class PosHeaderSlideshow extends StatefulWidget {
 
 class _PosHeaderSlideshowState extends State<PosHeaderSlideshow> {
   static const Duration _interval = Duration(seconds: 4);
+  static const double _headerRadius = 20;
 
   Timer? _timer;
   int _index = 0;
@@ -1196,9 +1198,7 @@ class _PosHeaderSlideshowState extends State<PosHeaderSlideshow> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Could not save header. Make sure the ${PosHeaderService.collectionName} collection exists.',
-          ),
+          content: Text('Could not save header. ${e.toString()}'),
         ),
       );
     }
@@ -1224,10 +1224,11 @@ class _PosHeaderSlideshowState extends State<PosHeaderSlideshow> {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(_headerRadius),
                 child: Container(
                   height: height,
                   decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(_headerRadius),
                     border: Border.all(color: NovaColors.borderTertiary),
                   ),
                   child: Stack(
@@ -1444,10 +1445,80 @@ class _PosHeaderEditorDialogState extends State<_PosHeaderEditorDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 640;
+    final dialogWidth = isCompact ? screenWidth - 24 : 560.0;
+
     return AlertDialog(
-      title: const Text('Edit POS Header'),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 12 : 40,
+        vertical: isCompact ? 16 : 24,
+      ),
+      backgroundColor: NovaColors.bgPrimary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      titlePadding: EdgeInsets.fromLTRB(
+        isCompact ? 18 : 24,
+        isCompact ? 18 : 22,
+        isCompact ? 18 : 24,
+        12,
+      ),
+      contentPadding: EdgeInsets.fromLTRB(
+        isCompact ? 18 : 24,
+        0,
+        isCompact ? 18 : 24,
+        16,
+      ),
+      actionsPadding: EdgeInsets.fromLTRB(
+        isCompact ? 12 : 16,
+        0,
+        isCompact ? 12 : 16,
+        16,
+      ),
+      title: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: NovaColors.violetLight,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.view_carousel_rounded,
+              color: NovaColors.violet,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Edit POS Header',
+                  style: TextStyle(
+                    color: NovaColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 20,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Update the slides shown above your product grid.',
+                  style: TextStyle(
+                    color: NovaColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
       content: SizedBox(
-        width: 560,
+        width: dialogWidth,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1461,14 +1532,63 @@ class _PosHeaderEditorDialogState extends State<_PosHeaderEditorDialog> {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _buildSlides()),
-          child: const Text('Save'),
-        ),
+        if (isCompact) ...[
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                foregroundColor: NovaColors.textSecondary,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Cancel'),
+            ),
+          ),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: NovaColors.violet,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () => Navigator.pop(context, _buildSlides()),
+              child: const Text('Save'),
+            ),
+          ),
+        ] else ...[
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: NovaColors.textSecondary,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: NovaColors.violet,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () => Navigator.pop(context, _buildSlides()),
+            child: const Text('Save'),
+          ),
+        ],
       ],
     );
   }
@@ -1516,6 +1636,27 @@ class _SlideEditState {
 }
 
 class _SlideEditCard extends StatelessWidget {
+  static const List<Color> _palette = [
+    Color(0xFF2E1600),
+    Color(0xFF7A3300),
+    Color(0xFFC45C00),
+    Color(0xFFE84B30),
+    Color(0xFFBE123C),
+    Color(0xFFD4537E),
+    Color(0xFF7C3AED),
+    Color(0xFF534AB7),
+    Color(0xFF1D4ED8),
+    Color(0xFF0891B2),
+    Color(0xFF1D9E75),
+    Color(0xFF2E7D32),
+    Color(0xFF65A30D),
+    Color(0xFFEAB308),
+    Color(0xFFBA7517),
+    Color(0xFF6B7280),
+    Color(0xFF374151),
+    Color(0xFF111827),
+  ];
+
   final int index;
   final _SlideEditState state;
 
@@ -1523,60 +1664,451 @@ class _SlideEditCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.of(context).size.width < 640;
+
     return DecoratedBox(
       decoration: BoxDecoration(
+        color: NovaColors.bgSecondary,
         border: Border.all(color: NovaColors.borderTertiary),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Slide ${index + 1}',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: state.badge,
-              decoration: const InputDecoration(labelText: 'Badge'),
-            ),
-            TextField(
-              controller: state.title,
-              decoration: const InputDecoration(labelText: 'Title'),
-            ),
-            TextField(
-              controller: state.subtitle,
-              decoration: const InputDecoration(labelText: 'Subtitle'),
-            ),
-            const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: state.startColor,
-                    decoration: const InputDecoration(labelText: 'Start color'),
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: NovaColors.violetLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${index + 1}',
+                    style: const TextStyle(
+                      color: NovaColors.violet,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: state.middleColor,
-                    decoration:
-                        const InputDecoration(labelText: 'Middle color'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: state.endColor,
-                    decoration: const InputDecoration(labelText: 'End color'),
+                const SizedBox(width: 10),
+                const Text(
+                  'Slide',
+                  style: TextStyle(
+                    color: NovaColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 14),
+            _HeaderEditorField(
+              controller: state.badge,
+              label: 'Badge',
+            ),
+            const SizedBox(height: 10),
+            _HeaderEditorField(
+              controller: state.title,
+              label: 'Title',
+            ),
+            const SizedBox(height: 10),
+            _HeaderEditorField(
+              controller: state.subtitle,
+              label: 'Subtitle',
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Choose gradient colors',
+              style: TextStyle(
+                color: NovaColors.textPrimary,
+                fontSize: isCompact ? 13 : 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _HeaderColorPalette(
+              label: 'Start color',
+              controller: state.startColor,
+              colors: _palette,
+            ),
+            const SizedBox(height: 10),
+            _HeaderColorPalette(
+              label: 'Middle color',
+              controller: state.middleColor,
+              colors: _palette,
+            ),
+            const SizedBox(height: 10),
+            _HeaderColorPalette(
+              label: 'End color',
+              controller: state.endColor,
+              colors: _palette,
+            ),
+            const SizedBox(height: 14),
+            AnimatedBuilder(
+              animation: Listenable.merge([
+                state.badge,
+                state.title,
+                state.subtitle,
+                state.startColor,
+                state.middleColor,
+                state.endColor,
+              ]),
+              builder: (context, _) {
+                return Container(
+                  height: 72,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        colorFromHex(state.startColor.text,
+                            state.original.startColor.value),
+                        colorFromHex(state.middleColor.text,
+                            state.original.middleColor.value),
+                        colorFromHex(
+                            state.endColor.text, state.original.endColor.value),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.black.withOpacity(0.45),
+                          Colors.black.withOpacity(0.08),
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          state.badge.text.trim().isEmpty
+                              ? 'BADGE'
+                              : state.badge.text.trim(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          state.title.text.trim().isEmpty
+                              ? 'Slide title'
+                              : state.title.text.trim(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          state.subtitle.text.trim().isEmpty
+                              ? 'Slide subtitle'
+                              : state.subtitle.text.trim(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderColorPalette extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final List<Color> colors;
+
+  const _HeaderColorPalette({
+    required this.label,
+    required this.controller,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, _) {
+        final selectedHex = value.text.trim().toUpperCase();
+        final selectedColor = colorFromHex(selectedHex, Colors.black.value);
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _showColorPaletteDialog(
+              context,
+              label: label,
+              controller: controller,
+              colors: colors,
+            ),
+            borderRadius: BorderRadius.circular(14),
+            child: Ink(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: NovaColors.bgPrimary,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: NovaColors.borderTertiary),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: selectedColor,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: NovaColors.borderSecondary),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            color: NovaColors.textPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          selectedHex,
+                          style: const TextStyle(
+                            color: NovaColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.palette_outlined,
+                    color: NovaColors.violet,
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showColorPaletteDialog(
+    BuildContext context, {
+    required String label,
+    required TextEditingController controller,
+    required List<Color> colors,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (context, value, _) {
+            final selectedHex = value.text.trim().toUpperCase();
+
+            return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 24,
+              ),
+              backgroundColor: NovaColors.bgPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              title: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: colorFromHex(selectedHex, Colors.black.value),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: NovaColors.borderSecondary),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        color: NovaColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 360,
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      for (final color in colors)
+                        _PaletteSwatch(
+                          color: color,
+                          isSelected:
+                              colorToHex(color).toUpperCase() == selectedHex,
+                          onTap: () => controller.text = colorToHex(color),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(color: NovaColors.violet),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _PaletteSwatch extends StatelessWidget {
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _PaletteSwatch({
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: isSelected ? 42 : 36,
+          height: isSelected ? 42 : 36,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? NovaColors.textPrimary : Colors.white,
+              width: isSelected ? 2.5 : 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isSelected ? 0.16 : 0.08),
+                blurRadius: isSelected ? 12 : 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: isSelected
+              ? const Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: 18,
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderEditorField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+
+  const _HeaderEditorField({
+    required this.controller,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      cursorColor: NovaColors.violet,
+      style: const TextStyle(
+        fontSize: 14,
+        color: NovaColors.textPrimary,
+        fontWeight: FontWeight.w600,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(
+          color: NovaColors.textSecondary,
+          fontSize: 13,
+        ),
+        filled: true,
+        fillColor: NovaColors.bgPrimary,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(
+            color: NovaColors.borderTertiary,
+            width: 1,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(
+            color: NovaColors.violet,
+            width: 1.5,
+          ),
         ),
       ),
     );
@@ -1913,8 +2445,8 @@ class _ProductCardState extends State<_ProductCard>
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
                                   color: NovaColors.violet,
                                 ),
                               ),

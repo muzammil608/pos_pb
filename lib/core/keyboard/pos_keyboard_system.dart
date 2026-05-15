@@ -6,8 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
 
+import '../theme/nova_theme.dart';
+
 bool get _isDesktop =>
     !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+
+bool get _supportsGlobalHotkeys =>
+    !kIsWeb && (Platform.isWindows || Platform.isMacOS);
 
 class FocusSearchIntent extends Intent {
   const FocusSearchIntent();
@@ -209,7 +214,7 @@ class PosHotkeyRegistry {
   static final List<HotKey> _registered = [];
 
   static Future<void> init() async {
-    if (!_isDesktop) return;
+    if (!_supportsGlobalHotkeys) return;
     await hotKeyManager.unregisterAll();
   }
 
@@ -222,7 +227,7 @@ class PosHotkeyRegistry {
     required VoidCallback onF6Kitchen,
     required VoidCallback onCtrlF,
   }) async {
-    if (!_isDesktop) return;
+    if (!_supportsGlobalHotkeys) return;
     await unregisterAll();
 
     final hotkeys = <(HotKey, VoidCallback)>[
@@ -266,7 +271,7 @@ class PosHotkeyRegistry {
   }
 
   static Future<void> unregisterAll() async {
-    if (!_isDesktop) return;
+    if (!_supportsGlobalHotkeys) return;
     final copy = List<HotKey>.from(_registered);
     _registered.clear();
     for (final hk in copy) {
@@ -841,8 +846,8 @@ class PosSearchBar extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final VoidCallback? onClear;
-
   final String? hintText;
+  final double height;
 
   const PosSearchBar({
     super.key,
@@ -850,6 +855,7 @@ class PosSearchBar extends StatefulWidget {
     required this.onChanged,
     this.onClear,
     this.hintText,
+    this.height = 42,
   });
 
   @override
@@ -890,28 +896,21 @@ class PosSearchBarState extends State<PosSearchBar> {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
-      height: 42,
+      height: widget.height,
       decoration: BoxDecoration(
         color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: _focused ? const Color(0xFF534AB7) : const Color(0xFFE4E4E8),
-          width: _focused ? 1.5 : 0.5,
+          color: const Color(0xFFE4E4E8),
+          width: 0.5,
         ),
-        boxShadow: _focused
-            ? [
-                BoxShadow(
-                  color: const Color(0xFF534AB7).withValues(alpha: 0.12),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                )
-              ]
-            : [],
+        boxShadow: const [],
       ),
       child: TextField(
         controller: widget.controller,
         focusNode: focusNode,
         onChanged: widget.onChanged,
+        cursorColor: NovaColors.violet,
         style: const TextStyle(fontSize: 14, color: Color(0xFF111118)),
         decoration: InputDecoration(
           hintText: widget.hintText ??

@@ -486,14 +486,14 @@ class _KitchenScreenState extends State<KitchenScreen>
               ? Container(
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFFFF4D1C), Color(0xFFFF8C42)],
+                      colors: [Color(0xFFD92D20), Color(0xFFB42318)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                          color: CafeColors.flame.withOpacity(0.4),
+                          color: const Color(0xFFD92D20).withOpacity(0.35),
                           blurRadius: 12,
                           offset: const Offset(0, 4)),
                     ],

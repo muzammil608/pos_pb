@@ -185,68 +185,96 @@ class _DashboardContent extends StatelessWidget {
                     final queueCount = queueSnapshot.data ?? 0;
                     final queueLoading = !queueSnapshot.hasData;
 
-                    final cards = [
-                      _StatCard(
-                        icon: Icons.trending_up_rounded,
-                        iconColor: NovaColors.violet,
-                        label: "Today's Revenue",
-                        value: revenueLoading
-                            ? '—'
-                            : 'Rs ${revenue.toStringAsFixed(0)}',
-                        delta: 'Live total',
-                        deltaUp: true,
-                        isLoading: revenueLoading,
-                        fullWidth: !isDesktop,
-                      ),
-                      _StatCard(
-                        icon: Icons.receipt_long_rounded,
-                        iconColor: NovaColors.teal,
-                        label: 'Orders Today',
-                        value: ordersLoading ? '—' : '$ordersToday',
-                        delta: 'Updated live',
-                        deltaUp: true,
-                        isLoading: ordersLoading,
-                        fullWidth: !isDesktop,
-                      ),
-                      _StatCard(
-                        icon: Icons.kitchen_rounded,
-                        iconColor: NovaColors.amber,
-                        label: 'Kitchen Queue',
-                        value: queueLoading ? '—' : '$queueCount',
-                        delta: 'Active items',
-                        deltaUp: null,
-                        isLoading: queueLoading,
-                        fullWidth: !isDesktop,
-                      ),
-                      _StatCard(
-                        icon: Icons.star_rounded,
-                        iconColor: NovaColors.rose,
-                        label: 'Satisfaction',
-                        value: '94.6%',
-                        delta: '↑ 1.8% vs last month',
-                        deltaUp: true,
-                        fullWidth: !isDesktop,
-                      ),
-                    ];
+                    return StreamBuilder<Map<String, int>>(
+                      stream: reportService.getTodayOrderFlowStats(),
+                      builder: (context, flowSnapshot) {
+                        final flowStats = flowSnapshot.data ??
+                            const {
+                              'total': 0,
+                              'pending': 0,
+                              'ready': 0,
+                              'completed': 0,
+                            };
+                        final flowLoading = !flowSnapshot.hasData;
+                        final totalOrders = flowStats['total'] ?? 0;
+                        final completedOrders = flowStats['completed'] ?? 0;
+                        final readyOrders = flowStats['ready'] ?? 0;
+                        final satisfaction = totalOrders == 0
+                            ? 0.0
+                            : (completedOrders / totalOrders) * 100;
+                        final satisfactionDelta = totalOrders == 0
+                            ? 'No orders yet today'
+                            : '$completedOrders of $totalOrders completed'
+                                '${readyOrders > 0 ? ' • $readyOrders ready' : ''}';
 
-                    if (isDesktop) {
-                      return Row(
-                        children: [
-                          for (int i = 0; i < cards.length; i++) ...[
-                            if (i > 0) const SizedBox(width: 12),
-                            Expanded(child: cards[i]),
+                        final cards = [
+                          _StatCard(
+                            icon: Icons.trending_up_rounded,
+                            iconColor: NovaColors.violet,
+                            label: "Today's Revenue",
+                            value: revenueLoading
+                                ? '—'
+                                : 'Rs ${revenue.toStringAsFixed(0)}',
+                            delta: 'Live total',
+                            deltaUp: true,
+                            isLoading: revenueLoading,
+                            fullWidth: !isDesktop,
+                          ),
+                          _StatCard(
+                            icon: Icons.receipt_long_rounded,
+                            iconColor: NovaColors.teal,
+                            label: 'Orders Today',
+                            value: ordersLoading ? '—' : '$ordersToday',
+                            delta: 'Updated live',
+                            deltaUp: true,
+                            isLoading: ordersLoading,
+                            fullWidth: !isDesktop,
+                          ),
+                          _StatCard(
+                            icon: Icons.kitchen_rounded,
+                            iconColor: NovaColors.amber,
+                            label: 'Kitchen Queue',
+                            value: queueLoading ? '—' : '$queueCount',
+                            delta: 'Active items',
+                            deltaUp: null,
+                            isLoading: queueLoading,
+                            fullWidth: !isDesktop,
+                          ),
+                          _StatCard(
+                            icon: Icons.star_rounded,
+                            iconColor: NovaColors.rose,
+                            label: 'Satisfaction',
+                            value: flowLoading
+                                ? '—'
+                                : '${satisfaction.toStringAsFixed(1)}%',
+                            delta: satisfactionDelta,
+                            deltaUp:
+                                totalOrders > 0 ? satisfaction >= 70 : null,
+                            isLoading: flowLoading,
+                            fullWidth: !isDesktop,
+                          ),
+                        ];
+
+                        if (isDesktop) {
+                          return Row(
+                            children: [
+                              for (int i = 0; i < cards.length; i++) ...[
+                                if (i > 0) const SizedBox(width: 12),
+                                Expanded(child: cards[i]),
+                              ],
+                            ],
+                          );
+                        }
+
+                        return Column(
+                          children: [
+                            for (int i = 0; i < cards.length; i++) ...[
+                              if (i > 0) const SizedBox(height: 12),
+                              cards[i],
+                            ],
                           ],
-                        ],
-                      );
-                    }
-
-                    return Column(
-                      children: [
-                        for (int i = 0; i < cards.length; i++) ...[
-                          if (i > 0) const SizedBox(height: 12),
-                          cards[i],
-                        ],
-                      ],
+                        );
+                      },
                     );
                   },
                 );

@@ -114,7 +114,7 @@ class ReceiptDialog extends StatelessWidget {
       pw.MemoryImage? logoImage;
 
       try {
-        final logoBytes = await rootBundle.load('assets/images/logo.png');
+        final logoBytes = await rootBundle.load('assets/images/logo1.png');
         logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
       } catch (_) {
         logoImage = null;
@@ -440,7 +440,7 @@ class ReceiptWidget extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Image.asset(
-              'assets/images/logo.png',
+              'assets/images/logo1.png',
               height: 54,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {

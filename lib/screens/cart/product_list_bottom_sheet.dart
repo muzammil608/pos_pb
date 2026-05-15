@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/keyboard/pos_keyboard_system.dart';
 import '../../core/theme/nova_theme.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
@@ -146,9 +147,14 @@ class ProductListBottomSheet extends StatefulWidget {
 class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
   final FocusNode _focusNode = FocusNode(debugLabel: 'ProductListBottomSheet');
   final TextEditingController _searchController = TextEditingController();
+  final GlobalKey<PosSearchBarState> _searchBarKey =
+      GlobalKey<PosSearchBarState>();
+  final GlobalKey<PosCategoryChipsState> _categoryChipsKey =
+      GlobalKey<PosCategoryChipsState>();
   int _focusedIndex = 0;
   int _columns = 3;
   String _query = '';
+  String _selectedCategory = 'All';
   List<Product> _products = const [];
 
   @override
@@ -182,6 +188,11 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
     });
   }
 
+  List<String> _getCategories(List<Product> products) {
+    final categories = products.map((p) => p.category).toSet().toList()..sort();
+    return ['All', ...categories];
+  }
+
   void _addFocusedProduct(BuildContext context) {
     if (_products.isEmpty) return;
     _addProduct(context, _products[_focusedIndex]);
@@ -202,6 +213,13 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
 
     return Shortcuts(
       shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.slash): _SheetFocusSearchIntent(),
+        SingleActivator(LogicalKeyboardKey.keyF, control: true):
+            _SheetFocusSearchIntent(),
+        SingleActivator(LogicalKeyboardKey.arrowRight, control: true):
+            _SheetNextCategoryIntent(),
+        SingleActivator(LogicalKeyboardKey.arrowLeft, control: true):
+            _SheetPrevCategoryIntent(),
         SingleActivator(LogicalKeyboardKey.arrowRight): _SheetMoveIntent(1),
         SingleActivator(LogicalKeyboardKey.arrowLeft): _SheetMoveIntent(-1),
         SingleActivator(LogicalKeyboardKey.arrowDown): _SheetMoveRowIntent(1),
@@ -213,6 +231,24 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
       },
       child: Actions(
         actions: {
+          _SheetFocusSearchIntent: CallbackAction<_SheetFocusSearchIntent>(
+            onInvoke: (_) {
+              _searchBarKey.currentState?.requestFocus();
+              return null;
+            },
+          ),
+          _SheetNextCategoryIntent: CallbackAction<_SheetNextCategoryIntent>(
+            onInvoke: (_) {
+              _categoryChipsKey.currentState?.nextCategory();
+              return null;
+            },
+          ),
+          _SheetPrevCategoryIntent: CallbackAction<_SheetPrevCategoryIntent>(
+            onInvoke: (_) {
+              _categoryChipsKey.currentState?.prevCategory();
+              return null;
+            },
+          ),
           _SheetMoveIntent: CallbackAction<_SheetMoveIntent>(
             onInvoke: (intent) {
               _moveFocus(intent.delta);
@@ -317,69 +353,24 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                 // Search bar
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TextField(
+                  child: PosSearchBar(
+                    key: _searchBarKey,
                     controller: _searchController,
-                    textInputAction: TextInputAction.search,
-                    onTap: () => _searchController.selection =
-                        TextSelection.collapsed(
-                            offset: _searchController.text.length),
                     onChanged: (value) {
                       setState(() {
                         _query = value.trim().toLowerCase();
                         _focusedIndex = 0;
                       });
                     },
-                    decoration: InputDecoration(
-                      hintText: 'Search products',
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: NovaColors.textTertiary,
-                        size: 18,
-                      ),
-                      suffixIcon: _query.isEmpty
-                          ? null
-                          : IconButton(
-                              tooltip: 'Clear',
-                              icon: const Icon(
-                                Icons.close_rounded,
-                                color: NovaColors.textTertiary,
-                                size: 16,
-                              ),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _query = '';
-                                  _focusedIndex = 0;
-                                });
-                                _focusNode.requestFocus();
-                              },
-                            ),
-                      filled: true,
-                      fillColor: NovaColors.bgPrimary,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 11),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: NovaColors.borderTertiary,
-                          width: 0.5,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: NovaColors.borderTertiary,
-                          width: 0.5,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: NovaColors.violet,
-                          width: 1.2,
-                        ),
-                      ),
-                    ),
+                    onClear: () {
+                      setState(() {
+                        _query = '';
+                        _focusedIndex = 0;
+                      });
+                      _focusNode.requestFocus();
+                    },
+                    hintText: 'Search products…  ( / or Ctrl+F )',
+                    height: 44,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -442,10 +433,17 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                       }
 
                       final allProducts = snapshot.data!;
+                      final categories = _getCategories(allProducts);
+                      if (!categories.contains(_selectedCategory)) {
+                        _selectedCategory = 'All';
+                      }
                       final filteredProducts = allProducts.where((product) {
-                        if (_query.isEmpty) return true;
-                        return product.name.toLowerCase().contains(_query) ||
+                        final matchesQuery = _query.isEmpty ||
+                            product.name.toLowerCase().contains(_query) ||
                             product.category.toLowerCase().contains(_query);
+                        final matchesCategory = _selectedCategory == 'All' ||
+                            product.category == _selectedCategory;
+                        return matchesQuery && matchesCategory;
                       }).toList();
 
                       _products = filteredProducts;
@@ -466,49 +464,92 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
 
                       return LayoutBuilder(
                         builder: (context, constraints) {
+                          final showChips = categories.length > 1;
                           // ── Mobile: list tiles with image ──────────────
                           if (constraints.maxWidth < 600) {
                             _columns = 1;
-                            return ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                              itemCount: _products.length,
-                              itemBuilder: (context, index) {
-                                final product = _products[index];
-                                return _BottomSheetProductTile(
-                                  product: product,
-                                  isFocused: index == _focusedIndex,
-                                  onTap: () => _addProduct(context, product),
-                                  onFocus: () =>
-                                      setState(() => _focusedIndex = index),
-                                );
-                              },
+                            return Column(
+                              children: [
+                                if (showChips)
+                                  PosCategoryChips(
+                                    key: _categoryChipsKey,
+                                    categories: categories,
+                                    selected: _selectedCategory,
+                                    onSelected: (category) {
+                                      setState(() {
+                                        _selectedCategory = category;
+                                        _focusedIndex = 0;
+                                      });
+                                    },
+                                  ),
+                                if (showChips) const SizedBox(height: 10),
+                                Expanded(
+                                  child: ListView.builder(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 0, 16, 24),
+                                    itemCount: _products.length,
+                                    itemBuilder: (context, index) {
+                                      final product = _products[index];
+                                      return _BottomSheetProductTile(
+                                        product: product,
+                                        isFocused: index == _focusedIndex,
+                                        onTap: () =>
+                                            _addProduct(context, product),
+                                        onFocus: () => setState(
+                                            () => _focusedIndex = index),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
                             );
                           }
 
                           // ── Desktop / tablet: grid cards with image ────
                           _columns = _columnCount(constraints.maxWidth);
-                          return GridView.builder(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: _columns,
-                              mainAxisSpacing: 10,
-                              crossAxisSpacing: 10,
-                              // Exact same values as pos_screen.dart _ProductCard grid
-                              childAspectRatio:
-                                  constraints.maxWidth < 380 ? 1.35 : 0.78,
-                            ),
-                            itemCount: _products.length,
-                            itemBuilder: (context, index) {
-                              final product = _products[index];
-                              return _BottomSheetProductGridCard(
-                                product: product,
-                                isFocused: index == _focusedIndex,
-                                onTap: () => _addProduct(context, product),
-                                onFocus: () =>
-                                    setState(() => _focusedIndex = index),
-                              );
-                            },
+                          return Column(
+                            children: [
+                              if (showChips)
+                                PosCategoryChips(
+                                  key: _categoryChipsKey,
+                                  categories: categories,
+                                  selected: _selectedCategory,
+                                  onSelected: (category) {
+                                    setState(() {
+                                      _selectedCategory = category;
+                                      _focusedIndex = 0;
+                                    });
+                                  },
+                                ),
+                              if (showChips) const SizedBox(height: 10),
+                              Expanded(
+                                child: GridView.builder(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: _columns,
+                                    mainAxisSpacing: 10,
+                                    crossAxisSpacing: 10,
+                                    childAspectRatio: constraints.maxWidth < 380
+                                        ? 1.35
+                                        : 0.92,
+                                  ),
+                                  itemCount: _products.length,
+                                  itemBuilder: (context, index) {
+                                    final product = _products[index];
+                                    return _BottomSheetProductGridCard(
+                                      product: product,
+                                      isFocused: index == _focusedIndex,
+                                      onTap: () =>
+                                          _addProduct(context, product),
+                                      onFocus: () =>
+                                          setState(() => _focusedIndex = index),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           );
                         },
                       );
@@ -606,11 +647,11 @@ class _BottomSheetProductTileState extends State<_BottomSheetProductTile>
                     const BorderRadius.horizontal(left: Radius.circular(12)),
                 child: _ProductImage(
                   product: widget.product,
-                  width: 72,
-                  height: 72,
+                  width: 64,
+                  height: 64,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               // Name + category pill
               Expanded(
                 child: Column(
@@ -648,7 +689,7 @@ class _BottomSheetProductTileState extends State<_BottomSheetProductTile>
               ),
               // Price pill + add circle (identical to _ProductListTile)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -787,7 +828,7 @@ class _BottomSheetProductGridCardState
                 Expanded(
                   flex: 4,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -797,7 +838,7 @@ class _BottomSheetProductGridCardState
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w500,
                             color: NovaColors.textPrimary,
                             height: 1.2,
@@ -818,8 +859,8 @@ class _BottomSheetProductGridCardState
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
                                     color: NovaColors.violet,
                                   ),
                                 ),
@@ -827,14 +868,14 @@ class _BottomSheetProductGridCardState
                             ),
                             const SizedBox(width: 6),
                             Container(
-                              width: 22,
-                              height: 22,
+                              width: 20,
+                              height: 20,
                               decoration: const BoxDecoration(
                                 color: NovaColors.violetLight,
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(Icons.add_rounded,
-                                  color: NovaColors.violet, size: 13),
+                                  color: NovaColors.violet, size: 12),
                             ),
                           ],
                         ),
@@ -870,4 +911,16 @@ class _SheetSelectIntent extends Intent {
 
 class _SheetCloseIntent extends Intent {
   const _SheetCloseIntent();
+}
+
+class _SheetFocusSearchIntent extends Intent {
+  const _SheetFocusSearchIntent();
+}
+
+class _SheetNextCategoryIntent extends Intent {
+  const _SheetNextCategoryIntent();
+}
+
+class _SheetPrevCategoryIntent extends Intent {
+  const _SheetPrevCategoryIntent();
 }

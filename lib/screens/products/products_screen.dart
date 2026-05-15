@@ -577,6 +577,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             ),
                             child: TextField(
                               controller: _searchController,
+                              cursorColor: NovaColors.violet,
                               onChanged: (v) => setState(
                                   () => _searchQuery = v.toLowerCase()),
                               style: const TextStyle(

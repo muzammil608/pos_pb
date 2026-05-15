@@ -44,6 +44,21 @@ class PosHeaderSlide {
     );
   }
 
+  factory PosHeaderSlide.fromMap(Map<String, dynamic> data) {
+    return PosHeaderSlide(
+      id: _readString(data['id']),
+      ownerId: _readString(data['ownerId']),
+      badge: _readString(data['badge']),
+      title: _readString(data['title']),
+      subtitle: _readString(data['subtitle']),
+      startColor: colorFromHex(_readString(data['startColor']), 0xFF3A1C00),
+      middleColor: colorFromHex(_readString(data['middleColor']), 0xFF7A3300),
+      endColor: colorFromHex(_readString(data['endColor']), 0xFFC45C00),
+      sortOrder: _readInt(data['sortOrder']),
+      isActive: _readBool(data['isActive'], fallback: true),
+    );
+  }
+
   static List<PosHeaderSlide> defaults(String ownerId) {
     return [
       PosHeaderSlide(
@@ -124,7 +139,7 @@ class PosHeaderSlide {
       'startColor': colorToHex(startColor),
       'middleColor': colorToHex(middleColor),
       'endColor': colorToHex(endColor),
-      'sortOrder': sortOrder,
+      'sortOrder': sortOrder.toInt(), // ensure it's always a plain int
       'isActive': isActive,
     };
   }
@@ -146,4 +161,19 @@ Color colorFromHex(String value, int fallback) {
 String colorToHex(Color color) {
   final value = color.value.toRadixString(16).padLeft(8, '0').toUpperCase();
   return '#${value.substring(2)}';
+}
+
+String _readString(dynamic value) => value?.toString() ?? '';
+
+int _readInt(dynamic value) {
+  if (value is int) return value;
+  return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+bool _readBool(dynamic value, {bool fallback = false}) {
+  if (value is bool) return value;
+  final normalized = value?.toString().toLowerCase().trim();
+  if (normalized == 'true') return true;
+  if (normalized == 'false') return false;
+  return fallback;
 }

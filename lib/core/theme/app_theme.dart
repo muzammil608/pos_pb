@@ -12,6 +12,9 @@ class AppTheme {
   static ThemeData lightTheme = ThemeData(
     useMaterial3: false,
     scaffoldBackgroundColor: Colors.white,
+    focusColor: Colors.transparent,
+    hoverColor: Colors.transparent,
+    highlightColor: Colors.transparent,
     drawerTheme: const DrawerThemeData(
       backgroundColor: Colors.white,
     ),
@@ -53,12 +56,17 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: primary, width: 2.0),
+        borderSide: const BorderSide(color: Color(0xFF534AB7), width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Color(0xFFD32F2F), width: 1.5),
       ),
+    ),
+    textSelectionTheme: const TextSelectionThemeData(
+      cursorColor: Color(0xFF534AB7),
+      selectionColor: Color(0x33534AB7),
+      selectionHandleColor: Color(0xFF534AB7),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(

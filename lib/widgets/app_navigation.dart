@@ -154,8 +154,8 @@ class AppNavigationDrawer extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
@@ -167,10 +167,13 @@ class AppNavigationDrawer extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      fit: BoxFit.cover,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/logo1.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
