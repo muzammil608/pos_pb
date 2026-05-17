@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/keyboard/pos_keyboard_system.dart';
 import '../../core/theme/nova_theme.dart';
@@ -24,6 +25,22 @@ String itemEmoji(String name) {
   }
   if (n.contains('salad')) return '🥗';
   return '🍴';
+}
+
+class _CartActionOption {
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final bool enabled;
+
+  const _CartActionOption({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.color,
+    this.enabled = true,
+  });
 }
 
 class _EditQuantityDialog extends StatefulWidget {
@@ -240,6 +257,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       FocusNode(debugLabel: 'CheckoutShortcuts');
   final TextEditingController _cashController = TextEditingController();
   final Map<String, GlobalKey> _cartItemKeys = {};
+  final Map<String, GlobalKey> _cartItemMenuKeys = {};
 
   @override
   void initState() {
@@ -368,70 +386,41 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     Map<String, dynamic> item,
   ) async {
     final cartDocId = item['cartDocId'] as String? ?? '';
-    final key = _cartItemKeys[cartDocId];
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    final target = key?.currentContext?.findRenderObject() as RenderBox?;
-
-    RelativeRect position;
-    if (overlay != null && target != null) {
-      final topLeft = target.localToGlobal(Offset.zero, ancestor: overlay);
-      final bottomRight = target.localToGlobal(
-        target.size.bottomRight(Offset.zero),
-        ancestor: overlay,
-      );
-      position = RelativeRect.fromRect(
-        Rect.fromPoints(topLeft, bottomRight),
-        Offset.zero & overlay.size,
-      );
-    } else {
-      final size = MediaQuery.of(context).size;
-      position = RelativeRect.fromLTRB(
-        size.width - 220,
-        size.height * 0.45,
-        16,
-        size.height * 0.25,
-      );
-    }
+    final menuKey = _cartItemMenuKeys[cartDocId];
+    final actions = [
+      const _CartActionOption(
+        value: 'add',
+        label: 'Add More',
+        icon: Icons.add_circle_outline,
+        color: NovaColors.violet,
+      ),
+      const _CartActionOption(
+        value: 'edit',
+        label: 'Edit Qty',
+        icon: Icons.edit_outlined,
+        color: NovaColors.amber,
+      ),
+      _CartActionOption(
+        value: 'delete',
+        label: 'Remove',
+        icon: Icons.delete_outline,
+        color: NovaColors.danger,
+        enabled: cartDocId.isNotEmpty,
+      ),
+    ];
 
     _focusCartShortcuts();
-    final value = await showMenu<String>(
+    final value = await showGeneralDialog<String>(
       context: context,
-      position: position,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      items: [
-        const PopupMenuItem(
-          value: 'add',
-          child: Row(children: [
-            Icon(Icons.add_circle_outline, color: NovaColors.violet, size: 16),
-            SizedBox(width: 10),
-            Text('Add More',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-          ]),
-        ),
-        const PopupMenuItem(
-          value: 'edit',
-          child: Row(children: [
-            Icon(Icons.edit_outlined, color: NovaColors.amber, size: 16),
-            SizedBox(width: 10),
-            Text('Edit Qty',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-          ]),
-        ),
-        PopupMenuItem(
-          value: 'delete',
-          enabled: cartDocId.isNotEmpty,
-          child: const Row(children: [
-            Icon(Icons.delete_outline, color: NovaColors.danger, size: 16),
-            SizedBox(width: 10),
-            Text('Remove',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: NovaColors.danger)),
-          ]),
-        ),
-      ],
+      barrierDismissible: true,
+      barrierLabel: 'Cart actions',
+      barrierColor: Colors.black12,
+      transitionDuration: const Duration(milliseconds: 120),
+      pageBuilder: (dialogContext, _, __) => _CartItemActionsDialog(
+        itemName: item['name']?.toString() ?? 'Item',
+        actions: actions,
+        anchorKey: menuKey,
+      ),
     );
 
     if (!mounted || !context.mounted || value == null) {
@@ -1117,6 +1106,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   cartDocId,
                                   GlobalKey.new,
                                 );
+                                final menuButtonKey =
+                                    _cartItemMenuKeys.putIfAbsent(
+                                  cartDocId,
+                                  GlobalKey.new,
+                                );
 
                                 return InkWell(
                                   key: itemKey,
@@ -1233,76 +1227,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                             ),
                                           ),
                                         ),
-                                        PopupMenuButton<String>(
+                                        IconButton(
+                                          key: menuButtonKey,
                                           icon: const Icon(
-                                              Icons.more_vert_rounded,
-                                              color: NovaColors.textTertiary,
-                                              size: 16),
+                                            Icons.more_vert_rounded,
+                                            color: NovaColors.textTertiary,
+                                            size: 16,
+                                          ),
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(
-                                              minWidth: 32),
-                                          shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10)),
-                                          onSelected: (value) {
+                                            minWidth: 32,
+                                            minHeight: 32,
+                                          ),
+                                          splashRadius: 18,
+                                          onPressed: () async {
                                             _selectCartItem(i);
-                                            if (value == 'add') {
-                                              _openProductBottomSheet(context);
-                                            } else if (value == 'edit') {
-                                              _editCartItemQuantity(
-                                                  context, cart, item);
-                                            } else if (value == 'delete' &&
-                                                cartDocId.isNotEmpty) {
-                                              _deleteCartItem(cart, item);
-                                            }
+                                            await _showCartItemActions(
+                                              context,
+                                              cart,
+                                              item,
+                                            );
                                           },
-                                          itemBuilder: (_) => [
-                                            const PopupMenuItem(
-                                              value: 'add',
-                                              child: Row(children: [
-                                                Icon(Icons.add_circle_outline,
-                                                    color: NovaColors.violet,
-                                                    size: 16),
-                                                SizedBox(width: 10),
-                                                Text('Add More',
-                                                    style: TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.w500)),
-                                              ]),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: 'edit',
-                                              child: Row(children: [
-                                                Icon(Icons.edit_outlined,
-                                                    color: NovaColors.amber,
-                                                    size: 16),
-                                                SizedBox(width: 10),
-                                                Text('Edit Qty',
-                                                    style: TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.w500)),
-                                              ]),
-                                            ),
-                                            PopupMenuItem(
-                                              value: 'delete',
-                                              enabled: cartDocId.isNotEmpty,
-                                              child: const Row(children: [
-                                                Icon(Icons.delete_outline,
-                                                    color: NovaColors.danger,
-                                                    size: 16),
-                                                SizedBox(width: 10),
-                                                Text('Remove',
-                                                    style: TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.w500,
-                                                        color:
-                                                            NovaColors.danger)),
-                                              ]),
-                                            ),
-                                          ],
                                         ),
                                       ],
                                     ),
@@ -1458,5 +1403,259 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       );
     });
+  }
+}
+
+class _CartItemActionsDialog extends StatefulWidget {
+  final String itemName;
+  final List<_CartActionOption> actions;
+  final GlobalKey? anchorKey;
+
+  const _CartItemActionsDialog({
+    required this.itemName,
+    required this.actions,
+    this.anchorKey,
+  });
+
+  @override
+  State<_CartItemActionsDialog> createState() => _CartItemActionsDialogState();
+}
+
+class _CartItemActionsDialogState extends State<_CartItemActionsDialog> {
+  late final FocusNode _focusNode;
+  late int _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode(debugLabel: 'CartItemActionsDialog');
+    _selectedIndex = widget.actions.indexWhere((action) => action.enabled);
+    if (_selectedIndex < 0) _selectedIndex = 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _moveSelection(int delta) {
+    if (widget.actions.isEmpty) return;
+
+    var next = _selectedIndex;
+    for (var i = 0; i < widget.actions.length; i++) {
+      next = (next + delta) % widget.actions.length;
+      if (next < 0) next = widget.actions.length - 1;
+      if (widget.actions[next].enabled) {
+        setState(() => _selectedIndex = next);
+        return;
+      }
+    }
+  }
+
+  void _submitSelection() {
+    if (widget.actions.isEmpty) return;
+    final action = widget.actions[_selectedIndex];
+    if (!action.enabled) return;
+    Navigator.of(context).pop(action.value);
+  }
+
+  KeyEventResult _handleKey(FocusNode _, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _moveSelection(-1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _moveSelection(1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      _submitSelection();
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      Navigator.of(context).pop();
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    const menuWidth = 320.0;
+    const horizontalMargin = 12.0;
+    const verticalMargin = 12.0;
+
+    double left = (media.size.width - menuWidth) / 2;
+    double top = media.size.height * 0.3;
+
+    final overlay =
+        Navigator.of(context).overlay?.context.findRenderObject() as RenderBox?;
+    final anchorBox =
+        widget.anchorKey?.currentContext?.findRenderObject() as RenderBox?;
+
+    if (overlay != null && anchorBox != null) {
+      final anchorTopLeft =
+          anchorBox.localToGlobal(Offset.zero, ancestor: overlay);
+      final anchorBottomRight = anchorBox.localToGlobal(
+        anchorBox.size.bottomRight(Offset.zero),
+        ancestor: overlay,
+      );
+
+      left = (anchorBottomRight.dx - menuWidth).clamp(
+        horizontalMargin,
+        media.size.width - menuWidth - horizontalMargin,
+      );
+
+      top = (anchorBottomRight.dy + 6).clamp(
+        verticalMargin,
+        media.size.height - 240,
+      );
+
+      if (top > media.size.height - 220) {
+        top = (anchorTopLeft.dy - 196).clamp(
+          verticalMargin,
+          media.size.height - 220,
+        );
+      }
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(context).pop(),
+            ),
+          ),
+          Positioned(
+            left: left,
+            top: top,
+            width: menuWidth,
+            child: Focus(
+              focusNode: _focusNode,
+              onKeyEvent: _handleKey,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: menuWidth),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: NovaColors.bgPrimary,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: NovaColors.borderSecondary),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x14000000),
+                        blurRadius: 24,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.itemName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: NovaColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Use arrow keys and Enter',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: NovaColors.textTertiary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      for (var i = 0; i < widget.actions.length; i++)
+                        _CartActionTile(
+                          action: widget.actions[i],
+                          selected: i == _selectedIndex,
+                          onTap: widget.actions[i].enabled
+                              ? () => Navigator.of(context).pop(
+                                    widget.actions[i].value,
+                                  )
+                              : null,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartActionTile extends StatelessWidget {
+  final _CartActionOption action;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  const _CartActionTile({
+    required this.action,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = action.enabled ? action.color : NovaColors.textTertiary;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: selected ? NovaColors.violetLight : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? NovaColors.violet : NovaColors.borderSecondary,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(action.icon, color: foreground, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  action.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: action.enabled
+                        ? NovaColors.textPrimary
+                        : NovaColors.textTertiary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
