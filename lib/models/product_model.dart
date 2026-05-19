@@ -10,6 +10,10 @@ class Product {
   final String? imageUrl;
   final int? iconCodePoint;
   final String? ownerId;
+  final int stockQty;
+  final int lowStockThreshold;
+  final int damagedQty;
+  final String barcode;
 
   Product({
     required this.id,
@@ -19,6 +23,10 @@ class Product {
     this.imageUrl,
     this.iconCodePoint,
     this.ownerId,
+    this.stockQty = 0,
+    this.lowStockThreshold = 5,
+    this.damagedQty = 0,
+    this.barcode = '',
   });
 
   IconData get icon {
@@ -65,6 +73,10 @@ class Product {
       imageUrl: imageUrl,
       iconCodePoint: parsedIconCodePoint,
       ownerId: record.getStringValue('ownerId'),
+      stockQty: _readInt(record.data['stockQty']) ?? 0,
+      lowStockThreshold: _readInt(record.data['lowStockThreshold']) ?? 5,
+      damagedQty: _readInt(record.data['damagedQty']) ?? 0,
+      barcode: record.getStringValue('barcode'),
     );
   }
 
@@ -101,6 +113,10 @@ class Product {
       imageUrl: data['imageUrl']?.toString(),
       iconCodePoint: parsedIconCodePoint,
       ownerId: data['ownerId'],
+      stockQty: _readInt(data['stockQty']) ?? 0,
+      lowStockThreshold: _readInt(data['lowStockThreshold']) ?? 5,
+      damagedQty: _readInt(data['damagedQty']) ?? 0,
+      barcode: data['barcode']?.toString() ?? '',
     );
   }
 
@@ -112,6 +128,10 @@ class Product {
       if (imageUrl != null) 'imageUrl': imageUrl,
       if (iconCodePoint != null) 'iconCodePoint': iconCodePoint,
       if (ownerId != null) 'ownerId': ownerId,
+      'stockQty': stockQty,
+      'lowStockThreshold': lowStockThreshold,
+      'damagedQty': damagedQty,
+      'barcode': barcode,
     };
   }
 
@@ -123,6 +143,10 @@ class Product {
     String? imageUrl,
     int? iconCodePoint,
     String? ownerId,
+    int? stockQty,
+    int? lowStockThreshold,
+    int? damagedQty,
+    String? barcode,
   }) {
     return Product(
       id: id ?? this.id,
@@ -132,6 +156,17 @@ class Product {
       imageUrl: imageUrl ?? this.imageUrl,
       iconCodePoint: iconCodePoint ?? this.iconCodePoint,
       ownerId: ownerId ?? this.ownerId,
+      stockQty: stockQty ?? this.stockQty,
+      lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
+      damagedQty: damagedQty ?? this.damagedQty,
+      barcode: barcode ?? this.barcode,
     );
+  }
+
+  static int? _readInt(dynamic raw) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    if (raw is String) return int.tryParse(raw);
+    return null;
   }
 }

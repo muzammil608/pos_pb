@@ -35,6 +35,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
     final categoryController =
         TextEditingController(text: product?.category ?? '');
+    final stockController = TextEditingController(
+      text: (product?.stockQty ?? 0).toString(),
+    );
+    final lowStockController = TextEditingController(
+      text: (product?.lowStockThreshold ?? 5).toString(),
+    );
+    final damagedController = TextEditingController(
+      text: (product?.damagedQty ?? 0).toString(),
+    );
+    final barcodeController =
+        TextEditingController(text: product?.barcode ?? '');
     final formKey = GlobalKey<FormState>();
     final isEdit = product != null;
 
@@ -157,6 +168,49 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 ? 'Category is required'
                                 : null,
                           ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _StyledField(
+                                  controller: stockController,
+                                  label: 'Stock Qty',
+                                  icon: Icons.inventory_2_outlined,
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _StyledField(
+                                  controller: lowStockController,
+                                  label: 'Low Alert',
+                                  icon: Icons.warning_amber_rounded,
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _StyledField(
+                                  controller: damagedController,
+                                  label: 'Damaged',
+                                  icon: Icons.broken_image_outlined,
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _StyledField(
+                                  controller: barcodeController,
+                                  label: 'Barcode',
+                                  icon: Icons.qr_code_2_outlined,
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 16),
                           const Text(
                             'Choose Icon',
@@ -251,6 +305,21 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                 categoryController.text.trim();
                                             final iconCodePoint =
                                                 selectedIcon.codePoint;
+                                            final stockQty = int.tryParse(
+                                                    stockController.text
+                                                        .trim()) ??
+                                                0;
+                                            final lowStockThreshold =
+                                                int.tryParse(lowStockController
+                                                        .text
+                                                        .trim()) ??
+                                                    5;
+                                            final damagedQty = int.tryParse(
+                                                    damagedController.text
+                                                        .trim()) ??
+                                                0;
+                                            final barcode =
+                                                barcodeController.text.trim();
 
                                             String? error;
                                             if (isEdit) {
@@ -261,6 +330,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                 price: price,
                                                 category: category,
                                                 iconCodePoint: iconCodePoint,
+                                                stockQty: stockQty,
+                                                lowStockThreshold:
+                                                    lowStockThreshold,
+                                                damagedQty: damagedQty,
+                                                barcode: barcode,
                                               );
                                             } else {
                                               error =
@@ -269,6 +343,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                 price: price,
                                                 category: category,
                                                 iconCodePoint: iconCodePoint,
+                                                stockQty: stockQty,
+                                                lowStockThreshold:
+                                                    lowStockThreshold,
+                                                damagedQty: damagedQty,
+                                                barcode: barcode,
                                               );
                                             }
 

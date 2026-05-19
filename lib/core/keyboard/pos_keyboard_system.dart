@@ -50,6 +50,10 @@ class ShowShortcutsIntent extends Intent {
   const ShowShortcutsIntent();
 }
 
+class RefreshIntent extends Intent {
+  const RefreshIntent();
+}
+
 class ConfirmItemIntent extends Intent {
   const ConfirmItemIntent();
 }
@@ -128,6 +132,7 @@ class PosShortcuts {
     const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true):
         const PrevCategoryIntent(),
     const SingleActivator(LogicalKeyboardKey.f2): const ReadyOrdersIntent(),
+    const SingleActivator(LogicalKeyboardKey.f5): const RefreshIntent(),
     const SingleActivator(LogicalKeyboardKey.enter, control: true):
         const CheckoutIntent(),
     const SingleActivator(LogicalKeyboardKey.keyK, control: true):
@@ -183,6 +188,7 @@ class PosShortcuts {
     const SingleActivator(LogicalKeyboardKey.period): NumpadKeyIntent('.'),
     const SingleActivator(LogicalKeyboardKey.enter): ConfirmItemIntent(),
     const SingleActivator(LogicalKeyboardKey.numpadEnter): ConfirmItemIntent(),
+    const SingleActivator(LogicalKeyboardKey.keyE): EditItemIntent(),
     const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true):
         CheckoutBackIntent(),
     const SingleActivator(LogicalKeyboardKey.f10): CheckoutBackIntent(),
@@ -197,8 +203,6 @@ class PosShortcuts {
         KitchenNavigateIntent(up: true),
     const SingleActivator(LogicalKeyboardKey.arrowDown):
         KitchenNavigateIntent(up: false),
-    const SingleActivator(LogicalKeyboardKey.keyE):
-        const KitchenEditItemIntent(),
     const SingleActivator(LogicalKeyboardKey.delete):
         const KitchenDeleteItemIntent(),
     const SingleActivator(LogicalKeyboardKey.enter):
@@ -310,7 +314,7 @@ class _UndoEntry {
   _UndoEntry(this.description, this.undoFn);
 }
 
-class PosKeyboardScope extends StatelessWidget {
+class PosKeyboardScope extends StatefulWidget {
   final Widget child;
   final GlobalKey<PosSearchBarState>? searchBarKey;
   final GlobalKey<PosCategoryChipsState>? categoryChipsKey;
@@ -325,6 +329,7 @@ class PosKeyboardScope extends StatelessWidget {
   final VoidCallback? onArrowDown;
   final VoidCallback? onArrowLeft;
   final VoidCallback? onArrowRight;
+  final VoidCallback? onRefresh;
 
   final ValueChanged<String>? onSelectPaymentMethod;
 
@@ -344,8 +349,38 @@ class PosKeyboardScope extends StatelessWidget {
     this.onArrowDown,
     this.onArrowLeft,
     this.onArrowRight,
+    this.onRefresh,
     this.onSelectPaymentMethod,
   });
+
+  @override
+  State<PosKeyboardScope> createState() => _PosKeyboardScopeState();
+}
+
+class _PosKeyboardScopeState extends State<PosKeyboardScope> {
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_handleHardwareKey);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
+    super.dispose();
+  }
+
+  bool _handleHardwareKey(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return false;
+    if (ModalRoute.of(context)?.isCurrent != true) return false;
+
+    if (event.logicalKey == LogicalKeyboardKey.f5) {
+      widget.onRefresh?.call();
+      return true;
+    }
+
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -355,91 +390,97 @@ class PosKeyboardScope extends StatelessWidget {
         actions: {
           FocusSearchIntent: CallbackAction<FocusSearchIntent>(
             onInvoke: (_) {
-              searchBarKey?.currentState?.requestFocus();
+              widget.searchBarKey?.currentState?.requestFocus();
               return null;
             },
           ),
           ClearSearchIntent: CallbackAction<ClearSearchIntent>(
             onInvoke: (_) {
-              searchBarKey?.currentState?.clear();
+              widget.searchBarKey?.currentState?.clear();
               return null;
             },
           ),
           NextCategoryIntent: CallbackAction<NextCategoryIntent>(
             onInvoke: (_) {
-              categoryChipsKey?.currentState?.nextCategory();
+              widget.categoryChipsKey?.currentState?.nextCategory();
               return null;
             },
           ),
           PrevCategoryIntent: CallbackAction<PrevCategoryIntent>(
             onInvoke: (_) {
-              categoryChipsKey?.currentState?.prevCategory();
+              widget.categoryChipsKey?.currentState?.prevCategory();
               return null;
             },
           ),
           CheckoutIntent: CallbackAction<CheckoutIntent>(
             onInvoke: (_) {
-              onCheckout?.call();
+              widget.onCheckout?.call();
               return null;
             },
           ),
           ReadyOrdersIntent: CallbackAction<ReadyOrdersIntent>(
             onInvoke: (_) {
-              onReadyOrders?.call();
+              widget.onReadyOrders?.call();
+              return null;
+            },
+          ),
+          RefreshIntent: CallbackAction<RefreshIntent>(
+            onInvoke: (_) {
+              widget.onRefresh?.call();
               return null;
             },
           ),
           KitchenIntent: CallbackAction<KitchenIntent>(
             onInvoke: (_) {
-              onKitchen?.call();
+              widget.onKitchen?.call();
               return null;
             },
           ),
           ClearCartIntent: CallbackAction<ClearCartIntent>(
             onInvoke: (_) {
-              onClearCart?.call();
+              widget.onClearCart?.call();
               return null;
             },
           ),
           DeleteItemIntent: CallbackAction<DeleteItemIntent>(
             onInvoke: (_) {
-              onDeleteFocusedItem?.call();
+              widget.onDeleteFocusedItem?.call();
               return null;
             },
           ),
           UndoCartIntent: CallbackAction<UndoCartIntent>(
             onInvoke: (_) {
-              onUndoCart?.call();
+              widget.onUndoCart?.call();
               return null;
             },
           ),
           ConfirmItemIntent: CallbackAction<ConfirmItemIntent>(
             onInvoke: (_) {
-              onConfirmFocusedItem?.call();
+              widget.onConfirmFocusedItem?.call();
               return null;
             },
           ),
           ArrowUpIntent: CallbackAction<ArrowUpIntent>(
             onInvoke: (_) {
-              onArrowUp?.call();
+              widget.onArrowUp?.call();
               return null;
             },
           ),
           ArrowDownIntent: CallbackAction<ArrowDownIntent>(
             onInvoke: (_) {
-              onArrowDown?.call();
+              widget.onArrowDown?.call();
               return null;
             },
           ),
           ArrowLeftIntent: CallbackAction<ArrowLeftIntent>(
             onInvoke: (_) {
-              onArrowLeft?.call();
+              widget.onArrowLeft?.call();
               return null;
             },
           ),
           ArrowRightIntent: CallbackAction<ArrowRightIntent>(
             onInvoke: (_) {
-              onArrowRight?.call();
+              widget.onArrowRight?.call();
               return null;
             },
           ),
@@ -453,14 +494,14 @@ class PosKeyboardScope extends StatelessWidget {
           ),
           SelectPaymentMethodIntent: CallbackAction<SelectPaymentMethodIntent>(
             onInvoke: (intent) {
-              onSelectPaymentMethod?.call(intent.method);
+              widget.onSelectPaymentMethod?.call(intent.method);
               return null;
             },
           ),
         },
         child: Focus(
           autofocus: true,
-          child: child,
+          child: widget.child,
         ),
       ),
     );
@@ -748,10 +789,6 @@ class _KitchenKeyboardScopeState extends State<KitchenKeyboardScope> {
     if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter) {
       (widget.onReadyOrder ?? widget.onConfirm)?.call();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.keyE) {
-      widget.onEdit?.call();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.delete) {
@@ -1411,7 +1448,6 @@ class PosShortcutHelp extends StatelessWidget {
         'Kitchen',
         [
           ('↑ / ↓', 'Navigate order list'),
-          ('E', 'Edit quantity of focused item'),
           ('Delete', 'Remove focused item'),
           ('Enter / Numpad ↵', 'Mark order as Ready'),
           ('F10 / Alt+←', 'Back to POS'),

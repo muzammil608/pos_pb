@@ -12,32 +12,23 @@ class ProductSeeder {
   ProductSeeder({required AuthService authService, required this.ownerId})
       : _authService = authService;
 
-  static int _iconForType(String type) {
-    return switch (type.toLowerCase()) {
-      'dairy' => 0xe25a,
-      'fruit' => 0xe7ec,
-      'vegetable' => 0xe7ec,
-      'bakery' => 0xe1c7,
-      'meat' => 0xe57a,
-      'vegan' => 0xe408,
-      _ => 0xe57a,
-    };
-  }
-
   String _capitalize(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1).toLowerCase();
+
+  Future<bool> _hasProducts(PocketBase pb) async {
+    final existing = await pb.collection('products').getList(
+          perPage: 1,
+          filter: 'ownerId = "$ownerId"',
+        );
+    return existing.totalItems > 0;
+  }
 
   Future<int> seed() async {
     try {
       final PocketBase pb = await _authService.initPb();
 
-      final existing = await pb.collection('products').getList(
-            filter: 'ownerId = "$ownerId"',
-            perPage: 1,
-          );
-      if (existing.totalItems > 0) {
-        debugPrint(
-            '[Seeder] Already seeded (${existing.totalItems} found) — skipping.');
+      if (await _hasProducts(pb)) {
+        debugPrint('[Seeder] Products already exist — skipping.');
         return 0;
       }
 
@@ -46,16 +37,22 @@ class ProductSeeder {
 
       int count = 0;
       for (final item in items) {
+        final name = item['title']?.toString().trim().isNotEmpty == true
+            ? item['title'].toString().trim()
+            : 'Unknown';
+        final price = (item['price'] as num?)?.toDouble() ?? 0;
         await pb.collection('products').create(body: {
-          'name': item['title'] ?? 'Unknown',
-          'price': (item['price'] as num).toDouble(),
+          'name': name,
+          'price': price,
           'category': _capitalize(item['type']?.toString() ?? 'Other'),
-          'iconCodePoint': _iconForType(item['type']?.toString() ?? ''),
+          'iconCodePoint': null,
+          'imageUrl': '',
           'ownerId': ownerId,
-          'description': item['description'] ?? '',
         });
         count++;
-        debugPrint('[Seeder] ($count/${items.length}) ${item['title']}');
+        debugPrint(
+          '[Seeder] ($count/${items.length}) $name (${_capitalize(item['type']?.toString() ?? 'Other')})',
+        );
       }
 
       debugPrint('[Seeder] ✅ Done — $count products inserted.');

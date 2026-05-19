@@ -21,6 +21,10 @@ class ProductProvider extends ChangeNotifier {
     required double price,
     required String category,
     int? iconCodePoint,
+    int stockQty = 0,
+    int lowStockThreshold = 5,
+    int damagedQty = 0,
+    String barcode = '',
   }) async {
     setLoading(true);
     try {
@@ -29,6 +33,10 @@ class ProductProvider extends ChangeNotifier {
         price: price,
         category: category,
         iconCodePoint: iconCodePoint,
+        stockQty: stockQty,
+        lowStockThreshold: lowStockThreshold,
+        damagedQty: damagedQty,
+        barcode: barcode,
       );
       notifyListeners();
       return result;
@@ -43,6 +51,10 @@ class ProductProvider extends ChangeNotifier {
     required double price,
     required String category,
     int? iconCodePoint,
+    int? stockQty,
+    int? lowStockThreshold,
+    int? damagedQty,
+    String? barcode,
   }) async {
     setLoading(true);
     try {
@@ -52,6 +64,10 @@ class ProductProvider extends ChangeNotifier {
         price: price,
         category: category,
         iconCodePoint: iconCodePoint,
+        stockQty: stockQty,
+        lowStockThreshold: lowStockThreshold,
+        damagedQty: damagedQty,
+        barcode: barcode,
       );
       notifyListeners();
       return result;

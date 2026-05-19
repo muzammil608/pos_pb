@@ -6,6 +6,7 @@ import '../../core/theme/nova_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/pocketbase/order_service.dart';
+import '../../services/pocketbase/inventory_service.dart';
 import '../../widgets/app_navigation.dart';
 import '../../widgets/responsive_layout.dart';
 import 'product_list_bottom_sheet.dart';
@@ -236,12 +237,14 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   late final OrderService _orderService;
+  late final InventoryService _inventoryService;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final auth = Provider.of<AuthProvider>(context, listen: false);
     _orderService = OrderService(auth.ownerId);
+    _inventoryService = InventoryService(auth.ownerId);
   }
 
   String _orderType = 'takeaway';
@@ -498,7 +501,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         };
       }).toList();
 
-      await _orderService.createOrder(
+      final order = await _orderService.createOrder(
         items: cartSnapshot,
         total: cart.total,
         orderType: _orderType,
@@ -508,12 +511,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         tenderedAmount: _paymentMethod == 'cash' ? _tenderedAmount : 0.0,
         change: changeAmount,
       );
+      String? inventoryWarning;
+      try {
+        await _inventoryService.applySaleDeductions(
+          orderId: order.id,
+          items: cartSnapshot,
+        );
+      } catch (_) {
+        inventoryWarning =
+            'Order placed, but inventory sync failed. Please check inventory settings/migrations.';
+      }
 
       if (!context.mounted) {
         return;
       }
 
       cart.clear();
+      if (inventoryWarning != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(inventoryWarning)),
+        );
+      }
       Navigator.pushNamedAndRemoveUntil(context, '/pos', (route) => false);
     } catch (e) {
       if (!context.mounted) {

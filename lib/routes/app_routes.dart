@@ -10,6 +10,7 @@ import '../screens/reports/orders_report_screen.dart';
 import '../screens/cart/checkout_screen.dart';
 import '../screens/products/products_screen.dart';
 import '../screens/admin/employee_manager_screen.dart';
+import '../screens/inventory/inventory_screen.dart';
 
 class AppRoutes {
   static Map<String, WidgetBuilder> get routes => {
@@ -22,6 +23,7 @@ class AppRoutes {
         '/orders': (_) => const OrdersReportScreen(),
         '/products': (_) => const ProductsScreen(),
         '/employees': (_) => const EmployeeManagerScreen(),
+        '/inventory': (_) => const InventoryScreen(),
         '/unauthorized': (_) => const UnauthorizedScreen(),
       };
 }

@@ -231,6 +231,13 @@ class AppNavigationDrawer extends StatelessWidget {
                   ),
                 if (auth.isAdmin)
                   _DrawerItem(
+                    icon: Icons.inventory_rounded,
+                    title: 'Inventory',
+                    route: '/inventory',
+                    currentRoute: currentRoute,
+                  ),
+                if (auth.isAdmin)
+                  _DrawerItem(
                     icon: Icons.inventory_2_rounded,
                     title: 'Products',
                     route: '/products',
@@ -413,7 +420,7 @@ class AppNavigationShell extends StatelessWidget {
   }
 }
 
-class _DrawerItem extends StatelessWidget {
+class _DrawerItem extends StatefulWidget {
   const _DrawerItem({
     required this.icon,
     required this.title,
@@ -427,8 +434,38 @@ class _DrawerItem extends StatelessWidget {
   final String currentRoute;
 
   @override
+  State<_DrawerItem> createState() => _DrawerItemState();
+}
+
+class _DrawerItemState extends State<_DrawerItem> {
+  bool _isNavigating = false;
+
+  Future<void> _handleTap(BuildContext context) async {
+    if (_isNavigating) return;
+    setState(() => _isNavigating = true);
+
+    final selected = widget.route == widget.currentRoute;
+    final navigator = Navigator.of(context);
+    final scaffoldState = Scaffold.maybeOf(context);
+    final drawerIsOpen = scaffoldState?.isDrawerOpen ?? false;
+
+    if (drawerIsOpen) {
+      navigator.pop();
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+    }
+
+    if (!mounted) return;
+    if (!selected) {
+      await navigator.pushReplacementNamed(widget.route);
+    }
+
+    if (!mounted) return;
+    setState(() => _isNavigating = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final selected = route == currentRoute;
+    final selected = widget.route == widget.currentRoute;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
@@ -450,12 +487,12 @@ class _DrawerItem extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         leading: Icon(
-          icon,
+          widget.icon,
           color: selected ? Colors.white : CafeColors.charcoal.withOpacity(0.5),
           size: 22,
         ),
         title: Text(
-          title,
+          widget.title,
           style: TextStyle(
             fontSize: 14,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
@@ -473,12 +510,7 @@ class _DrawerItem extends StatelessWidget {
                 ),
               )
             : null,
-        onTap: () {
-          Navigator.pop(context);
-          if (!selected) {
-            Navigator.pushNamed(context, route);
-          }
-        },
+        onTap: _isNavigating ? null : () => _handleTap(context),
       ),
     );
   }

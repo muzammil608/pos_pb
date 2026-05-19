@@ -109,6 +109,22 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
 
   bool _readyOrdersSheetOpen = false;
 
+  String _normalizeSearch(String value) => value.toLowerCase().trim();
+
+  int _matchScore(Product product, String normalizedQuery) {
+    final name = product.name.toLowerCase();
+    final category = product.category.toLowerCase();
+
+    if (name == normalizedQuery) return 0;
+    if (name.startsWith(normalizedQuery)) return 1;
+    if (name.contains(' $normalizedQuery')) return 2;
+    if (category == normalizedQuery) return 3;
+    if (category.startsWith(normalizedQuery)) return 4;
+    if (name.contains(normalizedQuery)) return 5;
+    if (category.contains(normalizedQuery)) return 6;
+    return 99;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -261,6 +277,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     if (qty != null && qty > 0 && mounted) {
       final cart = Provider.of<CartProvider>(context, listen: false);
       final productMap = product.toMap();
+      productMap['id'] = product.id;
       productMap['qty'] = qty;
       await cart.addItem(productMap);
 
@@ -910,6 +927,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
               onArrowDown: _onArrowDown,
               onArrowLeft: _onArrowLeft,
               onArrowRight: _onArrowRight,
+              onRefresh: () => setState(() {}),
               child: StreamBuilder<List<Product>>(
                 stream: _productService?.streamProducts ??
                     Stream<List<Product>>.value([]),
@@ -917,16 +935,37 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                   final allProducts = snapshot.data ?? [];
                   final categories = _getCategories(allProducts);
 
+                  final normalizedQuery = _normalizeSearch(_searchQuery);
+
                   final filteredProducts = allProducts.where((product) {
-                    final matchSearch = _searchQuery.isEmpty ||
-                        product.name.toLowerCase().contains(_searchQuery) ||
-                        product.category.toLowerCase().contains(_searchQuery);
+                    final name = product.name.toLowerCase();
+                    final category = product.category.toLowerCase();
+                    final matchSearch = normalizedQuery.isEmpty ||
+                        name.contains(normalizedQuery) ||
+                        category.contains(normalizedQuery);
                     final matchCategory = _selectedCategory == 'All' ||
                         product.category == _selectedCategory;
                     return matchSearch && matchCategory;
                   }).toList();
 
+                  if (normalizedQuery.isNotEmpty) {
+                    filteredProducts.sort((a, b) {
+                      final scoreCompare = _matchScore(a, normalizedQuery)
+                          .compareTo(_matchScore(b, normalizedQuery));
+                      if (scoreCompare != 0) return scoreCompare;
+                      return a.name.toLowerCase().compareTo(
+                            b.name.toLowerCase(),
+                          );
+                    });
+                  }
+
                   _lastFilteredProducts = filteredProducts;
+                  if (_lastFilteredProducts.isEmpty) {
+                    _focusedProductIndex = -1;
+                  } else if (_focusedProductIndex < 0 ||
+                      _focusedProductIndex >= _lastFilteredProducts.length) {
+                    _focusedProductIndex = 0;
+                  }
 
                   return ResponsiveCenter(
                     padding: EdgeInsets.zero,
@@ -937,9 +976,14 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                           child: PosSearchBar(
                             key: _searchBarKey,
                             controller: _searchController,
-                            onChanged: (v) =>
-                                setState(() => _searchQuery = v.toLowerCase()),
-                            onClear: () => setState(() => _searchQuery = ''),
+                            onChanged: (v) => setState(() {
+                              _searchQuery = v;
+                              _focusedProductIndex = 0;
+                            }),
+                            onClear: () => setState(() {
+                              _searchQuery = '';
+                              _focusedProductIndex = -1;
+                            }),
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -948,8 +992,10 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                             key: _categoryChipsKey,
                             categories: categories,
                             selected: _selectedCategory,
-                            onSelected: (cat) =>
-                                setState(() => _selectedCategory = cat),
+                            onSelected: (cat) => setState(() {
+                              _selectedCategory = cat;
+                              _focusedProductIndex = 0;
+                            }),
                           ),
                         if (_posHeaderService != null) ...[
                           const SizedBox(height: 10),

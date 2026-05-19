@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:pocketbase/pocketbase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,8 +10,17 @@ class PocketBaseService {
   static const String _configuredUrl = String.fromEnvironment('POCKETBASE_URL');
 
   static String get _baseUrl {
-    if (_configuredUrl.isNotEmpty) return _configuredUrl;
+    // Use custom env URL if provided
+    if (_configuredUrl.isNotEmpty) {
+      return _configuredUrl;
+    }
 
+    // Android emulator localhost fix
+    if (!kIsWeb && Platform.isAndroid) {
+      return 'http://10.0.2.2:8090';
+    }
+
+    // iOS simulator / desktop
     return 'http://127.0.0.1:8090';
   }
 
@@ -19,12 +30,19 @@ class PocketBaseService {
     final prefs = await SharedPreferences.getInstance();
 
     final store = AsyncAuthStore(
-      save: (data) async => prefs.setString('pb_auth', data),
+      save: (data) async {
+        await prefs.setString('pb_auth', data);
+      },
       initial: prefs.getString('pb_auth'),
     );
 
-    _instance = PocketBase(_baseUrl, authStore: store);
+    _instance = PocketBase(
+      _baseUrl,
+      authStore: store,
+    );
+
     debugPrint('PocketBase URL: $_baseUrl');
+
     return _instance!;
   }
 
