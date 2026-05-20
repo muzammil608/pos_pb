@@ -79,6 +79,8 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+      ).copyWith(
+        mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -89,6 +91,23 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+      ).copyWith(
+        mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom().copyWith(
+        mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom().copyWith(
+        mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+      ),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom().copyWith(
+        mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
       ),
     ),
     chipTheme: ChipThemeData(

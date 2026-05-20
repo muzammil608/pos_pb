@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:convert';
 
 class CartProvider with ChangeNotifier {
+  static const String _cartPrefsKey = 'pos_cart_items_v1';
   final _uuid = const Uuid();
   final List<Map<String, dynamic>> _items = [];
 
   bool _disposed = false;
+  bool _loaded = false;
 
   List<Map<String, dynamic>> get items => List.unmodifiable(_items);
 
@@ -22,6 +26,46 @@ class CartProvider with ChangeNotifier {
     if (!_disposed) {
       notifyListeners();
     }
+  }
+
+  CartProvider() {
+    _restoreCart();
+  }
+
+  Future<void> _restoreCart() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cartPrefsKey);
+      if (raw == null || raw.trim().isEmpty) {
+        _loaded = true;
+        _safeNotify();
+        return;
+      }
+
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        _items
+          ..clear()
+          ..addAll(
+            decoded.whereType<Map>().map(
+                  (e) => Map<String, dynamic>.from(e),
+                ),
+          );
+      }
+      _loaded = true;
+      _safeNotify();
+    } catch (_) {
+      _loaded = true;
+      _safeNotify();
+    }
+  }
+
+  Future<void> _persistCart() async {
+    if (!_loaded) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cartPrefsKey, jsonEncode(_items));
+    } catch (_) {}
   }
 
   Future<void> addItem(Map<String, dynamic> product) async {
@@ -62,6 +106,7 @@ class CartProvider with ChangeNotifier {
     }
 
     _safeNotify();
+    await _persistCart();
   }
 
   Future<void> removeItem(String cartDocId) async {
@@ -70,6 +115,7 @@ class CartProvider with ChangeNotifier {
     _items.removeWhere((item) => item['cartDocId'] == cartDocId);
 
     _safeNotify();
+    await _persistCart();
   }
 
   Future<void> updateItemQuantity(String cartDocId, int qty) async {
@@ -96,6 +142,7 @@ class CartProvider with ChangeNotifier {
     };
 
     _safeNotify();
+    await _persistCart();
   }
 
   Future<void> clear() async {
@@ -104,6 +151,7 @@ class CartProvider with ChangeNotifier {
     _items.clear();
 
     _safeNotify();
+    await _persistCart();
   }
 
   bool get isLoggedIn => true;

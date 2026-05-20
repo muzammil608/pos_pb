@@ -19,6 +19,7 @@ class ProductProvider extends ChangeNotifier {
   Future<String?> createProduct({
     required String name,
     required double price,
+    double purchasePrice = 0,
     required String category,
     int? iconCodePoint,
     int stockQty = 0,
@@ -31,6 +32,7 @@ class ProductProvider extends ChangeNotifier {
       final result = await _service.createProduct(
         name: name,
         price: price,
+        purchasePrice: purchasePrice,
         category: category,
         iconCodePoint: iconCodePoint,
         stockQty: stockQty,
@@ -49,6 +51,7 @@ class ProductProvider extends ChangeNotifier {
     required String id,
     required String name,
     required double price,
+    double? purchasePrice,
     required String category,
     int? iconCodePoint,
     int? stockQty,
@@ -62,6 +65,7 @@ class ProductProvider extends ChangeNotifier {
         id: id,
         name: name,
         price: price,
+        purchasePrice: purchasePrice,
         category: category,
         iconCodePoint: iconCodePoint,
         stockQty: stockQty,

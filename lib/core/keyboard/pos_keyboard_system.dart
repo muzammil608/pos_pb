@@ -38,8 +38,16 @@ class ReadyOrdersIntent extends Intent {
   const ReadyOrdersIntent();
 }
 
-class KitchenIntent extends Intent {
-  const KitchenIntent();
+class NewOrderIntent extends Intent {
+  const NewOrderIntent();
+}
+
+class OpenProductsIntent extends Intent {
+  const OpenProductsIntent();
+}
+
+class InventoryIntent extends Intent {
+  const InventoryIntent();
 }
 
 class ClearCartIntent extends Intent {
@@ -131,12 +139,16 @@ class PosShortcuts {
         const NextCategoryIntent(),
     const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true):
         const PrevCategoryIntent(),
+    const SingleActivator(LogicalKeyboardKey.f1): const NewOrderIntent(),
     const SingleActivator(LogicalKeyboardKey.f2): const ReadyOrdersIntent(),
+    const SingleActivator(LogicalKeyboardKey.f3): const ClearCartIntent(),
+    const SingleActivator(LogicalKeyboardKey.f4): const OpenProductsIntent(),
     const SingleActivator(LogicalKeyboardKey.f5): const RefreshIntent(),
+    const SingleActivator(LogicalKeyboardKey.f6): const InventoryIntent(),
     const SingleActivator(LogicalKeyboardKey.enter, control: true):
         const CheckoutIntent(),
-    const SingleActivator(LogicalKeyboardKey.keyK, control: true):
-        const KitchenIntent(),
+    const SingleActivator(LogicalKeyboardKey.keyI, control: true):
+        const InventoryIntent(),
     const SingleActivator(LogicalKeyboardKey.delete, control: true):
         const ClearCartIntent(),
     const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
@@ -228,7 +240,7 @@ class PosHotkeyRegistry {
     required VoidCallback onF3HoldOrder,
     required VoidCallback onF4AddCustomer,
     required VoidCallback onF5Refresh,
-    required VoidCallback onF6Kitchen,
+    required VoidCallback onF6Inventory,
     required VoidCallback onCtrlF,
   }) async {
     if (!_supportsGlobalHotkeys) return;
@@ -254,7 +266,7 @@ class PosHotkeyRegistry {
       ),
       (
         HotKey(key: PhysicalKeyboardKey.f6, scope: HotKeyScope.inapp),
-        onF6Kitchen
+        onF6Inventory
       ),
       (
         HotKey(
@@ -318,9 +330,11 @@ class PosKeyboardScope extends StatefulWidget {
   final Widget child;
   final GlobalKey<PosSearchBarState>? searchBarKey;
   final GlobalKey<PosCategoryChipsState>? categoryChipsKey;
+  final VoidCallback? onNewOrder;
   final VoidCallback? onCheckout;
   final VoidCallback? onReadyOrders;
-  final VoidCallback? onKitchen;
+  final VoidCallback? onProducts;
+  final VoidCallback? onInventory;
   final VoidCallback? onClearCart;
   final VoidCallback? onDeleteFocusedItem;
   final VoidCallback? onUndoCart;
@@ -338,9 +352,11 @@ class PosKeyboardScope extends StatefulWidget {
     required this.child,
     this.searchBarKey,
     this.categoryChipsKey,
+    this.onNewOrder,
     this.onCheckout,
     this.onReadyOrders,
-    this.onKitchen,
+    this.onProducts,
+    this.onInventory,
     this.onClearCart,
     this.onDeleteFocusedItem,
     this.onUndoCart,
@@ -418,9 +434,21 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
               return null;
             },
           ),
+          NewOrderIntent: CallbackAction<NewOrderIntent>(
+            onInvoke: (_) {
+              widget.onNewOrder?.call();
+              return null;
+            },
+          ),
           ReadyOrdersIntent: CallbackAction<ReadyOrdersIntent>(
             onInvoke: (_) {
               widget.onReadyOrders?.call();
+              return null;
+            },
+          ),
+          OpenProductsIntent: CallbackAction<OpenProductsIntent>(
+            onInvoke: (_) {
+              widget.onProducts?.call();
               return null;
             },
           ),
@@ -430,9 +458,9 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
               return null;
             },
           ),
-          KitchenIntent: CallbackAction<KitchenIntent>(
+          InventoryIntent: CallbackAction<InventoryIntent>(
             onInvoke: (_) {
-              widget.onKitchen?.call();
+              widget.onInventory?.call();
               return null;
             },
           ),
@@ -882,6 +910,7 @@ class _PosFocusIndicatorState extends State<PosFocusIndicator> {
 class PosSearchBar extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
+  final ValueChanged<String>? onSubmitted;
   final VoidCallback? onClear;
   final String? hintText;
   final double height;
@@ -890,6 +919,7 @@ class PosSearchBar extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onChanged,
+    this.onSubmitted,
     this.onClear,
     this.hintText,
     this.height = 42,
@@ -947,6 +977,7 @@ class PosSearchBarState extends State<PosSearchBar> {
         controller: widget.controller,
         focusNode: focusNode,
         onChanged: widget.onChanged,
+        onSubmitted: widget.onSubmitted,
         cursorColor: NovaColors.violet,
         style: const TextStyle(fontSize: 14, color: Color(0xFF111118)),
         decoration: InputDecoration(
@@ -1405,7 +1436,7 @@ class PosShortcutHelp extends StatelessWidget {
         'Navigation',
         [
           ('Ctrl+F  or  /', 'Focus product search'),
-          ('Ctrl+K', 'Go to kitchen'),
+          ('Ctrl+I', 'Open inventory'),
           ('Ctrl+→ / Ctrl+←', 'Next / prev category'),
           ('↑ ↓ ← →', 'Navigate product list'),
           ('Tab / Shift+Tab', 'Move between fields'),
@@ -1415,11 +1446,11 @@ class PosShortcutHelp extends StatelessWidget {
         'F-Keys',
         [
           ('F1', 'New order / go to POS'),
-          ('F2', 'Open cart'),
-          ('F3', 'Hold current order'),
-          ('F4', 'Add / edit customer'),
-          ('F5', 'Refresh inventory'),
-          ('F6', 'Go to kitchen'),
+          ('F2', 'Ready orders'),
+          ('F3', 'Clear current order'),
+          ('F4', 'Open products'),
+          ('F5', 'Refresh products'),
+          ('F6', 'Open inventory'),
         ]
       ),
       (
@@ -1427,7 +1458,7 @@ class PosShortcutHelp extends StatelessWidget {
         [
           ('Enter', 'Confirm / add focused item'),
           ('Escape', 'Cancel dialog / clear search'),
-          ('Delete', 'Remove focused item'),
+          ('Delete', 'Remove last cart item'),
           ('Ctrl+Z', 'Undo last cart action'),
           ('Ctrl+Enter', 'Go to checkout'),
           ('Ctrl+Delete', 'Clear entire cart'),
@@ -1442,15 +1473,6 @@ class PosShortcutHelp extends StatelessWidget {
           ('F10 / Alt+←', 'Back to POS'),
           ('F7', 'Select Cash payment'),
           ('F8', 'Select Card payment'),
-        ]
-      ),
-      (
-        'Kitchen',
-        [
-          ('↑ / ↓', 'Navigate order list'),
-          ('Delete', 'Remove focused item'),
-          ('Enter / Numpad ↵', 'Mark order as Ready'),
-          ('F10 / Alt+←', 'Back to POS'),
         ]
       ),
     ];

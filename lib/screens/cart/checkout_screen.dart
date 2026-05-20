@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/keyboard/pos_keyboard_system.dart';
 import '../../core/theme/nova_theme.dart';
+import '../../core/utils/app_notice.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/pocketbase/order_service.dart';
@@ -80,9 +81,7 @@ class _EditQuantityDialogState extends State<_EditQuantityDialog> {
     final qty = int.tryParse(_qtyController.text.trim());
     if (qty == null || qty <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter a valid quantity greater than 0.'),
-        ),
+        const SnackBar(content: Text('Enter a valid quantity greater than 0.')),
       );
       return;
     }
@@ -247,8 +246,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _inventoryService = InventoryService(auth.ownerId);
   }
 
-  String _orderType = 'takeaway';
-  String? _tableNumber;
+  final String _orderType = 'dine_in';
   String _customerName = '';
   String _paymentMethod = 'cash';
   double _tenderedAmount = 0.0;
@@ -377,8 +375,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const ProductListBottomSheet(),
+      builder: (sheetContext) {
+        final size = MediaQuery.of(sheetContext).size;
+        final panelWidth = size.width >= 900 ? 560.0 : size.width;
+        final panelHeight = size.height * (size.width >= 900 ? 0.72 : 0.82);
+
+        return Align(
+          alignment: Alignment.bottomLeft,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: panelWidth,
+              maxHeight: panelHeight,
+            ),
+            child: const ProductListBottomSheet(),
+          ),
+        );
+      },
     );
     if (mounted) _focusCartShortcuts();
   }
@@ -469,16 +483,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    if (_orderType == 'dine_in' &&
-        (_tableNumber == null || _tableNumber!.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a table for dine in orders.'),
-        ),
-      );
-      return;
-    }
-
     final changeAmount =
         _paymentMethod == 'cash' ? _tenderedAmount - cart.total : 0.0;
 
@@ -501,37 +505,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         };
       }).toList();
 
-      final order = await _orderService.createOrder(
+      final stockIssueMessage = await _validateStockBeforePlace(cartSnapshot);
+      if (stockIssueMessage != null) {
+        if (context.mounted) {
+          AppNotice.show(
+            context,
+            stockIssueMessage,
+            type: AppNoticeType.warning,
+            duration: const Duration(seconds: 4),
+          );
+        }
+        return;
+      }
+
+      await _orderService.createOrder(
         items: cartSnapshot,
         total: cart.total,
+        status: 'ready',
         orderType: _orderType,
-        tableNumber: _tableNumber,
         customerName: _customerName,
         paymentMethod: _paymentMethod,
         tenderedAmount: _paymentMethod == 'cash' ? _tenderedAmount : 0.0,
         change: changeAmount,
       );
-      String? inventoryWarning;
-      try {
-        await _inventoryService.applySaleDeductions(
-          orderId: order.id,
-          items: cartSnapshot,
-        );
-      } catch (_) {
-        inventoryWarning =
-            'Order placed, but inventory sync failed. Please check inventory settings/migrations.';
-      }
-
       if (!context.mounted) {
         return;
       }
 
       cart.clear();
-      if (inventoryWarning != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(inventoryWarning)),
-        );
-      }
       Navigator.pushNamedAndRemoveUntil(context, '/pos', (route) => false);
     } catch (e) {
       if (!context.mounted) {
@@ -546,14 +547,53 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ? 'No internet connection. Please check your connection and try again.'
           : 'Error: $e';
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMsg)),
+      AppNotice.show(
+        context,
+        errorMsg,
+        type: AppNoticeType.error,
+        duration: const Duration(seconds: 4),
       );
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Future<String?> _validateStockBeforePlace(
+    List<Map<String, dynamic>> cartSnapshot,
+  ) async {
+    final issues = <String>[];
+
+    for (final item in cartSnapshot) {
+      final productId = item['productId']?.toString() ?? '';
+      final name = item['name']?.toString() ?? 'Item';
+      final requestedQty = (item['qty'] as num?)?.toInt() ??
+          (item['quantity'] as num?)?.toInt() ??
+          1;
+
+      if (productId.isEmpty) {
+        issues.add('$name: product mapping missing');
+        continue;
+      }
+
+      try {
+        final product = await _inventoryService.getProduct(productId);
+        final available = product.stockQty;
+        if (available <= 0) {
+          issues.add('$name is out of stock');
+        } else if (requestedQty > available) {
+          issues.add(
+            '$name has only $available in stock (requested $requestedQty)',
+          );
+        }
+      } catch (_) {
+        issues.add('Could not verify stock for $name');
+      }
+    }
+
+    if (issues.isEmpty) return null;
+    return 'Cannot place order:\n${issues.join('\n')}';
   }
 
   InputDecoration _fieldDecoration(String label, {IconData? icon}) {
@@ -636,26 +676,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(52),
           child: Container(
-            color: NovaColors.bgPrimary,
+            color: NovaColors.violetDeep,
             child: SafeArea(
               child: AppBar(
                 backgroundColor: Colors.transparent,
                 elevation: 0,
-                iconTheme: const IconThemeData(color: NovaColors.textSecondary),
+                iconTheme: const IconThemeData(color: Colors.white),
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                      color: NovaColors.textSecondary, size: 18),
+                      color: Colors.white, size: 18),
                   onPressed: () => Navigator.pop(context),
                 ),
                 title: const Row(
                   children: [
                     Icon(Icons.shopping_bag_outlined,
-                        color: NovaColors.violet, size: 18),
+                        color: Colors.white70, size: 18),
                     SizedBox(width: 8),
                     Text(
                       'Checkout',
                       style: TextStyle(
-                        color: NovaColors.textPrimary,
+                        color: Colors.white,
                         fontWeight: FontWeight.w500,
                         fontSize: 16,
                       ),
@@ -664,8 +704,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(0.5),
-                  child:
-                      Container(height: 0.5, color: NovaColors.borderTertiary),
+                  child: Container(height: 0.5, color: Colors.white24),
                 ),
                 actions: [
                   Padding(
@@ -753,79 +792,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 14, 14, 14, keyboardOpen ? 8 : 14),
                             child: Column(
                               children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: DropdownButtonFormField<String>(
-                                        isExpanded: true,
-                                        value: _orderType,
-                                        decoration: _fieldDecoration(
-                                            'Order Type',
-                                            icon: Icons.storefront_outlined),
-                                        dropdownColor: NovaColors.bgPrimary,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          color: NovaColors.textPrimary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        items: const [
-                                          DropdownMenuItem(
-                                            value: 'takeaway',
-                                            child: Text('🛍️  Takeaway',
-                                                overflow:
-                                                    TextOverflow.ellipsis),
-                                          ),
-                                          DropdownMenuItem(
-                                            value: 'dine_in',
-                                            child: Text('🍽️  Dine In',
-                                                overflow:
-                                                    TextOverflow.ellipsis),
-                                          ),
-                                        ],
-                                        onChanged: (value) {
-                                          setState(() {
-                                            _orderType = value ?? 'takeaway';
-                                            if (_orderType != 'dine_in') {
-                                              _tableNumber = null;
-                                            }
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                    if (_orderType == 'dine_in') ...[
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: DropdownButtonFormField<String>(
-                                          isExpanded: true,
-                                          value: _tableNumber,
-                                          decoration: _fieldDecoration('Table',
-                                              icon: Icons.table_bar_outlined),
-                                          dropdownColor: NovaColors.bgPrimary,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            color: NovaColors.textPrimary,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                          hint: const Text('Select',
-                                              style: TextStyle(
-                                                  color:
-                                                      NovaColors.textTertiary,
-                                                  fontSize: 13)),
-                                          items: List.generate(
-                                            20,
-                                            (i) => DropdownMenuItem(
-                                              value: '${i + 1}',
-                                              child: Text('Table ${i + 1}'),
-                                            ),
-                                          ),
-                                          onChanged: (value) => setState(
-                                              () => _tableNumber = value),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 2),
                                 Row(
                                   children: [
                                     Expanded(

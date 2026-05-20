@@ -33,6 +33,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
     final priceController = TextEditingController(
       text: product != null ? product.price.toStringAsFixed(0) : '',
     );
+    final purchasePriceController = TextEditingController(
+      text: product != null && product.purchasePrice > 0
+          ? product.purchasePrice.toStringAsFixed(0)
+          : '',
+    );
     final categoryController =
         TextEditingController(text: product?.category ?? '');
     final stockController = TextEditingController(
@@ -135,7 +140,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           const SizedBox(height: 12),
                           _StyledField(
                             controller: priceController,
-                            label: 'Price',
+                            label: 'Sale Price',
                             icon: Icons.payments_outlined,
                             prefixText: 'Rs ',
                             keyboardType: const TextInputType.numberWithOptions(
@@ -144,6 +149,22 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               if (v == null || v.trim().isEmpty) {
                                 return 'Price is required';
                               }
+                              if (double.tryParse(v.trim()) == null) {
+                                return 'Enter a valid number';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _StyledField(
+                            controller: purchasePriceController,
+                            label: 'Purchase Price',
+                            icon: Icons.shopping_cart_checkout_rounded,
+                            prefixText: 'Rs ',
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return null;
                               if (double.tryParse(v.trim()) == null) {
                                 return 'Enter a valid number';
                               }
@@ -301,6 +322,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                 nameController.text.trim();
                                             final price = double.parse(
                                                 priceController.text.trim());
+                                            final purchasePrice =
+                                                double.tryParse(
+                                                      purchasePriceController
+                                                          .text
+                                                          .trim(),
+                                                    ) ??
+                                                    0;
                                             final category =
                                                 categoryController.text.trim();
                                             final iconCodePoint =
@@ -328,6 +356,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                 id: product.id,
                                                 name: name,
                                                 price: price,
+                                                purchasePrice: purchasePrice,
                                                 category: category,
                                                 iconCodePoint: iconCodePoint,
                                                 stockQty: stockQty,
@@ -341,6 +370,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                   await provider.createProduct(
                                                 name: name,
                                                 price: price,
+                                                purchasePrice: purchasePrice,
                                                 category: category,
                                                 iconCodePoint: iconCodePoint,
                                                 stockQty: stockQty,

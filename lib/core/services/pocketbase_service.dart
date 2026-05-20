@@ -15,12 +15,14 @@ class PocketBaseService {
       return _configuredUrl;
     }
 
-    // Android emulator localhost fix
-    if (!kIsWeb && Platform.isAndroid) {
-      return 'http://10.0.2.2:8090';
+    // Mobile debug default: use adb reverse / simulator loopback.
+    // For physical devices over Wi-Fi, pass:
+    // --dart-define=POCKETBASE_URL=http://<your-lan-ip>:8090
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      return 'http://127.0.0.1:8090';
     }
 
-    // iOS simulator / desktop
+    // Desktop / other platforms
     return 'http://127.0.0.1:8090';
   }
 

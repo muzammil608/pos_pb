@@ -32,6 +32,10 @@ class _Breakpoint {
 
 class _ResponsiveLayout {
   _ResponsiveLayout(double screenWidth, double screenHeight) {
+    // Guard against infinity on first layout pass on physical devices
+    screenWidth = screenWidth.isInfinite ? 400.0 : screenWidth;
+    screenHeight = screenHeight.isInfinite ? 800.0 : screenHeight;
+
     if (screenWidth < _Breakpoint.xs) {
       cardMaxWidth = screenWidth - 32;
     } else if (screenWidth < _Breakpoint.sm) {
@@ -158,7 +162,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final route = switch (role) {
       'admin' => '/admin',
       'cashier' => '/pos',
-      'kitchen' => '/kitchen',
       _ => '/pos',
     };
 
@@ -222,6 +225,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final bool isEmptyError = _emailError == 'Please fill out required field!';
     return TextField(
       controller: _emailController,
+      autofocus: false,
       keyboardType: TextInputType.emailAddress,
       textInputAction: TextInputAction.next,
       autocorrect: false,
@@ -249,6 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordError == 'Please fill out required field!';
     return TextField(
       controller: _passwordController,
+      autofocus: false,
       obscureText: _obscurePassword,
       keyboardType: TextInputType.visiblePassword,
       textInputAction: TextInputAction.done,
@@ -352,7 +357,10 @@ class _LoginScreenState extends State<LoginScreen> {
             physics: const ClampingScrollPhysics(),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight.isInfinite
+                      ? 0
+                      : constraints.maxHeight),
               child: IntrinsicHeight(
                 child: Container(
                   decoration:
@@ -365,7 +373,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           horizontal: layout.horizontalPadding,
                           vertical: layout.verticalPadding,
                         ),
-                        child: _buildPageLayout(layout, constraints.maxWidth),
+                        child: _buildPageLayout(
+                            layout,
+                            constraints.maxWidth.isInfinite
+                                ? 400.0
+                                : constraints.maxWidth),
                       ),
                     ),
                   ),
@@ -669,7 +681,18 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset('assets/images/google_logo.png', height: 22, width: 22),
+            Image.asset(
+              'assets/images/google_logo.png',
+              height: 22,
+              width: 22,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(
+                  Icons.g_mobiledata_rounded,
+                  color: _LoginColors.charcoal.withOpacity(0.85),
+                  size: 28,
+                );
+              },
+            ),
             const SizedBox(width: 10),
             Text(
               'Continue with Google',

@@ -179,15 +179,9 @@ class _DashboardContent extends StatelessWidget {
                 final ordersToday = ordersSnapshot.data ?? 0;
                 final ordersLoading = !ordersSnapshot.hasData;
 
-                return StreamBuilder<int>(
-                  stream: reportService.getKitchenQueueCount(),
-                  builder: (context, queueSnapshot) {
-                    final queueCount = queueSnapshot.data ?? 0;
-                    final queueLoading = !queueSnapshot.hasData;
-
-                    return StreamBuilder<Map<String, int>>(
-                      stream: reportService.getTodayOrderFlowStats(),
-                      builder: (context, flowSnapshot) {
+                return StreamBuilder<Map<String, int>>(
+                  stream: reportService.getTodayOrderFlowStats(),
+                  builder: (context, flowSnapshot) {
                         final flowStats = flowSnapshot.data ??
                             const {
                               'total': 0,
@@ -231,13 +225,13 @@ class _DashboardContent extends StatelessWidget {
                             fullWidth: !isDesktop,
                           ),
                           _StatCard(
-                            icon: Icons.kitchen_rounded,
+                            icon: Icons.pending_actions_rounded,
                             iconColor: NovaColors.amber,
-                            label: 'Kitchen Queue',
-                            value: queueLoading ? '—' : '$queueCount',
-                            delta: 'Active items',
+                            label: 'Ready Orders',
+                            value: flowLoading ? '—' : '$readyOrders',
+                            delta: 'Live queue',
                             deltaUp: null,
-                            isLoading: queueLoading,
+                            isLoading: flowLoading,
                             fullWidth: !isDesktop,
                           ),
                           _StatCard(
@@ -276,8 +270,6 @@ class _DashboardContent extends StatelessWidget {
                         );
                       },
                     );
-                  },
-                );
               },
             );
           },
@@ -552,12 +544,12 @@ class _QuickActionsRow extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _QuickActionCard(
-            icon: Icons.kitchen_rounded,
-            label: 'Kitchen',
-            subtitle: 'Live Orders',
+            icon: Icons.receipt_long_rounded,
+            label: 'Orders',
+            subtitle: 'Ready & Pending',
             color: NovaColors.teal,
             bgColor: NovaColors.tealLight,
-            onTap: () => Navigator.pushNamed(context, '/kitchen'),
+            onTap: () => Navigator.pushNamed(context, '/orders'),
           ),
         ),
       ],

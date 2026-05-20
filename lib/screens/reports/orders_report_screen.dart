@@ -293,7 +293,7 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
         order['id'].toString().substring(0, 6);
     final total = (order['total'] as num?)?.toDouble() ?? 0.0;
     final status = order['status']?.toString() ?? 'unknown';
-    final orderType = order['orderType']?.toString() ?? 'takeaway';
+    final orderType = order['orderType']?.toString() ?? 'dine_in';
     final createdAt = order['createdAtDate'] as DateTime;
 
     return _OrderCard(

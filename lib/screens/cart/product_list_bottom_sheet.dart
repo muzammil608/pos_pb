@@ -280,10 +280,14 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
           child: Container(
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(context).size.height * 0.82,
+              maxWidth: 560,
             ),
             decoration: const BoxDecoration(
               color: NovaColors.bgTertiary,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(18),
+                topRight: Radius.circular(18),
+              ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,

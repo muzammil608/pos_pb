@@ -6,6 +6,7 @@ class Product {
   final String id;
   final String name;
   final double price;
+  final double purchasePrice;
   final String category;
   final String? imageUrl;
   final int? iconCodePoint;
@@ -19,6 +20,7 @@ class Product {
     required this.id,
     required this.name,
     required this.price,
+    this.purchasePrice = 0,
     required this.category,
     this.imageUrl,
     this.iconCodePoint,
@@ -43,6 +45,12 @@ class Product {
     final String name =
         rawName.trim().isEmpty ? 'Unnamed Product' : rawName.trim();
     final double price = record.getDoubleValue('price');
+    final double purchasePrice = _readDouble(
+          record.data['purchasePrice'] ??
+              record.data['costPrice'] ??
+              record.data['cost_price'],
+        ) ??
+        0;
     final String category =
         rawCategory.trim().isEmpty ? 'Other' : rawCategory.trim();
 
@@ -69,6 +77,7 @@ class Product {
       id: record.id,
       name: name,
       price: price,
+      purchasePrice: purchasePrice,
       category: category,
       imageUrl: imageUrl,
       iconCodePoint: parsedIconCodePoint,
@@ -83,6 +92,8 @@ class Product {
   factory Product.fromMap(Map<String, dynamic> data, String id) {
     final rawName = data['name'] ?? data['productName'] ?? data['title'];
     final rawPrice = data['price'] ?? data['unitPrice'] ?? data['amount'];
+    final rawPurchasePrice =
+        data['purchasePrice'] ?? data['costPrice'] ?? data['cost_price'];
     final rawCategory = data['category'] ?? data['type'];
 
     final parsedName = rawName?.toString().trim() ?? '';
@@ -91,9 +102,13 @@ class Product {
     final double? numericPrice = rawPrice is num
         ? rawPrice.toDouble()
         : double.tryParse(rawPrice?.toString() ?? '');
+    final double? numericPurchasePrice = rawPurchasePrice is num
+        ? rawPurchasePrice.toDouble()
+        : double.tryParse(rawPurchasePrice?.toString() ?? '');
 
     final String name = parsedName.isEmpty ? 'Unnamed Product' : parsedName;
     final double price = numericPrice ?? 0.0;
+    final double purchasePrice = numericPurchasePrice ?? 0.0;
     final String category = parsedCategory.isEmpty ? 'Other' : parsedCategory;
 
     int? parsedIconCodePoint;
@@ -109,6 +124,7 @@ class Product {
       id: id,
       name: name,
       price: price,
+      purchasePrice: purchasePrice,
       category: category,
       imageUrl: data['imageUrl']?.toString(),
       iconCodePoint: parsedIconCodePoint,
@@ -124,6 +140,7 @@ class Product {
     return {
       'name': name,
       'price': price,
+      'purchasePrice': purchasePrice,
       'category': category,
       if (imageUrl != null) 'imageUrl': imageUrl,
       if (iconCodePoint != null) 'iconCodePoint': iconCodePoint,
@@ -139,6 +156,7 @@ class Product {
     String? id,
     String? name,
     double? price,
+    double? purchasePrice,
     String? category,
     String? imageUrl,
     int? iconCodePoint,
@@ -152,6 +170,7 @@ class Product {
       id: id ?? this.id,
       name: name ?? this.name,
       price: price ?? this.price,
+      purchasePrice: purchasePrice ?? this.purchasePrice,
       category: category ?? this.category,
       imageUrl: imageUrl ?? this.imageUrl,
       iconCodePoint: iconCodePoint ?? this.iconCodePoint,
@@ -167,6 +186,12 @@ class Product {
     if (raw is int) return raw;
     if (raw is num) return raw.toInt();
     if (raw is String) return int.tryParse(raw);
+    return null;
+  }
+
+  static double? _readDouble(dynamic raw) {
+    if (raw is num) return raw.toDouble();
+    if (raw is String) return double.tryParse(raw);
     return null;
   }
 }

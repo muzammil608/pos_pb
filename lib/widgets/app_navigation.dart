@@ -117,8 +117,6 @@ class AppNavigationDrawer extends StatelessWidget {
     switch (role.toLowerCase()) {
       case 'admin':
         return CafeColors.creme;
-      case 'kitchen':
-        return CafeColors.oliveLight;
       default:
         return CafeColors.creme;
     }
@@ -126,8 +124,6 @@ class AppNavigationDrawer extends StatelessWidget {
 
   Color _roleTextColor(String role) {
     switch (role.toLowerCase()) {
-      case 'kitchen':
-        return CafeColors.olive;
       default:
         return CafeColors.flame;
     }
@@ -168,11 +164,18 @@ class AppNavigationDrawer extends StatelessWidget {
                     ],
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(4),
                     child: ClipOval(
                       child: Image.asset(
-                        'assets/images/logo1.png',
-                        fit: BoxFit.contain,
+                        'assets/images/orion.png',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.storefront_rounded,
+                            color: CafeColors.flame,
+                            size: 30,
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -248,13 +251,6 @@ class AppNavigationDrawer extends StatelessWidget {
                     icon: Icons.people_rounded,
                     title: 'Employee Manager',
                     route: '/employees',
-                    currentRoute: currentRoute,
-                  ),
-                if (auth.isAdmin || auth.isKitchen)
-                  _DrawerItem(
-                    icon: Icons.kitchen_rounded,
-                    title: 'Kitchen',
-                    route: '/kitchen',
                     currentRoute: currentRoute,
                   ),
               ],

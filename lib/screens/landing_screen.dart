@@ -46,9 +46,6 @@ class _LandingScreenState extends State<LandingScreen> {
         case 'cashier':
           Navigator.pushReplacementNamed(context, '/pos');
           break;
-        case 'kitchen':
-          Navigator.pushReplacementNamed(context, '/kitchen');
-          break;
         default:
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Unknown role: $role. Defaulting to POS.')),

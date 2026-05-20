@@ -114,7 +114,9 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   int _matchScore(Product product, String normalizedQuery) {
     final name = product.name.toLowerCase();
     final category = product.category.toLowerCase();
+    final barcode = product.barcode.toLowerCase();
 
+    if (barcode.isNotEmpty && barcode == normalizedQuery) return -1;
     if (name == normalizedQuery) return 0;
     if (name.startsWith(normalizedQuery)) return 1;
     if (name.contains(' $normalizedQuery')) return 2;
@@ -139,39 +141,23 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   Future<void> _registerHotkeys() async {
     await PosHotkeyRegistry.register(
       onF1NewOrder: () {
-        if (mounted) {
-          _searchBarKey.currentState?.requestFocus();
-        }
+        if (mounted) _startNewOrder();
       },
       onF2Cart: () {
         if (!mounted) return;
         _showReadyOrdersSheet(context);
       },
       onF3HoldOrder: () {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Hold order — coming soon'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
+        if (mounted) _clearCurrentOrderWithUndo();
       },
       onF4AddCustomer: () {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Add customer — coming soon'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
+        if (mounted) _openProducts();
       },
       onF5Refresh: () {
         if (mounted) setState(() {});
       },
-      onF6Kitchen: () {
-        if (mounted) _onKitchen();
+      onF6Inventory: () {
+        if (mounted) _openInventory();
       },
       onCtrlF: () {
         _searchBarKey.currentState?.requestFocus();
@@ -232,16 +218,29 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     _addProductWithQtyDialog(product);
   }
 
-  void _onDeleteFocusedItem() {}
+  void _onDeleteFocusedItem() {
+    final cart = Provider.of<CartProvider>(context, listen: false);
+    if (cart.items.isEmpty) return;
+
+    final item = Map<String, dynamic>.from(cart.items.last);
+    final cartDocId = item['cartDocId']?.toString();
+    if (cartDocId == null || cartDocId.isEmpty) return;
+
+    CartUndoStack.instance.push('Remove ${item['name'] ?? 'item'}', () {
+      cart.addItem(item);
+    });
+    cart.removeItem(cartDocId);
+  }
 
   void _onUndoCart() {
     final stack = CartUndoStack.instance;
     if (stack.canUndo) {
+      final description = stack.lastDescription ?? 'last action';
       stack.undo();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Undone: ${stack.lastDescription ?? "last action"}'),
+            content: Text('Undone: $description'),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -256,11 +255,11 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     }
   }
 
-  void _onKitchen() {
-    Navigator.pushNamed(context, '/kitchen');
+  void _onClearCart() {
+    _clearCurrentOrderWithUndo();
   }
 
-  void _onClearCart() {
+  void _clearCurrentOrderWithUndo() {
     final cart = Provider.of<CartProvider>(context, listen: false);
     if (cart.items.isEmpty) return;
     final snapshot = List<Map<String, dynamic>>.from(cart.items);
@@ -270,6 +269,33 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
       }
     });
     cart.clear();
+  }
+
+  void _startNewOrder() {
+    final cart = Provider.of<CartProvider>(context, listen: false);
+    if (cart.items.isNotEmpty) {
+      _clearCurrentOrderWithUndo();
+    }
+    _searchBarKey.currentState?.clear();
+    _searchBarKey.currentState?.requestFocus();
+  }
+
+  void _openProducts() {
+    Navigator.pushNamed(context, '/products');
+  }
+
+  void _openInventory() {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (!auth.isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Inventory is available for admins.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    Navigator.pushNamed(context, '/inventory');
   }
 
   Future<void> _addProductWithQtyDialog(Product product) async {
@@ -282,9 +308,73 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
       await cart.addItem(productMap);
 
       CartUndoStack.instance.push('Add ${product.name}', () {
-        cart.removeItem(product.id);
+        final addedItem = cart.items.lastWhere(
+          (item) => item['productId'] == product.id,
+          orElse: () => const <String, dynamic>{},
+        );
+        final cartDocId = addedItem['cartDocId']?.toString();
+        if (cartDocId != null && cartDocId.isNotEmpty) {
+          cart.removeItem(cartDocId);
+        }
       });
     }
+  }
+
+  Product? _findProductByBarcode(List<Product> products, String rawCode) {
+    final code = rawCode.trim().toLowerCase();
+    if (code.isEmpty) return null;
+
+    for (final product in products) {
+      final barcode = product.barcode.trim().toLowerCase();
+      final id = product.id.trim().toLowerCase();
+      if ((barcode.isNotEmpty && barcode == code) || id == code) {
+        return product;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _addScannedProduct(Product product) async {
+    if (!mounted) return;
+
+    final cart = Provider.of<CartProvider>(context, listen: false);
+    final productMap = product.toMap()
+      ..['id'] = product.id
+      ..['qty'] = 1;
+
+    await cart.addItem(productMap);
+
+    CartUndoStack.instance.push('Scan ${product.name}', () {
+      final addedItem = cart.items.lastWhere(
+        (item) => item['productId'] == product.id,
+        orElse: () => const <String, dynamic>{},
+      );
+      final cartDocId = addedItem['cartDocId']?.toString();
+      if (cartDocId != null && cartDocId.isNotEmpty) {
+        cart.removeItem(cartDocId);
+      }
+    });
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Added ${product.name} - Rs ${product.price.toStringAsFixed(0)}',
+        ),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+    _searchBarKey.currentState?.clear();
+    _searchBarKey.currentState?.requestFocus();
+  }
+
+  Future<void> _handleSearchSubmitted(
+    String value,
+    List<Product> products,
+  ) async {
+    final product = _findProductByBarcode(products, value);
+    if (product == null) return;
+    await _addScannedProduct(product);
   }
 
   Future<int?> _showQtyDialog(
@@ -454,7 +544,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   }) async {
     final data = doc.data();
     final orderId = doc.id;
-    final orderType = data['orderType']?.toString() ?? 'takeaway';
+    final orderType = data['orderType']?.toString() ?? 'dine_in';
     final customerName = data['customerName']?.toString().trim();
     final items = List<Map<String, dynamic>>.from(
       (data['items'] as List? ?? []).map(
@@ -694,7 +784,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
 
                                       final orderType =
                                           data['orderType']?.toString() ??
-                                              'takeaway';
+                                              'dine_in';
                                       final customerName = data['customerName']
                                           ?.toString()
                                           .trim();
@@ -813,22 +903,21 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
           appBar: PreferredSize(
             preferredSize: const Size.fromHeight(52),
             child: Container(
-              color: NovaColors.bgPrimary,
+              color: NovaColors.violetDeep,
               child: SafeArea(
                 child: AppBar(
                   backgroundColor: Colors.transparent,
                   elevation: 0,
-                  iconTheme:
-                      const IconThemeData(color: NovaColors.textSecondary),
+                  iconTheme: const IconThemeData(color: Colors.white),
                   title: const Row(
                     children: [
                       Icon(Icons.storefront_rounded,
-                          color: NovaColors.violet, size: 18),
+                          color: Colors.white70, size: 18),
                       SizedBox(width: 8),
                       Text(
                         'Order Station',
                         style: TextStyle(
-                          color: NovaColors.textPrimary,
+                          color: Colors.white,
                           fontWeight: FontWeight.w500,
                           fontSize: 16,
                         ),
@@ -837,8 +926,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                   ),
                   bottom: PreferredSize(
                     preferredSize: const Size.fromHeight(0.5),
-                    child: Container(
-                        height: 0.5, color: NovaColors.borderTertiary),
+                    child: Container(height: 0.5, color: Colors.white24),
                   ),
                   actions: [
                     if (_isDesktop)
@@ -846,7 +934,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                         tooltip: 'Keyboard Shortcuts (?)',
                         onPressed: () => PosShortcutHelp.show(context),
                         icon: const Icon(Icons.keyboard_rounded,
-                            color: NovaColors.textSecondary, size: 20),
+                            color: Colors.white70, size: 20),
                       ),
                     StreamBuilder<OrderRecordSnapshot>(
                       stream: _orderService?.getOrders(),
@@ -916,9 +1004,10 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
             child: PosKeyboardScope(
               searchBarKey: _searchBarKey,
               categoryChipsKey: _categoryChipsKey,
+              onNewOrder: _startNewOrder,
               onCheckout: _onCheckout,
               onReadyOrders: () => _showReadyOrdersSheet(context),
-              onKitchen: _onKitchen,
+              onProducts: _openProducts,
               onClearCart: _onClearCart,
               onDeleteFocusedItem: _onDeleteFocusedItem,
               onUndoCart: _onUndoCart,
@@ -928,6 +1017,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
               onArrowLeft: _onArrowLeft,
               onArrowRight: _onArrowRight,
               onRefresh: () => setState(() {}),
+              onInventory: _openInventory,
               child: StreamBuilder<List<Product>>(
                 stream: _productService?.streamProducts ??
                     Stream<List<Product>>.value([]),
@@ -940,9 +1030,11 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                   final filteredProducts = allProducts.where((product) {
                     final name = product.name.toLowerCase();
                     final category = product.category.toLowerCase();
+                    final barcode = product.barcode.toLowerCase();
                     final matchSearch = normalizedQuery.isEmpty ||
                         name.contains(normalizedQuery) ||
-                        category.contains(normalizedQuery);
+                        category.contains(normalizedQuery) ||
+                        barcode.contains(normalizedQuery);
                     final matchCategory = _selectedCategory == 'All' ||
                         product.category == _selectedCategory;
                     return matchSearch && matchCategory;
@@ -980,6 +1072,8 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                               _searchQuery = v;
                               _focusedProductIndex = 0;
                             }),
+                            onSubmitted: (v) =>
+                                _handleSearchSubmitted(v, allProducts),
                             onClear: () => setState(() {
                               _searchQuery = '';
                               _focusedProductIndex = -1;

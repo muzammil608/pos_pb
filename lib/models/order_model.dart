@@ -51,7 +51,7 @@ class Order {
       createdAt:
           DateTime.tryParse(record.getStringValue('created')) ?? DateTime.now(),
       orderType: record.getStringValue('orderType').isEmpty
-          ? 'takeaway'
+          ? 'dine_in'
           : record.getStringValue('orderType'),
       tableNumber: record.getStringValue('tableNumber').isEmpty
           ? null
@@ -81,7 +81,7 @@ class Order {
       total: (data['total'] as num?)?.toDouble() ?? 0.0,
       status: data['status']?.toString() ?? 'pending',
       createdAt: DateTime.tryParse(data['createdAt'] ?? '') ?? DateTime.now(),
-      orderType: data['orderType']?.toString() ?? 'takeaway',
+      orderType: data['orderType']?.toString() ?? 'dine_in',
       tableNumber: data['tableNumber']?.toString(),
       ownerId: data['ownerId'],
       customerName: data['customerName'],

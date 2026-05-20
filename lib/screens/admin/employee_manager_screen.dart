@@ -33,8 +33,6 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
 
   Color _roleColor(String role) {
     switch (role.toLowerCase()) {
-      case 'kitchen':
-        return CafeColors.olive;
       case 'cashier':
       default:
         return CafeColors.flame;
@@ -43,8 +41,6 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
 
   Color _roleBgColor(String role) {
     switch (role.toLowerCase()) {
-      case 'kitchen':
-        return CafeColors.oliveLight;
       case 'cashier':
       default:
         return CafeColors.creme;
@@ -263,8 +259,6 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
                           items: const [
                             DropdownMenuItem(
                                 value: 'cashier', child: Text('Cashier')),
-                            DropdownMenuItem(
-                                value: 'kitchen', child: Text('Kitchen')),
                           ],
                           onChanged: (value) => setDialogState(
                               () => _selectedRole = value ?? 'cashier'),
@@ -527,8 +521,6 @@ class _EmployeeManagerScreenState extends State<EmployeeManagerScreen> {
                       items: const [
                         DropdownMenuItem(
                             value: 'cashier', child: Text('Cashier')),
-                        DropdownMenuItem(
-                            value: 'kitchen', child: Text('Kitchen')),
                       ],
                       onChanged: (value) => setDialogState(
                           () => selectedRole = value ?? 'cashier'),

@@ -7,7 +7,7 @@ class PrinterService {
     String orderId,
     List<Map<String, dynamic>> cartItems,
     double total, {
-    String orderType = 'takeaway',
+    String orderType = 'dine_in',
     String? tableNumber,
     String? customerName,
     String paymentMethod = 'cash',
