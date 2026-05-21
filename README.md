@@ -1,6 +1,6 @@
 # pos_system
 
-Restaurant POS System (Flutter + PocketBase).
+POS System (Flutter + PocketBase).
 
 ## Local PocketBase
 

@@ -379,14 +379,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         final size = MediaQuery.of(sheetContext).size;
-        final panelWidth = size.width >= 900 ? 560.0 : size.width;
-        final panelHeight = size.height * (size.width >= 900 ? 0.72 : 0.82);
+        final isWide = size.width >= 900;
+        final panelWidth = isWide ? size.width / 3 : size.width;
+        final panelHeight = size.height * 0.82;
 
         return Align(
-          alignment: Alignment.bottomLeft,
+          alignment: Alignment.bottomRight,
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: panelWidth,
+              minWidth: isWide ? 360 : 0,
+              maxWidth: isWide
+                  ? panelWidth.clamp(360.0, 560.0).toDouble()
+                  : panelWidth,
               maxHeight: panelHeight,
             ),
             child: const ProductListBottomSheet(),

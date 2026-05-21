@@ -10,6 +10,7 @@ import '../screens/cart/checkout_screen.dart';
 import '../screens/products/products_screen.dart';
 import '../screens/admin/employee_manager_screen.dart';
 import '../screens/inventory/inventory_screen.dart';
+import '../core/utils/no_animation_route.dart';
 
 class AppRoutes {
   static Map<String, WidgetBuilder> get routes => {
@@ -24,4 +25,14 @@ class AppRoutes {
         '/inventory': (_) => const InventoryScreen(),
         '/unauthorized': (_) => const UnauthorizedScreen(),
       };
+
+  static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
+    final builder = routes[settings.name];
+    if (builder == null) return null;
+
+    return NoAnimationPageRoute<void>(
+      settings: settings,
+      builder: builder,
+    );
+  }
 }

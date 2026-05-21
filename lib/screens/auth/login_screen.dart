@@ -493,7 +493,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: 10),
-        _buildDividerRow('PIZZA RESTAURANT', shrinkWrap: true),
+        _buildDividerRow('POS', shrinkWrap: true),
         const SizedBox(height: 28),
         Text(
           'Built for busy restaurant teams\n— so you can focus on the food,\nnot the paperwork.',
@@ -537,7 +537,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Transform.translate(
           offset: Offset(0, layout.spacingBeforeCard * 0.55),
           child: Center(
-            child: _buildDividerRow('PIZZA RESTAURANT', shrinkWrap: true),
+            child: _buildDividerRow('POS', shrinkWrap: true),
           ),
         ),
       ],

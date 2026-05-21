@@ -110,6 +110,18 @@ class AppTheme {
         mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
       ),
     ),
+    listTileTheme: ListTileThemeData(
+      mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+    ),
+    checkboxTheme: CheckboxThemeData(
+      mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+    ),
+    radioTheme: RadioThemeData(
+      mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+    ),
+    switchTheme: SwitchThemeData(
+      mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+    ),
     chipTheme: ChipThemeData(
       backgroundColor: primary.withOpacity(0.18),
       selectedColor: primary,

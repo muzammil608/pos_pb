@@ -33,10 +33,10 @@ class PrinterService {
     await showDialog(
       context: context,
       builder: (ctx) => ReceiptDialog(
-        companyName: 'ORION PIZZA RESTAURANT',
+        companyName: 'POS',
         phone: '+92 3177921817',
         email: 'muzmalabbas579@gmail.com',
-        website: 'www.orionpizza.com',
+        website: 'www.orion.com',
         servedBy: servedBy,
         customerName: resolvedCustomerName,
         orderType: resolvedOrderType,

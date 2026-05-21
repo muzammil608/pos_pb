@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/keyboard/pos_keyboard_system.dart';
 import '../../core/theme/nova_theme.dart';
+import '../../core/utils/clickable_cursor.dart';
 import '../../models/pos_header_slide_model.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
@@ -782,12 +783,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                                       final doc = readyDocs[index];
                                       final data = doc.data();
 
-                                      final orderType =
-                                          data['orderType']?.toString() ??
-                                              'dine_in';
-                                      final customerName = data['customerName']
-                                          ?.toString()
-                                          .trim();
                                       final orderLabel =
                                           '#${data['orderNumber'] ?? doc.id.substring(0, 6)}';
                                       final items =
@@ -800,8 +795,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
 
                                       return _ReadyOrderCard(
                                         orderLabel: orderLabel,
-                                        orderType: orderType,
-                                        customerName: customerName,
                                         items: items,
                                         total: (data['total'] as num?)
                                                 ?.toDouble() ??
@@ -2352,120 +2345,122 @@ class _ProductListTileState extends State<_ProductListTile>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _ctrl.forward(),
-      onTapUp: (_) {
-        _ctrl.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _ctrl.reverse(),
-      child: ScaleTransition(
-        scale: _scale,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          margin: const EdgeInsets.only(bottom: 8),
-          decoration: BoxDecoration(
-            color: NovaColors.bgPrimary,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: widget.isFocused
-                  ? NovaColors.violet
-                  : NovaColors.borderTertiary,
-              width: widget.isFocused ? 1.5 : 0.5,
+    return ClickableCursor(
+      child: GestureDetector(
+        onTapDown: (_) => _ctrl.forward(),
+        onTapUp: (_) {
+          _ctrl.reverse();
+          widget.onTap();
+        },
+        onTapCancel: () => _ctrl.reverse(),
+        child: ScaleTransition(
+          scale: _scale,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: NovaColors.bgPrimary,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: widget.isFocused
+                    ? NovaColors.violet
+                    : NovaColors.borderTertiary,
+                width: widget.isFocused ? 1.5 : 0.5,
+              ),
+              boxShadow: widget.isFocused
+                  ? [
+                      BoxShadow(
+                        color: NovaColors.violet.withValues(alpha: 0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      )
+                    ]
+                  : [],
             ),
-            boxShadow: widget.isFocused
-                ? [
-                    BoxShadow(
-                      color: NovaColors.violet.withValues(alpha: 0.15),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    )
-                  ]
-                : [],
-          ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius:
-                    const BorderRadius.horizontal(left: Radius.circular(12)),
-                child: _ProductImage(
-                  product: widget.product,
-                  width: 72,
-                  height: 72,
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius:
+                      const BorderRadius.horizontal(left: Radius.circular(12)),
+                  child: _ProductImage(
+                    product: widget.product,
+                    width: 72,
+                    height: 72,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      widget.product.name,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: NovaColors.textPrimary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 3),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: NovaColors.bgTertiary,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        widget.product.category,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        widget.product.name,
                         style: const TextStyle(
-                          fontSize: 10,
-                          color: NovaColors.textTertiary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: NovaColors.violetLight,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Rs ${widget.product.price.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: NovaColors.violet,
+                          color: NovaColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: NovaColors.bgTertiary,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          widget.product.category,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: NovaColors.textTertiary,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      width: 26,
-                      height: 26,
-                      decoration: const BoxDecoration(
-                        color: NovaColors.violetLight,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.add_rounded,
-                          color: NovaColors.violet, size: 15),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: NovaColors.violetLight,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Rs ${widget.product.price.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: NovaColors.violet,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: 26,
+                        height: 26,
+                        decoration: const BoxDecoration(
+                          color: NovaColors.violetLight,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.add_rounded,
+                            color: NovaColors.violet, size: 15),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2716,8 +2711,6 @@ class _BottomBarButton extends StatelessWidget {
 
 class _ReadyOrderCard extends StatelessWidget {
   final String orderLabel;
-  final String orderType;
-  final String? customerName;
   final List<Map<String, dynamic>> items;
   final double total;
   final int index;
@@ -2725,21 +2718,11 @@ class _ReadyOrderCard extends StatelessWidget {
 
   const _ReadyOrderCard({
     required this.orderLabel,
-    required this.orderType,
-    this.customerName,
     required this.items,
     required this.total,
     required this.index,
     required this.onComplete,
   });
-
-  String _orderTypeEmoji(String type) {
-    final t = type.toLowerCase();
-    if (t.contains('dine')) return '🍽️';
-    if (t.contains('take')) return '🛍️';
-    if (t.contains('delivery')) return '🚴';
-    return '📦';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -2770,53 +2753,21 @@ class _ReadyOrderCard extends StatelessWidget {
                         color: NovaColors.borderTertiary, width: 0.5),
                   ),
                   child: Center(
-                    child: Text(_orderTypeEmoji(orderType),
-                        style: const TextStyle(fontSize: 20)),
+                    child: const Icon(
+                      Icons.receipt_long_rounded,
+                      size: 20,
+                      color: NovaColors.teal,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Order $orderLabel',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: NovaColors.textPrimary,
-                        ),
-                      ),
-                      if (customerName != null && customerName!.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            const Icon(Icons.person_outline_rounded,
-                                size: 11, color: NovaColors.textTertiary),
-                            const SizedBox(width: 3),
-                            Text(customerName!,
-                                style: const TextStyle(
-                                    fontSize: 11,
-                                    color: NovaColors.textSecondary)),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: NovaColors.tealLight,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
                   child: Text(
-                    orderType.toUpperCase(),
+                    'Order $orderLabel',
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: NovaColors.tealDeep,
+                      color: NovaColors.textPrimary,
                     ),
                   ),
                 ),

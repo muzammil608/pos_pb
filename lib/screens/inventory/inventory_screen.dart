@@ -15,6 +15,7 @@ import '../../core/utils/app_notice.dart';
 import '../../models/inventory_transaction_model.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../core/utils/no_animation_route.dart';
 import '../../services/pocketbase/inventory_service.dart';
 import '../../widgets/app_navigation.dart';
 import '../../widgets/responsive_layout.dart';
@@ -83,6 +84,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   actions: [
                     IconButton(
                       tooltip: 'Refresh',
+                      mouseCursor: SystemMouseCursors.click,
                       onPressed: () => setState(() {}),
                       icon: const Icon(Icons.refresh_rounded,
                           color: Colors.white70, size: 20),
@@ -118,10 +120,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Body
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _InventoryBody extends StatefulWidget {
   const _InventoryBody({required this.service});
@@ -322,10 +320,6 @@ class _InventoryBodyState extends State<_InventoryBody> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Header
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _HeaderRow extends StatelessWidget {
   const _HeaderRow({required this.totalProducts, required this.onRefresh});
   final int totalProducts;
@@ -370,6 +364,8 @@ class _HeaderRow extends StatelessWidget {
               textStyle:
                   const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ).copyWith(
+              mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
             ),
           ),
         ],
@@ -564,6 +560,8 @@ class _BarcodeRestockPanelState extends State<_BarcodeRestockPanel> {
             style: FilledButton.styleFrom(
               backgroundColor: NovaColors.teal,
               foregroundColor: Colors.white,
+            ).copyWith(
+              mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
             ),
             child: const Text('Add Stock'),
           ),
@@ -680,6 +678,7 @@ class _BarcodeRestockPanelState extends State<_BarcodeRestockPanel> {
                   )
                 : IconButton(
                     tooltip: 'Submit barcode',
+                    mouseCursor: SystemMouseCursors.click,
                     onPressed: () => _handleScan(_barcodeController.text),
                     icon: const Icon(
                       Icons.keyboard_return_rounded,
@@ -711,10 +710,6 @@ class _BarcodeRestockPanelState extends State<_BarcodeRestockPanel> {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Profit Panel
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _ProfitExpansionPanel extends StatelessWidget {
   const _ProfitExpansionPanel({
@@ -783,6 +778,7 @@ class _ProfitExpansionPanel extends StatelessWidget {
         children: [
           InkWell(
             borderRadius: BorderRadius.circular(12),
+            mouseCursor: SystemMouseCursors.click,
             onTap: onToggle,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -1013,12 +1009,6 @@ class _ProfitProductRow extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Metrics Grid
-// Uses IntrinsicHeight rows so every card in a row stretches to the same
-// height, and LayoutBuilder picks columns based on actual available width.
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _MetricsGrid extends StatelessWidget {
   const _MetricsGrid({required this.summary, required this.products});
   final InventorySummary summary;
@@ -1029,9 +1019,6 @@ class _MetricsGrid extends StatelessWidget {
     final cards = _buildMetricCards(summary, products);
 
     return LayoutBuilder(builder: (context, c) {
-      // Decide columns based on the actual width this widget has been given.
-      // On desktop the grid is full-width (above the table+side-panel row),
-      // so ≥700 → 4 cols is safe. On tablet/mobile → always 2 cols.
       final columns = c.maxWidth >= 700 ? 4 : 2;
 
       final rows = <Widget>[];
@@ -1103,10 +1090,6 @@ double _salesProfit(Product product, int soldQty) =>
 
 String _formatMoney(num value) => 'Rs ${value.toStringAsFixed(0)}';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Inventory Table Panel
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _InventoryTablePanel extends StatefulWidget {
   const _InventoryTablePanel({
     required this.products,
@@ -1128,11 +1111,59 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
   String _selectedCategory = 'All Categories';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode =
+      FocusNode(debugLabel: 'InventorySearchField');
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_handleKeyboard);
+  }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyboard);
+    _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  bool _handleKeyboard(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return false;
+    if (ModalRoute.of(context)?.isCurrent != true) return false;
+
+    final keyboard = HardwareKeyboard.instance;
+    final isCtrlOrMeta = keyboard.isControlPressed || keyboard.isMetaPressed;
+    final isFocusSearch =
+        (isCtrlOrMeta && event.logicalKey == LogicalKeyboardKey.keyF) ||
+            event.logicalKey == LogicalKeyboardKey.slash;
+
+    if (isFocusSearch) {
+      _focusSearch();
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.escape &&
+        (_searchFocusNode.hasFocus || _searchQuery.isNotEmpty)) {
+      _clearSearch();
+      _searchFocusNode.unfocus();
+      return true;
+    }
+
+    return false;
+  }
+
+  void _focusSearch() {
+    _searchFocusNode.requestFocus();
+    _searchController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _searchController.text.length,
+    );
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() => _searchQuery = '');
   }
 
   List<Product> get _filtered {
@@ -1160,21 +1191,19 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
 
     return LayoutBuilder(builder: (context, c) {
       final isMobile = c.maxWidth < 760;
-      final compactTable = c.maxWidth < 920;
+      final compactTable = c.maxWidth < 1080;
       final tableColumnSpacing = compactTable ? 8.0 : 18.0;
       final tableHorizontalMargin = compactTable ? 8.0 : 12.0;
       final productWidth = compactTable ? 150.0 : 190.0;
       final categoryWidth = compactTable ? 70.0 : 96.0;
       final moneyWidth = compactTable ? 50.0 : 62.0;
-      final stockWidth = compactTable ? 66.0 : 84.0;
+      final stockWidth = compactTable ? 76.0 : 94.0;
       final reorderWidth = compactTable ? 42.0 : 62.0;
       final statusWidth = compactTable ? 82.0 : 94.0;
       final actionsWidth = compactTable ? 102.0 : 120.0;
       final double contentHeight = (visible.length * 60.0).clamp(200.0, 600.0);
 
       return Container(
-        // KEY FIX: clip the container so the horizontal-scrolling DataTable
-        // never bleeds outside and causes the parent ListView to overflow.
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
           color: NovaColors.bgPrimary,
@@ -1226,22 +1255,23 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                 height: 38,
                 child: TextField(
                   controller: _searchController,
+                  focusNode: _searchFocusNode,
                   style: const TextStyle(
                       color: NovaColors.textPrimary, fontSize: 13),
                   onChanged: (v) => setState(() => _searchQuery = v.trim()),
                   decoration: InputDecoration(
-                    hintText: 'Search by name, barcode or category…',
+                    hintText:
+                        'Search by name, barcode or category…  ( / or Ctrl+F )',
                     hintStyle: const TextStyle(
                         color: NovaColors.textTertiary, fontSize: 12),
                     prefixIcon: const Icon(Icons.search_rounded,
                         color: NovaColors.textSecondary, size: 18),
                     suffixIcon: _searchQuery.isNotEmpty
-                        ? GestureDetector(
-                            onTap: () {
-                              _searchController.clear();
-                              setState(() => _searchQuery = '');
-                            },
-                            child: const Icon(Icons.close_rounded,
+                        ? IconButton(
+                            tooltip: 'Clear search',
+                            mouseCursor: SystemMouseCursors.click,
+                            onPressed: _clearSearch,
+                            icon: const Icon(Icons.close_rounded,
                                 color: NovaColors.textSecondary, size: 16),
                           )
                         : null,
@@ -1358,13 +1388,19 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                         DataColumn(
                           label: SizedBox(
                             width: statusWidth,
-                            child: const Text('Status'),
+                            child: const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text('Status'),
+                            ),
                           ),
                         ),
                         DataColumn(
                           label: SizedBox(
                             width: actionsWidth,
-                            child: const Text('Actions'),
+                            child: const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text('Actions'),
+                            ),
                           ),
                         ),
                       ],
@@ -1451,7 +1487,8 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                           DataCell(SizedBox(
                             width: actionsWidth,
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                              mainAxisSize: MainAxisSize.max,
+                              mainAxisAlignment: MainAxisAlignment.start,
                               children: [
                                 _TableActionButton(
                                   tooltip: 'Restock',
@@ -1506,7 +1543,7 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
     List<Product> availableProducts,
   ) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      NoAnimationPageRoute(
         builder: (_) => SupplierOrderScreen(
           product: product,
           products: availableProducts,
@@ -1577,8 +1614,11 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
               }
             },
             style: FilledButton.styleFrom(
-                backgroundColor: NovaColors.teal,
-                foregroundColor: Colors.white),
+                    backgroundColor: NovaColors.teal,
+                    foregroundColor: Colors.white)
+                .copyWith(
+              mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+            ),
             child: const Text('Confirm'),
           ),
         ],
@@ -1602,7 +1642,6 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
         try {
           widget.onMutated();
         } catch (e) {
-          // If parent has already unmounted, ignore refresh callback errors.
           debugPrint('[Inventory] refresh after restock skipped: $e');
         }
       } catch (e) {
@@ -1685,8 +1724,11 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
               }
             },
             style: FilledButton.styleFrom(
-                backgroundColor: NovaColors.violet,
-                foregroundColor: Colors.white),
+                    backgroundColor: NovaColors.violet,
+                    foregroundColor: Colors.white)
+                .copyWith(
+              mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+            ),
             child: const Text('Apply'),
           ),
         ],
@@ -1739,10 +1781,7 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       );
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Mobile product card list
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _ProductCardList extends StatelessWidget {
   const _ProductCardList({
@@ -1803,7 +1842,7 @@ class _ProductCardList extends StatelessWidget {
                       children: [
                         _StatusPill(product: p),
                         const SizedBox(width: 8),
-                        _StockCell(product: p),
+                        Flexible(child: _StockCell(product: p)),
                       ],
                     ),
                   ],
@@ -1814,18 +1853,21 @@ class _ProductCardList extends StatelessWidget {
                 children: [
                   IconButton(
                     tooltip: 'Restock',
+                    mouseCursor: SystemMouseCursors.click,
                     icon: const Icon(Icons.add_circle_outline_rounded,
                         size: 20, color: NovaColors.teal),
                     onPressed: () => onRestock(p),
                   ),
                   IconButton(
                     tooltip: 'Adjust',
+                    mouseCursor: SystemMouseCursors.click,
                     icon: const Icon(Icons.tune_rounded,
                         size: 20, color: NovaColors.textSecondary),
                     onPressed: () => onAdjust(p),
                   ),
                   IconButton(
                     tooltip: 'Supplier order',
+                    mouseCursor: SystemMouseCursors.click,
                     icon: const Icon(Icons.local_shipping_outlined,
                         size: 20, color: NovaColors.violet),
                     onPressed: () => onOrder(p),
@@ -1839,10 +1881,6 @@ class _ProductCardList extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Side Panels
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _SidePanels extends StatelessWidget {
   const _SidePanels({
@@ -1912,8 +1950,6 @@ class _SidePanels extends StatelessWidget {
       ),
     );
 
-    // On desktop the side panels always stack vertically since they share
-    // the single 1/4-width column. On tablet they sit side-by-side.
     if (isTablet) {
       return Column(
         children: [
@@ -1955,7 +1991,7 @@ class _ReorderButton extends StatelessWidget {
       child: FilledButton.icon(
         onPressed: () {
           Navigator.of(context).push(
-            MaterialPageRoute(
+            NoAnimationPageRoute(
               builder: (_) => SupplierOrderScreen(
                 product: product,
                 products: products,
@@ -1971,6 +2007,8 @@ class _ReorderButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ).copyWith(
+          mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
         ),
       ),
     );
@@ -2089,32 +2127,7 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
 
   late final List<Product> _orderProducts;
 
-  static const _defaultSuppliers = [
-    _SupplierInfo(
-      name: 'Metro Wholesale',
-      contact: '+92 300 111 2233',
-      email: 'orders@metrowholesale.pk',
-      address: 'Main Market Supply Center',
-      leadTime: '1-2 days',
-      terms: 'Cash on delivery',
-    ),
-    _SupplierInfo(
-      name: 'Fresh Stock Traders',
-      contact: '+92 321 555 9080',
-      email: 'sales@freshstock.pk',
-      address: 'Warehouse Road, Block B',
-      leadTime: 'Same day',
-      terms: 'Bank transfer',
-    ),
-    _SupplierInfo(
-      name: 'Daily Goods Supplier',
-      contact: '+92 333 778 4410',
-      email: 'orders@dailygoods.pk',
-      address: 'Industrial Area, Gate 4',
-      leadTime: '2-3 days',
-      terms: '7 day credit',
-    ),
-  ];
+  static const _defaultSuppliers = <_SupplierInfo>[];
 
   @override
   void initState() {
@@ -2388,6 +2401,7 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
             ),
             const SizedBox(height: 12),
             ListTile(
+              mouseCursor: SystemMouseCursors.click,
               contentPadding: EdgeInsets.zero,
               dense: true,
               leading: const FaIcon(
@@ -2417,6 +2431,7 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
               },
             ),
             ListTile(
+              mouseCursor: SystemMouseCursors.click,
               contentPadding: EdgeInsets.zero,
               dense: true,
               leading: const FaIcon(
@@ -2446,6 +2461,9 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
               },
             ),
             ListTile(
+              mouseCursor: supplier.email.isEmpty
+                  ? SystemMouseCursors.basic
+                  : SystemMouseCursors.click,
               contentPadding: EdgeInsets.zero,
               dense: true,
               leading: const FaIcon(
@@ -2540,7 +2558,7 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final supplier = _suppliers[_selectedSupplier];
+    final supplier = _suppliers.isEmpty ? null : _suppliers[_selectedSupplier];
     final lines = _selectedOrderLines();
     final totalQty = lines.fold<int>(0, (sum, line) => sum + line.qty);
 
@@ -2595,17 +2613,20 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
               const SizedBox(height: 14),
               _PanelCard(
                 title: 'Supplier Details',
-                child: Column(
-                  children: [
-                    for (var i = 0; i < _suppliers.length; i++)
-                      _SupplierOption(
-                        supplier: _suppliers[i],
-                        selected: i == _selectedSupplier,
-                        onTap: () => setState(() => _selectedSupplier = i),
-                        onEdit: () => _startEditSupplier(i),
+                child: _suppliers.isEmpty
+                    ? const _MutedText(text: 'No suppliers yet. Add one below.')
+                    : Column(
+                        children: [
+                          for (var i = 0; i < _suppliers.length; i++)
+                            _SupplierOption(
+                              supplier: _suppliers[i],
+                              selected: i == _selectedSupplier,
+                              onTap: () =>
+                                  setState(() => _selectedSupplier = i),
+                              onEdit: () => _startEditSupplier(i),
+                            ),
+                        ],
                       ),
-                  ],
-                ),
               ),
               const SizedBox(height: 14),
               _PanelCard(
@@ -2641,7 +2662,7 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
                     children: [
                       _OrderSummaryRow(
                         label: 'Supplier',
-                        value: supplier.name,
+                        value: supplier?.name ?? 'None selected',
                       ),
                       _OrderSummaryRow(
                         label: 'Selected Items',
@@ -2657,14 +2678,21 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
                         width: double.infinity,
                         height: 42,
                         child: FilledButton.icon(
-                          onPressed:
-                              lines.isEmpty ? null : _prepareAndSendOrder,
+                          onPressed: (lines.isEmpty || _suppliers.isEmpty)
+                              ? null
+                              : _prepareAndSendOrder,
                           icon: const Icon(Icons.check_circle_outline_rounded,
                               size: 18),
                           label: const Text('Prepare Order'),
                           style: FilledButton.styleFrom(
                             backgroundColor: NovaColors.teal,
                             foregroundColor: Colors.white,
+                          ).copyWith(
+                            mouseCursor: WidgetStateProperty.resolveWith(
+                              (states) => states.contains(WidgetState.disabled)
+                                  ? SystemMouseCursors.basic
+                                  : SystemMouseCursors.click,
+                            ),
                           ),
                         ),
                       ),
@@ -2874,6 +2902,7 @@ class _SupplierOrderItemRow extends StatelessWidget {
           Checkbox(
             value: selected,
             onChanged: onSelected,
+            mouseCursor: SystemMouseCursors.click,
             activeColor: NovaColors.teal,
             visualDensity: VisualDensity.compact,
           ),
@@ -2954,6 +2983,8 @@ class _SupplierBulkButton extends StatelessWidget {
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ).copyWith(
+        mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
       ),
       child: Text(label),
     );
@@ -2976,6 +3007,7 @@ class _SupplierOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
+      mouseCursor: SystemMouseCursors.click,
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -3037,6 +3069,7 @@ class _SupplierOption extends StatelessWidget {
             const SizedBox(width: 6),
             IconButton(
               tooltip: 'Edit supplier',
+              mouseCursor: SystemMouseCursors.click,
               onPressed: onEdit,
               icon: const Icon(
                 Icons.edit_outlined,
@@ -3179,6 +3212,9 @@ class _ManualSupplierForm extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
+                      ).copyWith(
+                        mouseCursor:
+                            WidgetStateProperty.all(SystemMouseCursors.click),
                       ),
                       child: const Text('Cancel'),
                     ),
@@ -3202,6 +3238,9 @@ class _ManualSupplierForm extends StatelessWidget {
                           fontSize: 12, fontWeight: FontWeight.w700),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
+                    ).copyWith(
+                      mouseCursor:
+                          WidgetStateProperty.all(SystemMouseCursors.click),
                     ),
                   ),
                 ],
@@ -3373,37 +3412,57 @@ class _StockCell extends StatelessWidget {
       barColor = const Color(0xFF2E7D32); // green
     }
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: compact ? 36 : 60,
-          height: 6,
-          decoration: BoxDecoration(
-            color: NovaColors.bgSecondary,
-            borderRadius: BorderRadius.circular(99),
-          ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: ratio,
-            child: Container(
-              decoration: BoxDecoration(
-                color: barColor,
-                borderRadius: BorderRadius.circular(99),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fallbackWidth = compact ? 76.0 : 94.0;
+        final cellWidth =
+            constraints.hasBoundedWidth ? constraints.maxWidth : fallbackWidth;
+        final qtyWidth = compact ? 34.0 : 40.0;
+        final gap = compact ? 6.0 : 8.0;
+        final barWidth = (cellWidth - qtyWidth - gap).clamp(20.0, 60.0);
+
+        return SizedBox(
+          width: constraints.hasBoundedWidth ? double.infinity : fallbackWidth,
+          child: Row(
+            children: [
+              Container(
+                width: barWidth,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: NovaColors.bgSecondary,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: ratio,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: barColor,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              SizedBox(width: gap),
+              SizedBox(
+                width: qtyWidth,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${product.stockQty}',
+                    maxLines: 1,
+                    style: const TextStyle(
+                      color: NovaColors.textPrimary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            '${product.stockQty}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: NovaColors.textPrimary, fontSize: 12),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 }
@@ -3425,6 +3484,7 @@ class _TableActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       tooltip: tooltip,
+      mouseCursor: SystemMouseCursors.click,
       constraints: const BoxConstraints.tightFor(width: 34, height: 34),
       padding: EdgeInsets.zero,
       visualDensity: VisualDensity.compact,
@@ -3480,18 +3540,22 @@ class _StatusPill extends StatelessWidget {
       fg = const Color(0xFF2E7D32);
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: fg,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(6, 4, 7, 4),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          style: TextStyle(
+            color: fg,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -3736,6 +3800,9 @@ class _PanelCard extends StatelessWidget {
                     padding: const EdgeInsets.only(left: 8),
                     child: InkWell(
                       onTap: onActionTap,
+                      mouseCursor: onActionTap == null
+                          ? SystemMouseCursors.basic
+                          : SystemMouseCursors.click,
                       borderRadius: BorderRadius.circular(6),
                       child: Text(
                         actionText!,
@@ -3815,7 +3882,6 @@ class _ThinListItem extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 1),
-                // Allow subtitle to wrap onto 2 lines instead of clipping
                 Text(
                   subtitle,
                   maxLines: 2,

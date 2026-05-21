@@ -1,5 +1,5 @@
 name: pos_system
-description: "Restaurant POS System (Flutter + PocketBase)"
+description: "POS System (Flutter + PocketBase)"
 publish_to: 'none'
 
 version: 1.0.0+1

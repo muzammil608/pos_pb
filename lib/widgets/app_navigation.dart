@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/cafe_colors.dart';
+import '../core/utils/clickable_cursor.dart';
 import '../providers/auth_provider.dart';
 
 class AppUserAvatar extends StatelessWidget {
@@ -76,25 +77,27 @@ class AppDrawerAvatarButton extends StatelessWidget {
     return Builder(
       builder: (builderContext) => Padding(
         padding: const EdgeInsets.only(right: 12),
-        child: GestureDetector(
-          onTap: () => Scaffold.of(builderContext).openDrawer(),
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white54, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: AppUserAvatar(
-              photoUrl: photoUrl,
-              userName: userName,
-              radius: 18,
-              fontSize: 14,
+        child: ClickableCursor(
+          child: GestureDetector(
+            onTap: () => Scaffold.of(builderContext).openDrawer(),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white54, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: AppUserAvatar(
+                photoUrl: photoUrl,
+                userName: userName,
+                radius: 18,
+                fontSize: 14,
+              ),
             ),
           ),
         ),
@@ -195,7 +198,7 @@ class AppNavigationDrawer extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Restaurant POS',
+                      'POS',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 13,

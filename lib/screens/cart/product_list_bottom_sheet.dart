@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/keyboard/pos_keyboard_system.dart';
 import '../../core/theme/nova_theme.dart';
+import '../../core/utils/clickable_cursor.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
@@ -612,123 +613,125 @@ class _BottomSheetProductTileState extends State<_BottomSheetProductTile>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _ctrl.forward(),
-      onTapUp: (_) {
-        _ctrl.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _ctrl.reverse(),
-      child: ScaleTransition(
-        scale: _scale,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          margin: const EdgeInsets.only(bottom: 8),
-          decoration: BoxDecoration(
-            color: NovaColors.bgPrimary,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: widget.isFocused
-                  ? NovaColors.violet
-                  : NovaColors.borderTertiary,
-              width: widget.isFocused ? 1.5 : 0.5,
+    return ClickableCursor(
+      child: GestureDetector(
+        onTapDown: (_) => _ctrl.forward(),
+        onTapUp: (_) {
+          _ctrl.reverse();
+          widget.onTap();
+        },
+        onTapCancel: () => _ctrl.reverse(),
+        child: ScaleTransition(
+          scale: _scale,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: NovaColors.bgPrimary,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: widget.isFocused
+                    ? NovaColors.violet
+                    : NovaColors.borderTertiary,
+                width: widget.isFocused ? 1.5 : 0.5,
+              ),
+              boxShadow: widget.isFocused
+                  ? [
+                      BoxShadow(
+                        color: NovaColors.violet.withValues(alpha: 0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : [],
             ),
-            boxShadow: widget.isFocused
-                ? [
-                    BoxShadow(
-                      color: NovaColors.violet.withValues(alpha: 0.15),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : [],
-          ),
-          child: Row(
-            children: [
-              // Product image — 72×72, left-rounded (identical to _ProductListTile)
-              ClipRRect(
-                borderRadius:
-                    const BorderRadius.horizontal(left: Radius.circular(12)),
-                child: _ProductImage(
-                  product: widget.product,
-                  width: 64,
-                  height: 64,
+            child: Row(
+              children: [
+                // Product image — 72×72, left-rounded (identical to _ProductListTile)
+                ClipRRect(
+                  borderRadius:
+                      const BorderRadius.horizontal(left: Radius.circular(12)),
+                  child: _ProductImage(
+                    product: widget.product,
+                    width: 64,
+                    height: 64,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              // Name + category pill
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      widget.product.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: NovaColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: NovaColors.bgTertiary,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        widget.product.category,
+                const SizedBox(width: 10),
+                // Name + category pill
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        widget.product.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 10,
-                          color: NovaColors.textTertiary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Price pill + add circle (identical to _ProductListTile)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: NovaColors.violetLight,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Rs ${widget.product.price.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: NovaColors.violet,
+                          color: NovaColors.textPrimary,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      width: 26,
-                      height: 26,
-                      decoration: const BoxDecoration(
-                        color: NovaColors.violetLight,
-                        shape: BoxShape.circle,
+                      const SizedBox(height: 3),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: NovaColors.bgTertiary,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          widget.product.category,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: NovaColors.textTertiary,
+                          ),
+                        ),
                       ),
-                      child: const Icon(Icons.add_rounded,
-                          color: NovaColors.violet, size: 15),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                // Price pill + add circle (identical to _ProductListTile)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: NovaColors.violetLight,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Rs ${widget.product.price.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: NovaColors.violet,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: 26,
+                        height: 26,
+                        decoration: const BoxDecoration(
+                          color: NovaColors.violetLight,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.add_rounded,
+                            color: NovaColors.violet, size: 15),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

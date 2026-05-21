@@ -176,7 +176,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             controller: categoryController,
                             label: 'Category',
                             icon: Icons.category_outlined,
-                            hint: 'e.g. Drinks, Pizza, Burgers',
+                            hint: 'e.g. Drinks, POS, Burgers',
                             textCapitalization: TextCapitalization.words,
                             onChanged: (value) {
                               if (!isEdit && value.isNotEmpty) {
