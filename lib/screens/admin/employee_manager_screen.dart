@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/cafe_colors.dart';
 import '../../core/theme/nova_theme.dart';
+import '../../core/utils/clickable_cursor.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/app_navigation.dart';
 import '../../widgets/responsive_layout.dart';
@@ -1106,16 +1107,18 @@ class _ActionIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(10),
+      child: ClickableCursor(
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 16),
           ),
-          child: Icon(icon, color: color, size: 16),
         ),
       ),
     );

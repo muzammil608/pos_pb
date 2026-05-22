@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/utils/icon_helper.dart';
+import '../../core/utils/clickable_cursor.dart';
 import '../../models/product_model.dart';
 import '../../core/theme/cafe_colors.dart';
 import '../../core/theme/nova_theme.dart';
@@ -26,6 +27,39 @@ class _ProductsScreenState extends State<ProductsScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _showProductSnackBar({
+    required BuildContext context,
+    required String message,
+    required bool isError,
+  }) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isDesktop = screenWidth >= ResponsiveLayout.desktopBreakpoint;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isError ? Icons.error_outline : Icons.check_circle_outline,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Flexible(child: Text(message)),
+          ],
+        ),
+        backgroundColor: isError ? const Color(0xFFE53935) : CafeColors.olive,
+        behavior: SnackBarBehavior.floating,
+        width: isDesktop ? 420 : null,
+        margin: isDesktop
+            ? null
+            : const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   void _showProductForm(BuildContext context, {Product? product}) {
@@ -384,36 +418,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                             if (!sheetContext.mounted) return;
                                             Navigator.pop(sheetContext);
 
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                content: Row(
-                                                  children: [
-                                                    Icon(
-                                                      error != null
-                                                          ? Icons.error_outline
-                                                          : Icons
-                                                              .check_circle_outline,
-                                                      color: Colors.white,
-                                                      size: 18,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Text(error ??
-                                                        (isEdit
-                                                            ? 'Product updated'
-                                                            : 'Product added')),
-                                                  ],
-                                                ),
-                                                backgroundColor: error != null
-                                                    ? const Color(0xFFE53935)
-                                                    : CafeColors.olive,
-                                                behavior:
-                                                    SnackBarBehavior.floating,
-                                                shape: RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            12)),
-                                              ),
+                                            _showProductSnackBar(
+                                              context: context,
+                                              message: error ??
+                                                  (isEdit
+                                                      ? 'Product updated'
+                                                      : 'Product added'),
+                                              isError: error != null,
                                             );
                                           },
                                     icon: provider.isLoading
@@ -473,121 +484,106 @@ class _ProductsScreenState extends State<ProductsScreen> {
       context: context,
       builder: (dialogContext) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFEDE8),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.delete_outline_rounded,
-                    color: CafeColors.flame, size: 32),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Delete Product',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: CafeColors.charcoal,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Are you sure you want to delete "${product.name}"? This cannot be undone.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: CafeColors.charcoal.withOpacity(0.6),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        side: BorderSide(
-                            color: CafeColors.charcoal.withOpacity(0.2)),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: CafeColors.charcoal,
-                        ),
-                      ),
-                    ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFEDE8),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFE53935), Color(0xFFEF5350)],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          Navigator.pop(dialogContext);
-                          final error = await context
-                              .read<ProductProvider>()
-                              .deleteProduct(product.id);
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  Icon(
-                                    error != null
-                                        ? Icons.error_outline
-                                        : Icons.check_circle_outline,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(error ?? 'Product deleted'),
-                                ],
-                              ),
-                              backgroundColor: error != null
-                                  ? const Color(0xFFE53935)
-                                  : CafeColors.olive,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
+                  child: const Icon(Icons.delete_outline_rounded,
+                      color: CafeColors.flame, size: 32),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Delete Product',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: CafeColors.charcoal,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Are you sure you want to delete "${product.name}"? This cannot be undone.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: CafeColors.charcoal.withOpacity(0.6),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 13),
+                          side: BorderSide(
+                              color: CafeColors.charcoal.withOpacity(0.2)),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                         ),
                         child: const Text(
-                          'Delete',
+                          'Cancel',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                            color: CafeColors.charcoal,
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFE53935), Color(0xFFEF5350)],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(dialogContext);
+                            final error = await context
+                                .read<ProductProvider>()
+                                .deleteProduct(product.id);
+                            if (!context.mounted) return;
+                            _showProductSnackBar(
+                              context: context,
+                              message: error ?? 'Product deleted',
+                              isError: error != null,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text(
+                            'Delete',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -617,52 +613,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
           drawer: AppNavigationShell.isDesktop(context)
               ? null
               : AppNavigationDrawer(auth: auth, currentRoute: '/products'),
-          appBar: PreferredSize(
-            preferredSize: const Size.fromHeight(64),
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: CafeColors.headerGradient,
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x33FF4D1C),
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: SafeArea(
-                child: AppBar(
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  iconTheme: const IconThemeData(color: Colors.white),
-                  title: const Row(
-                    children: [
-                      Icon(Icons.inventory_2_rounded,
-                          color: Colors.white70, size: 22),
-                      SizedBox(width: 10),
-                      Text(
-                        'Products',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: AppDrawerAvatarButton(
-                        photoUrl: photoUrl,
-                        userName: userName,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          appBar: AppNavigationAppBar(
+            title: 'Products',
+            icon: Icons.inventory_2_rounded,
+            photoUrl: photoUrl,
+            userName: userName,
           ),
           body: AppNavigationShell(
             auth: auth,
@@ -722,24 +677,26 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        GestureDetector(
-                          onTap: () => _showProductForm(context),
-                          child: Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              gradient: CafeColors.headerGradient,
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: CafeColors.flame.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
+                        ClickableCursor(
+                          child: GestureDetector(
+                            onTap: () => _showProductForm(context),
+                            child: Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                gradient: CafeColors.headerGradient,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: CafeColors.flame.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(Icons.add_rounded,
+                                  color: Colors.white, size: 24),
                             ),
-                            child: const Icon(Icons.add_rounded,
-                                color: Colors.white, size: 24),
                           ),
                         ),
                       ],
@@ -796,50 +753,54 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                   itemBuilder: (context, i) {
                                     final cat = categories[i];
                                     final isSelected = _selectedCategory == cat;
-                                    return GestureDetector(
-                                      onTap: () => setState(
-                                          () => _selectedCategory = cat),
-                                      child: AnimatedContainer(
-                                        duration:
-                                            const Duration(milliseconds: 200),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 16, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          gradient: isSelected
-                                              ? CafeColors.headerGradient
-                                              : null,
-                                          color:
-                                              isSelected ? null : Colors.white,
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                          border: Border.all(
+                                    return ClickableCursor(
+                                      child: GestureDetector(
+                                        onTap: () => setState(
+                                            () => _selectedCategory = cat),
+                                        child: AnimatedContainer(
+                                          duration:
+                                              const Duration(milliseconds: 200),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            gradient: isSelected
+                                                ? CafeColors.headerGradient
+                                                : null,
                                             color: isSelected
-                                                ? Colors.transparent
-                                                : CafeColors.flame
-                                                    .withOpacity(0.2),
+                                                ? null
+                                                : Colors.white,
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                            border: Border.all(
+                                              color: isSelected
+                                                  ? Colors.transparent
+                                                  : CafeColors.flame
+                                                      .withOpacity(0.2),
+                                            ),
+                                            boxShadow: isSelected
+                                                ? [
+                                                    BoxShadow(
+                                                      color: CafeColors.flame
+                                                          .withOpacity(0.25),
+                                                      blurRadius: 6,
+                                                      offset:
+                                                          const Offset(0, 2),
+                                                    )
+                                                  ]
+                                                : null,
                                           ),
-                                          boxShadow: isSelected
-                                              ? [
-                                                  BoxShadow(
-                                                    color: CafeColors.flame
-                                                        .withOpacity(0.25),
-                                                    blurRadius: 6,
-                                                    offset: const Offset(0, 2),
-                                                  )
-                                                ]
-                                              : null,
-                                        ),
-                                        child: Text(
-                                          cat,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: isSelected
-                                                ? FontWeight.w700
-                                                : FontWeight.w500,
-                                            color: isSelected
-                                                ? Colors.white
-                                                : CafeColors.charcoal
-                                                    .withOpacity(0.6),
+                                          child: Text(
+                                            cat,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : CafeColors.charcoal
+                                                      .withOpacity(0.6),
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -921,7 +882,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                             crossAxisCount: columns,
                                             mainAxisSpacing: 12,
                                             crossAxisSpacing: 12,
-                                            childAspectRatio: 4.8,
+                                            mainAxisExtent:
+                                                constraints.maxWidth / columns <
+                                                        360
+                                                    ? 118
+                                                    : 94,
                                           ),
                                           itemCount: filtered.length,
                                           itemBuilder: (context, i) {
@@ -1132,106 +1097,204 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: CafeColors.flame.withOpacity(0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: CafeColors.flame.withOpacity(0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: CafeColors.creme,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(product.icon, color: CafeColors.flame, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: CafeColors.charcoal,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: CafeColors.oliveLight,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      product.category,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: CafeColors.olive,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: compact
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        children: [
+                          _ProductIcon(product: product),
+                          const SizedBox(width: 10),
+                          Expanded(child: _ProductCardInfo(product: product)),
+                        ],
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(child: _ProductPrice(product: product)),
+                          _ProductCardActions(
+                            onEdit: onEdit,
+                            onDelete: onDelete,
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      _ProductIcon(product: product),
+                      const SizedBox(width: 12),
+                      Expanded(child: _ProductCardInfo(product: product)),
+                      const SizedBox(width: 8),
+                      _ProductPrice(product: product),
+                      const SizedBox(width: 4),
+                      _ProductCardActions(onEdit: onEdit, onDelete: onDelete),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            Text(
-              'Rs ${product.price.toStringAsFixed(0)}',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: CafeColors.flame,
-              ),
-            ),
-            const SizedBox(width: 4),
-            IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F4FD),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.edit_rounded,
-                    color: Color(0xFF1976D2), size: 16),
-              ),
-              onPressed: onEdit,
-              tooltip: 'Edit',
-              constraints: const BoxConstraints(),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-            ),
-            IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFEDE8),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.delete_outline_rounded,
-                    color: CafeColors.flame, size: 16),
-              ),
-              onPressed: onDelete,
-              tooltip: 'Delete',
-              constraints: const BoxConstraints(),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-            ),
-          ],
-        ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ProductIcon extends StatelessWidget {
+  const _ProductIcon({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: CafeColors.creme,
+        borderRadius: BorderRadius.circular(14),
       ),
+      child: Icon(product.icon, color: CafeColors.flame, size: 24),
+    );
+  }
+}
+
+class _ProductCardInfo extends StatelessWidget {
+  const _ProductCardInfo({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          product.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: CafeColors.charcoal,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: CafeColors.oliveLight,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              product.category,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: CafeColors.olive,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProductPrice extends StatelessWidget {
+  const _ProductPrice({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Rs ${product.price.toStringAsFixed(0)}',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w800,
+        color: CafeColors.flame,
+      ),
+    );
+  }
+}
+
+class _ProductCardActions extends StatelessWidget {
+  const _ProductCardActions({
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F4FD),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.edit_rounded,
+              color: Color(0xFF1976D2),
+              size: 16,
+            ),
+          ),
+          onPressed: onEdit,
+          tooltip: 'Edit',
+          mouseCursor: SystemMouseCursors.click,
+          constraints: const BoxConstraints(),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+        ),
+        IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEDE8),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.delete_outline_rounded,
+              color: CafeColors.flame,
+              size: 16,
+            ),
+          ),
+          onPressed: onDelete,
+          tooltip: 'Delete',
+          mouseCursor: SystemMouseCursors.click,
+          constraints: const BoxConstraints(),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+        ),
+      ],
     );
   }
 }

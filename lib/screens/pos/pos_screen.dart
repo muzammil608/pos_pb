@@ -893,103 +893,69 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
           drawer: AppNavigationShell.isDesktop(context)
               ? null
               : AppNavigationDrawer(auth: auth, currentRoute: '/pos'),
-          appBar: PreferredSize(
-            preferredSize: const Size.fromHeight(52),
-            child: Container(
-              color: NovaColors.violetDeep,
-              child: SafeArea(
-                child: AppBar(
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  iconTheme: const IconThemeData(color: Colors.white),
-                  title: const Row(
-                    children: [
-                      Icon(Icons.storefront_rounded,
-                          color: Colors.white70, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'Order Station',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 16,
+          appBar: AppNavigationAppBar(
+            title: 'Order Station',
+            icon: Icons.storefront_rounded,
+            photoUrl: photoUrl,
+            userName: userName,
+            actions: [
+              if (_isDesktop)
+                IconButton(
+                  tooltip: 'Keyboard Shortcuts (?)',
+                  onPressed: () => PosShortcutHelp.show(context),
+                  icon: const Icon(Icons.keyboard_rounded,
+                      color: Colors.white70, size: 20),
+                ),
+              StreamBuilder<OrderRecordSnapshot>(
+                stream: _orderService?.getOrders(),
+                builder: (context, snapshot) {
+                  final readyCount = _readyOrderCount(snapshot);
+                  return IconButton(
+                    tooltip: 'Ready Orders  (F2)',
+                    onPressed: () => _showReadyOrdersSheet(context),
+                    icon: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(
+                          readyCount > 0
+                              ? Icons.notifications_active_rounded
+                              : Icons.notifications_outlined,
+                          color: readyCount > 0
+                              ? NovaColors.violet
+                              : NovaColors.textSecondary,
+                          size: 22,
                         ),
-                      ),
-                    ],
-                  ),
-                  bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(0.5),
-                    child: Container(height: 0.5, color: Colors.white24),
-                  ),
-                  actions: [
-                    if (_isDesktop)
-                      IconButton(
-                        tooltip: 'Keyboard Shortcuts (?)',
-                        onPressed: () => PosShortcutHelp.show(context),
-                        icon: const Icon(Icons.keyboard_rounded,
-                            color: Colors.white70, size: 20),
-                      ),
-                    StreamBuilder<OrderRecordSnapshot>(
-                      stream: _orderService?.getOrders(),
-                      builder: (context, snapshot) {
-                        final readyCount = _readyOrderCount(snapshot);
-                        return IconButton(
-                          tooltip: 'Ready Orders  (F2)',
-                          onPressed: () => _showReadyOrdersSheet(context),
-                          icon: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Icon(
-                                readyCount > 0
-                                    ? Icons.notifications_active_rounded
-                                    : Icons.notifications_outlined,
-                                color: readyCount > 0
-                                    ? NovaColors.violet
-                                    : NovaColors.textSecondary,
-                                size: 22,
+                        if (readyCount > 0)
+                          Positioned(
+                            top: -3,
+                            right: -3,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: NovaColors.teal,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: NovaColors.bgPrimary, width: 1.5),
                               ),
-                              if (readyCount > 0)
-                                Positioned(
-                                  top: -3,
-                                  right: -3,
-                                  child: Container(
-                                    width: 14,
-                                    height: 14,
-                                    decoration: BoxDecoration(
-                                      color: NovaColors.teal,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                          color: NovaColors.bgPrimary,
-                                          width: 1.5),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        '$readyCount',
-                                        style: const TextStyle(
-                                          fontSize: 7,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
+                              child: Center(
+                                child: Text(
+                                  '$readyCount',
+                                  style: const TextStyle(
+                                    fontSize: 7,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
                                   ),
                                 ),
-                            ],
+                              ),
+                            ),
                           ),
-                        );
-                      },
+                      ],
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: AppDrawerAvatarButton(
-                        photoUrl: photoUrl,
-                        userName: userName,
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
-            ),
+            ],
           ),
           body: AppNavigationShell(
             auth: auth,
@@ -1383,19 +1349,21 @@ class _PosHeaderSlideshowState extends State<PosHeaderSlideshow> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(
                             activeSlides.length,
-                            (i) => GestureDetector(
-                              onTap: () => _goTo(i),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                width: i == activeIndex ? 18 : 7,
-                                height: 7,
-                                margin:
-                                    const EdgeInsets.symmetric(horizontal: 3),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(
-                                    i == activeIndex ? 0.95 : 0.45,
+                            (i) => ClickableCursor(
+                              child: GestureDetector(
+                                onTap: () => _goTo(i),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  width: i == activeIndex ? 18 : 7,
+                                  height: 7,
+                                  margin:
+                                      const EdgeInsets.symmetric(horizontal: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(
+                                      i == activeIndex ? 0.95 : 0.45,
+                                    ),
+                                    borderRadius: BorderRadius.circular(999),
                                   ),
-                                  borderRadius: BorderRadius.circular(999),
                                 ),
                               ),
                             ),
@@ -1427,6 +1395,7 @@ class _PosHeaderSlideshowState extends State<PosHeaderSlideshow> {
                           child: IconButton.filledTonal(
                             onPressed: () => _editSlides(slides),
                             tooltip: 'Edit POS header',
+                            mouseCursor: SystemMouseCursors.click,
                             icon: const Icon(Icons.edit_rounded, size: 18),
                           ),
                         ),
@@ -2005,6 +1974,7 @@ class _HeaderColorPalette extends StatelessWidget {
               controller: controller,
               colors: colors,
             ),
+            mouseCursor: SystemMouseCursors.click,
             borderRadius: BorderRadius.circular(14),
             child: Ink(
               padding: const EdgeInsets.all(12),
@@ -2165,6 +2135,7 @@ class _PaletteSwatch extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(12),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
@@ -2505,106 +2476,108 @@ class _ProductCardState extends State<_ProductCard>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        _controller.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _controller.reverse(),
-      child: ScaleTransition(
-        scale: _scaleAnim,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          decoration: BoxDecoration(
-            color: NovaColors.bgPrimary,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: widget.isFocused
-                  ? NovaColors.violet
-                  : NovaColors.borderTertiary,
-              width: widget.isFocused ? 1.5 : 0.5,
-            ),
-            boxShadow: widget.isFocused
-                ? [
-                    BoxShadow(
-                      color: NovaColors.violet.withValues(alpha: 0.15),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    )
-                  ]
-                : [],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                flex: 5,
-                child: _ProductImage(
-                  product: widget.product,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(12)),
-                ),
+    return ClickableCursor(
+      child: GestureDetector(
+        onTapDown: (_) => _controller.forward(),
+        onTapUp: (_) {
+          _controller.reverse();
+          widget.onTap();
+        },
+        onTapCancel: () => _controller.reverse(),
+        child: ScaleTransition(
+          scale: _scaleAnim,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            decoration: BoxDecoration(
+              color: NovaColors.bgPrimary,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: widget.isFocused
+                    ? NovaColors.violet
+                    : NovaColors.borderTertiary,
+                width: widget.isFocused ? 1.5 : 0.5,
               ),
-              Expanded(
-                flex: 4,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        widget.product.name,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: NovaColors.textPrimary,
-                          height: 1.2,
+              boxShadow: widget.isFocused
+                  ? [
+                      BoxShadow(
+                        color: NovaColors.violet.withValues(alpha: 0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      )
+                    ]
+                  : [],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: _ProductImage(
+                    product: widget.product,
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(12)),
+                  ),
+                ),
+                Expanded(
+                  flex: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          widget.product.name,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: NovaColors.textPrimary,
+                            height: 1.2,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: NovaColors.violetLight,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'Rs ${widget.product.price.toStringAsFixed(0)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: NovaColors.violet,
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: NovaColors.violetLight,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Rs ${widget.product.price.toStringAsFixed(0)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: NovaColors.violet,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            width: 22,
-                            height: 22,
-                            decoration: const BoxDecoration(
-                              color: NovaColors.violetLight,
-                              shape: BoxShape.circle,
+                            const SizedBox(width: 6),
+                            Container(
+                              width: 22,
+                              height: 22,
+                              decoration: const BoxDecoration(
+                                color: NovaColors.violetLight,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.add_rounded,
+                                  color: NovaColors.violet, size: 13),
                             ),
-                            child: const Icon(Icons.add_rounded,
-                                color: NovaColors.violet, size: 13),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

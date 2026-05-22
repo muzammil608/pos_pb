@@ -384,6 +384,115 @@ class AppNavigationDrawer extends StatelessWidget {
   }
 }
 
+class AppNavigationAppBar extends StatelessWidget
+    implements PreferredSizeWidget {
+  const AppNavigationAppBar({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.photoUrl,
+    required this.userName,
+    this.subtitle,
+    this.leading,
+    this.actions = const [],
+    this.height = 64,
+  });
+
+  final String title;
+  final IconData icon;
+  final String? photoUrl;
+  final String userName;
+  final String? subtitle;
+  final Widget? leading;
+  final List<Widget> actions;
+  final double height;
+
+  @override
+  Size get preferredSize => Size.fromHeight(height);
+
+  @override
+  Widget build(BuildContext context) {
+    return PreferredSize(
+      preferredSize: preferredSize,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: CafeColors.headerGradient,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x33FF4D1C),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: leading,
+            iconTheme: const IconThemeData(color: Colors.white),
+            title: Row(
+              children: [
+                Icon(icon, color: Colors.white70, size: 22),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: subtitle == null
+                      ? Text(
+                          title,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            letterSpacing: 0.3,
+                          ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              title,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 17,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            Text(
+                              subtitle!,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white60,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ],
+            ),
+            actions: [
+              ...actions,
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: AppDrawerAvatarButton(
+                  photoUrl: photoUrl,
+                  userName: userName,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class AppNavigationShell extends StatelessWidget {
   const AppNavigationShell({
     super.key,

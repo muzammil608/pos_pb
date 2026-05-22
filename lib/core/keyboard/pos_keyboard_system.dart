@@ -390,6 +390,24 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
     if (!mounted || event is! KeyDownEvent) return false;
     if (ModalRoute.of(context)?.isCurrent != true) return false;
 
+    final searchBar = widget.searchBarKey?.currentState;
+    if (event.logicalKey == LogicalKeyboardKey.keyF &&
+        HardwareKeyboard.instance.isControlPressed) {
+      searchBar?.requestFocus();
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.slash &&
+        searchBar?.hasFocus != true) {
+      searchBar?.requestFocus();
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      searchBar?.clear();
+      return true;
+    }
+
     if (event.logicalKey == LogicalKeyboardKey.f5) {
       widget.onRefresh?.call();
       return true;
@@ -931,26 +949,16 @@ class PosSearchBar extends StatefulWidget {
 
 class PosSearchBarState extends State<PosSearchBar> {
   final FocusNode focusNode = FocusNode();
-  bool _focused = false;
-
-  @override
-  void initState() {
-    super.initState();
-    focusNode.addListener(_onFocusChange);
-  }
-
-  void _onFocusChange() {
-    if (mounted) setState(() => _focused = focusNode.hasFocus);
-  }
 
   @override
   void dispose() {
-    focusNode.removeListener(_onFocusChange);
     focusNode.dispose();
     super.dispose();
   }
 
-  void requestFocus() => focusNode.requestFocus();
+  bool get hasFocus => focusNode.hasFocus;
+
+  void requestFocus() => FocusScope.of(context).requestFocus(focusNode);
 
   void clear() {
     widget.controller.clear();
@@ -982,7 +990,7 @@ class PosSearchBarState extends State<PosSearchBar> {
         style: const TextStyle(fontSize: 14, color: Color(0xFF111118)),
         decoration: InputDecoration(
           hintText: widget.hintText ??
-              (_isDesktop ? 'Search items…  ( / or Ctrl+F )' : 'Search items…'),
+              (_isDesktop ? 'Search items…  (Ctrl+F)' : 'Search items…'),
           hintStyle: const TextStyle(color: Color(0xFF9999AE), fontSize: 13),
           prefixIcon: const Icon(Icons.search_rounded,
               color: Color(0xFF6B6B80), size: 18),
@@ -993,12 +1001,7 @@ class PosSearchBarState extends State<PosSearchBar> {
                   onPressed: clear,
                   tooltip: 'Clear (Esc)',
                 )
-              : (!_focused && _isDesktop)
-                  ? Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: _KeyBadge('/'),
-                    )
-                  : null,
+              : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 11),
         ),
@@ -1136,45 +1139,51 @@ class _CategoryChipState extends State<_CategoryChip> {
         }
         return KeyEventResult.ignored;
       },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          height: widget.isCompact ? 26 : 30,
-          constraints: BoxConstraints(maxWidth: widget.isCompact ? 110 : 145),
-          alignment: Alignment.center,
-          padding: EdgeInsets.symmetric(horizontal: widget.isCompact ? 9 : 12),
-          decoration: BoxDecoration(
-            color: widget.isSelected
-                ? const Color(0xFF534AB7)
-                : const Color(0xFFFFFFFF),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: _focused
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            height: widget.isCompact ? 26 : 30,
+            constraints: BoxConstraints(maxWidth: widget.isCompact ? 110 : 145),
+            alignment: Alignment.center,
+            padding:
+                EdgeInsets.symmetric(horizontal: widget.isCompact ? 9 : 12),
+            decoration: BoxDecoration(
+              color: widget.isSelected
                   ? const Color(0xFF534AB7)
-                  : widget.isSelected
-                      ? const Color(0xFF534AB7)
-                      : const Color(0xFFE4E4E8),
-              width: _focused ? 2 : 0.5,
+                  : const Color(0xFFFFFFFF),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _focused
+                    ? const Color(0xFF534AB7)
+                    : widget.isSelected
+                        ? const Color(0xFF534AB7)
+                        : const Color(0xFFE4E4E8),
+                width: _focused ? 2 : 0.5,
+              ),
+              boxShadow: _focused
+                  ? [
+                      BoxShadow(
+                          color: const Color(0xFF534AB7).withValues(alpha: 0.2),
+                          blurRadius: 6)
+                    ]
+                  : [],
             ),
-            boxShadow: _focused
-                ? [
-                    BoxShadow(
-                        color: const Color(0xFF534AB7).withValues(alpha: 0.2),
-                        blurRadius: 6)
-                  ]
-                : [],
-          ),
-          child: Text(
-            widget.label,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: widget.isCompact ? 10.5 : 11.5,
-              height: 1.0,
-              fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: widget.isSelected ? Colors.white : const Color(0xFF6B6B80),
+            child: Text(
+              widget.label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: widget.isCompact ? 10.5 : 11.5,
+                height: 1.0,
+                fontWeight:
+                    widget.isSelected ? FontWeight.w600 : FontWeight.w400,
+                color:
+                    widget.isSelected ? Colors.white : const Color(0xFF6B6B80),
+              ),
             ),
           ),
         ),

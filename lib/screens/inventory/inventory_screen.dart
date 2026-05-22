@@ -59,47 +59,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
           drawer: AppNavigationShell.isDesktop(context)
               ? null
               : AppNavigationDrawer(auth: auth, currentRoute: '/inventory'),
-          appBar: PreferredSize(
-            preferredSize: const Size.fromHeight(56),
-            child: Container(
-              color: NovaColors.violetDeep,
-              child: SafeArea(
-                child: AppBar(
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  iconTheme: const IconThemeData(color: Colors.white),
-                  titleSpacing: 8,
-                  title: const Text(
-                    'Inventory Dashboard',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-                  bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(0.5),
-                    child: Container(height: 0.5, color: Colors.white24),
-                  ),
-                  actions: [
-                    IconButton(
-                      tooltip: 'Refresh',
-                      mouseCursor: SystemMouseCursors.click,
-                      onPressed: () => setState(() {}),
-                      icon: const Icon(Icons.refresh_rounded,
-                          color: Colors.white70, size: 20),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: AppDrawerAvatarButton(
-                        photoUrl: photoUrl,
-                        userName: userName,
-                      ),
-                    ),
-                  ],
-                ),
+          appBar: AppNavigationAppBar(
+            title: 'Inventory Dashboard',
+            icon: Icons.inventory_rounded,
+            photoUrl: photoUrl,
+            userName: userName,
+            actions: [
+              IconButton(
+                tooltip: 'Refresh',
+                mouseCursor: SystemMouseCursors.click,
+                onPressed: () => setState(() {}),
+                icon: const Icon(Icons.refresh_rounded,
+                    color: Colors.white70, size: 20),
               ),
-            ),
+            ],
           ),
           body: Center(
             child: Container(
@@ -729,7 +702,12 @@ class _ProfitExpansionPanel extends StatelessWidget {
     final productById = {
       for (final p in products) p.id: p,
     };
-    final saleTx = transactions.where((t) => t.type.toLowerCase() == 'sale');
+    final cutoff = DateTime.now().subtract(const Duration(hours: 12));
+    final saleTx = transactions.where(
+      (t) =>
+          t.type.toLowerCase() == 'sale' &&
+          t.createdAt.toLocal().isAfter(cutoff),
+    );
     final soldQtyByProduct = <String, int>{};
     for (final tx in saleTx) {
       soldQtyByProduct[tx.productId] =
@@ -2111,6 +2089,11 @@ class SupplierOrderScreen extends StatefulWidget {
 
 class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
   static const String _suppliersPrefsKey = 'supplier_order_suppliers_v1';
+  static const Set<String> _starterSupplierNames = {
+    'metro wholesale',
+    'fresh stock traders',
+    'daily goods supplier',
+  };
 
   final _supplierFormKey = GlobalKey<FormState>();
   final _supplierNameController = TextEditingController();
@@ -2127,12 +2110,10 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
 
   late final List<Product> _orderProducts;
 
-  static const _defaultSuppliers = <_SupplierInfo>[];
-
   @override
   void initState() {
     super.initState();
-    _suppliers = List<_SupplierInfo>.from(_defaultSuppliers);
+    _suppliers = <_SupplierInfo>[];
     _loadSuppliers();
     final products = widget.products ?? [widget.product];
     final byId = <String, Product>{};
@@ -2306,6 +2287,28 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
     _saveSuppliers();
   }
 
+  void _deleteSupplier(int index) {
+    setState(() {
+      _suppliers.removeAt(index);
+      if (_editingSupplierIndex == index) {
+        _editingSupplierIndex = null;
+        _supplierNameController.clear();
+        _supplierContactController.clear();
+        _supplierEmailController.clear();
+        _supplierAddressController.clear();
+        _supplierLeadTimeController.clear();
+        _supplierTermsController.clear();
+      } else if (_editingSupplierIndex != null &&
+          _editingSupplierIndex! > index) {
+        _editingSupplierIndex = _editingSupplierIndex! - 1;
+      }
+      _selectedSupplier = _suppliers.isEmpty
+          ? 0
+          : _selectedSupplier.clamp(0, _suppliers.length - 1);
+    });
+    _saveSuppliers();
+  }
+
   Future<void> _loadSuppliers() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_suppliersPrefsKey);
@@ -2317,6 +2320,9 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
       final loaded = parsed
           .whereType<Map>()
           .map((e) => _SupplierInfo.fromMap(Map<String, dynamic>.from(e)))
+          .where((supplier) => !_starterSupplierNames.contains(
+                supplier.name.trim().toLowerCase(),
+              ))
           .toList();
       if (loaded.isEmpty) return;
 
@@ -2325,8 +2331,11 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
         _suppliers = loaded;
         _selectedSupplier = _selectedSupplier.clamp(0, _suppliers.length - 1);
       });
+      if (loaded.length != parsed.length) {
+        await _saveSuppliers();
+      }
     } catch (_) {
-      // Ignore malformed cached data and keep defaults.
+      // Ignore malformed cached data and keep the supplier list empty.
     }
   }
 
@@ -2624,6 +2633,7 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
                               onTap: () =>
                                   setState(() => _selectedSupplier = i),
                               onEdit: () => _startEditSupplier(i),
+                              onDelete: () => _deleteSupplier(i),
                             ),
                         ],
                       ),
@@ -2840,26 +2850,61 @@ class _SupplierOrderItemsList extends StatelessWidget {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-          child: Row(
-            children: [
-              Text(
-                '${selectedProductIds.length}/${products.length} selected',
-                style: const TextStyle(
-                  color: NovaColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+          child: LayoutBuilder(builder: (context, constraints) {
+            final count = Text(
+              '${selectedProductIds.length}/${products.length} selected',
+              style: const TextStyle(
+                color: NovaColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
-              const Spacer(),
-              _SupplierBulkButton(
-                  label: 'Low stock', onPressed: onSelectLowStock),
-              const SizedBox(width: 8),
-              _SupplierBulkButton(label: 'All', onPressed: onSelectAll),
-              const SizedBox(width: 8),
-              _SupplierBulkButton(label: 'Clear', onPressed: onClear),
-            ],
-          ),
+            );
+            final actions = Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.end,
+              children: [
+                _SupplierBulkButton(
+                  icon: Icons.warning_amber_rounded,
+                  label: 'Low stock',
+                  color: NovaColors.amber,
+                  onPressed: onSelectLowStock,
+                ),
+                _SupplierBulkButton(
+                  icon: Icons.done_all_rounded,
+                  label: 'All',
+                  color: NovaColors.teal,
+                  onPressed: onSelectAll,
+                ),
+                _SupplierBulkButton(
+                  icon: Icons.clear_rounded,
+                  label: 'Clear',
+                  color: const Color(0xFFE53935),
+                  onPressed: onClear,
+                ),
+              ],
+            );
+
+            if (constraints.maxWidth < 420) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  count,
+                  const SizedBox(height: 8),
+                  actions,
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                count,
+                const SizedBox(width: 12),
+                Expanded(child: actions),
+              ],
+            );
+          }),
         ),
         for (var i = 0; i < products.length; i++) ...[
           _SupplierOrderItemRow(
@@ -2964,29 +3009,35 @@ class _SupplierOrderItemRow extends StatelessWidget {
 
 class _SupplierBulkButton extends StatelessWidget {
   const _SupplierBulkButton({
+    required this.icon,
     required this.label,
+    required this.color,
     required this.onPressed,
   });
 
+  final IconData icon;
   final String label;
+  final Color color;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
+    return OutlinedButton.icon(
       onPressed: onPressed,
+      icon: Icon(icon, size: 15),
+      label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
       style: OutlinedButton.styleFrom(
-        foregroundColor: NovaColors.textSecondary,
-        side: const BorderSide(color: NovaColors.borderSecondary),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        minimumSize: Size.zero,
+        foregroundColor: color,
+        backgroundColor: color.withOpacity(0.08),
+        side: BorderSide(color: color.withOpacity(0.32)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        minimumSize: const Size(74, 34),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ).copyWith(
         mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
       ),
-      child: Text(label),
     );
   }
 }
@@ -2997,12 +3048,14 @@ class _SupplierOption extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final _SupplierInfo supplier;
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -3074,6 +3127,16 @@ class _SupplierOption extends StatelessWidget {
               icon: const Icon(
                 Icons.edit_outlined,
                 color: NovaColors.textSecondary,
+                size: 18,
+              ),
+            ),
+            IconButton(
+              tooltip: 'Delete supplier',
+              mouseCursor: SystemMouseCursors.click,
+              onPressed: onDelete,
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+                color: Color(0xFFB54724),
                 size: 18,
               ),
             ),

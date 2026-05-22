@@ -677,50 +677,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         drawer: AppNavigationShell.isDesktop(context)
             ? null
             : AppNavigationDrawer(auth: auth, currentRoute: '/checkout'),
-        appBar: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: Container(
-            color: NovaColors.violetDeep,
-            child: SafeArea(
-              child: AppBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                iconTheme: const IconThemeData(color: Colors.white),
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                      color: Colors.white, size: 18),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                title: const Row(
-                  children: [
-                    Icon(Icons.shopping_bag_outlined,
-                        color: Colors.white70, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'Checkout',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(0.5),
-                  child: Container(height: 0.5, color: Colors.white24),
-                ),
-                actions: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: AppDrawerAvatarButton(
-                      photoUrl: photoUrl,
-                      userName: userName,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        appBar: AppNavigationAppBar(
+          title: 'Checkout',
+          icon: Icons.shopping_bag_outlined,
+          photoUrl: photoUrl,
+          userName: userName,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: Colors.white, size: 18),
+            onPressed: () => Navigator.pop(context),
           ),
         ),
         body: Consumer<CartProvider>(

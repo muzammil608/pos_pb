@@ -293,14 +293,12 @@ class _OrdersReportScreenState extends State<OrdersReportScreen> {
         order['id'].toString().substring(0, 6);
     final total = (order['total'] as num?)?.toDouble() ?? 0.0;
     final status = order['status']?.toString() ?? 'unknown';
-    final orderType = order['orderType']?.toString() ?? 'dine_in';
     final createdAt = order['createdAtDate'] as DateTime;
 
     return _OrderCard(
       orderNumber: orderNumber,
       total: total,
       status: status,
-      orderType: orderType,
       createdAt: createdAt,
       formattedDate: _formatOrderDate(createdAt),
       statusColor: _statusColor(status),
@@ -373,8 +371,9 @@ class _OrdersSummaryHeaderDelegate extends SliverPersistentHeaderDelegate {
   Widget build(
       BuildContext context, double shrinkOffset, bool overlapsContent) {
     final collapseRange = maxExtent - minExtent;
-    final t =
-        collapseRange <= 0 ? 1.0 : (shrinkOffset / collapseRange).clamp(0.0, 1.0);
+    final t = collapseRange <= 0
+        ? 1.0
+        : (shrinkOffset / collapseRange).clamp(0.0, 1.0);
     final horizontalPadding = lerpDouble(22, 18, t)!;
     final verticalPadding = lerpDouble(22, 14, t)!;
     final titleSize = lerpDouble(13, 12, t)!;
@@ -389,7 +388,8 @@ class _OrdersSummaryHeaderDelegate extends SliverPersistentHeaderDelegate {
 
     return Container(
       color: NovaColors.bgTertiary,
-      padding: const EdgeInsets.only(top: _OrdersReportScreenState._summaryCardTopSpacing),
+      padding: const EdgeInsets.only(
+          top: _OrdersReportScreenState._summaryCardTopSpacing),
       child: Container(
         decoration: BoxDecoration(
           gradient: CafeColors.headerGradient,
@@ -517,7 +517,8 @@ class _OrdersPeriodHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _OrdersPeriodHeaderDelegate oldDelegate) {
-    return extentHeight != oldDelegate.extentHeight || child != oldDelegate.child;
+    return extentHeight != oldDelegate.extentHeight ||
+        child != oldDelegate.child;
   }
 }
 
@@ -560,7 +561,6 @@ class _OrderCard extends StatelessWidget {
   final String orderNumber;
   final double total;
   final String status;
-  final String orderType;
   final DateTime createdAt;
   final String formattedDate;
   final Color statusColor;
@@ -571,7 +571,6 @@ class _OrderCard extends StatelessWidget {
     required this.orderNumber,
     required this.total,
     required this.status,
-    required this.orderType,
     required this.createdAt,
     required this.formattedDate,
     required this.statusColor,
@@ -664,23 +663,6 @@ class _OrderCard extends StatelessWidget {
                   const SizedBox(height: 7),
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: CafeColors.creme,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          orderType.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: CafeColors.flame,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 3),
