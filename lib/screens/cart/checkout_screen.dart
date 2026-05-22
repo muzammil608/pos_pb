@@ -253,6 +253,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _isSubmitting = false;
   int _focusedCartIndex = 0;
 
+  // Guards to prevent re-entrant dialog/sheet calls
+  bool _actionsDialogOpen = false;
+  bool _productSheetOpen = false;
+  bool _editDialogOpen = false;
+
   final FocusNode _cashFocus = FocusNode();
   final FocusNode _checkoutShortcutFocus =
       FocusNode(debugLabel: 'CheckoutShortcuts');
@@ -311,7 +316,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _focusCartShortcuts() {
     _cashFocus.unfocus();
-    _checkoutShortcutFocus.requestFocus();
+    if (mounted) _checkoutShortcutFocus.requestFocus();
   }
 
   void _selectCartItem(int index) {
@@ -332,6 +337,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _editFocusedCartItem(
       BuildContext context, CartProvider cart) async {
     if (cart.items.isEmpty) return;
+    if (_actionsDialogOpen) return; // prevent re-entry
     _focusCartShortcuts();
     await _showCartItemActions(context, cart, cart.items[_safeCartIndex(cart)]);
   }
@@ -346,19 +352,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (cartDocId.isEmpty || index < 0) return;
 
     await cart.removeItem(cartDocId);
-    setState(() {
-      if (cart.items.isEmpty) {
-        _focusedCartIndex = 0;
-      } else {
-        _focusedCartIndex = index.clamp(0, cart.items.length - 1);
-      }
-    });
-    _focusCartShortcuts();
+    if (mounted) {
+      setState(() {
+        if (cart.items.isEmpty) {
+          _focusedCartIndex = 0;
+        } else {
+          _focusedCartIndex = index.clamp(0, cart.items.length - 1);
+        }
+      });
+    }
   }
 
   Future<void> _deleteFocusedCartItem(CartProvider cart) async {
     if (cart.items.isEmpty) return;
     await _deleteCartItem(cart, cart.items[_safeCartIndex(cart)]);
+    if (mounted) _focusCartShortcuts();
   }
 
   Future<void> _editCartItemQuantity(
@@ -366,46 +374,55 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     CartProvider cart,
     Map<String, dynamic> item,
   ) async {
-    _focusCartShortcuts();
     await _showEditItemDialog(context, cart, item);
   }
 
   Future<void> _openProductBottomSheet(BuildContext context) async {
-    _focusCartShortcuts();
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        final size = MediaQuery.of(sheetContext).size;
-        final isWide = size.width >= 900;
-        final panelWidth = isWide ? size.width / 3 : size.width;
-        final panelHeight = size.height * 0.82;
+    if (_productSheetOpen) return;
+    _productSheetOpen = true;
+    try {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          final size = MediaQuery.of(sheetContext).size;
+          final isWide = size.width >= 900;
+          final panelWidth = isWide ? size.width / 3 : size.width;
+          final panelHeight = size.height * 0.82;
 
-        return Align(
-          alignment: Alignment.bottomRight,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: isWide ? 360 : 0,
-              maxWidth: isWide
-                  ? panelWidth.clamp(360.0, 560.0).toDouble()
-                  : panelWidth,
-              maxHeight: panelHeight,
+          return Align(
+            alignment: Alignment.bottomRight,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: isWide ? 360 : 0,
+                maxWidth: isWide
+                    ? panelWidth.clamp(360.0, 560.0).toDouble()
+                    : panelWidth,
+                maxHeight: panelHeight,
+              ),
+              child: const ProductListBottomSheet(),
             ),
-            child: const ProductListBottomSheet(),
-          ),
-        );
-      },
-    );
-    if (mounted) _focusCartShortcuts();
+          );
+        },
+      );
+    } finally {
+      _productSheetOpen = false;
+      if (mounted) _focusCartShortcuts();
+    }
   }
 
+  /// Shows the cart item actions dialog (Add More / Edit Qty / Remove).
+  /// Returns the chosen action value, or null if dismissed.
   Future<void> _showCartItemActions(
     BuildContext context,
     CartProvider cart,
     Map<String, dynamic> item,
   ) async {
+    if (_actionsDialogOpen) return;
+    _actionsDialogOpen = true;
+
     final cartDocId = item['cartDocId'] as String? ?? '';
     final menuKey = _cartItemMenuKeys[cartDocId];
     final actions = [
@@ -430,30 +447,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ),
     ];
 
-    _focusCartShortcuts();
-    final value = await showGeneralDialog<String>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Cart actions',
-      barrierColor: Colors.black12,
-      transitionDuration: const Duration(milliseconds: 120),
-      pageBuilder: (dialogContext, _, __) => _CartItemActionsDialog(
-        itemName: item['name']?.toString() ?? 'Item',
-        actions: actions,
-        anchorKey: menuKey,
-      ),
-    );
+    String? value;
+    try {
+      value = await showGeneralDialog<String>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: 'Cart actions',
+        barrierColor: Colors.black12,
+        transitionDuration: const Duration(milliseconds: 120),
+        pageBuilder: (dialogContext, _, __) => _CartItemActionsDialog(
+          itemName: item['name']?.toString() ?? 'Item',
+          actions: actions,
+          anchorKey: menuKey,
+        ),
+      );
+    } finally {
+      _actionsDialogOpen = false;
+    }
 
+    // Dialog is fully closed at this point — now handle the result.
     if (!mounted || !context.mounted || value == null) {
       _focusCartShortcuts();
       return;
     }
+
     if (value == 'add') {
       await _openProductBottomSheet(context);
     } else if (value == 'edit') {
-      await _editCartItemQuantity(context, cart, item);
+      if (_editDialogOpen) return;
+      _editDialogOpen = true;
+      try {
+        await _editCartItemQuantity(context, cart, item);
+      } finally {
+        _editDialogOpen = false;
+        if (mounted) _focusCartShortcuts();
+      }
     } else if (value == 'delete') {
       await _deleteCartItem(cart, item);
+      if (mounted) _focusCartShortcuts();
     }
   }
 
@@ -476,16 +507,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _placeOrder(BuildContext context, CartProvider cart) async {
-    if (cart.items.isEmpty) {
-      return;
-    }
+    if (cart.items.isEmpty) return;
     if (_paymentMethod == 'cash' &&
         _cashIsInsufficient(_tenderedAmount, cart.total)) {
       return;
     }
-    if (_isSubmitting) {
-      return;
-    }
+    if (_isSubmitting) return;
 
     final changeAmount =
         _paymentMethod == 'cash' ? _tenderedAmount - cart.total : 0.0;
@@ -532,16 +559,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         tenderedAmount: _paymentMethod == 'cash' ? _tenderedAmount : 0.0,
         change: changeAmount,
       );
-      if (!context.mounted) {
-        return;
-      }
+      if (!context.mounted) return;
 
       cart.clear();
       Navigator.pushNamedAndRemoveUntil(context, '/pos', (route) => false);
     } catch (e) {
-      if (!context.mounted) {
-        return;
-      }
+      if (!context.mounted) return;
 
       final errorMsg = e.toString().toLowerCase().contains('network') ||
               e.toString().toLowerCase().contains('internet') ||
@@ -1383,7 +1406,7 @@ class _CartItemActionsDialogState extends State<_CartItemActionsDialog> {
   void initState() {
     super.initState();
     _focusNode = FocusNode(debugLabel: 'CartItemActionsDialog');
-    _selectedIndex = widget.actions.indexWhere((action) => action.enabled);
+    _selectedIndex = widget.actions.indexWhere((a) => a.enabled);
     if (_selectedIndex < 0) _selectedIndex = 0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
@@ -1398,7 +1421,6 @@ class _CartItemActionsDialogState extends State<_CartItemActionsDialog> {
 
   void _moveSelection(int delta) {
     if (widget.actions.isEmpty) return;
-
     var next = _selectedIndex;
     for (var i = 0; i < widget.actions.length; i++) {
       next = (next + delta) % widget.actions.length;
@@ -1414,28 +1436,30 @@ class _CartItemActionsDialogState extends State<_CartItemActionsDialog> {
     if (widget.actions.isEmpty) return;
     final action = widget.actions[_selectedIndex];
     if (!action.enabled) return;
-    Navigator.of(context).pop(action.value);
+    Navigator.of(context, rootNavigator: false).pop(action.value);
   }
 
   KeyEventResult _handleKey(FocusNode _, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
-    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      _moveSelection(-1);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      _moveSelection(1);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
-      _submitSelection();
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.escape) {
-      Navigator.of(context).pop();
-      return KeyEventResult.handled;
+    switch (event.logicalKey) {
+      case LogicalKeyboardKey.arrowUp:
+        _moveSelection(-1);
+        return KeyEventResult.handled;
+
+      case LogicalKeyboardKey.arrowDown:
+        _moveSelection(1);
+        return KeyEventResult.handled;
+
+      case LogicalKeyboardKey.enter:
+      case LogicalKeyboardKey.numpadEnter:
+        _submitSelection();
+        return KeyEventResult.handled;
+
+      case LogicalKeyboardKey.escape:
+        // Pop with null — no action chosen.
+        Navigator.of(context, rootNavigator: false).pop();
+        return KeyEventResult.handled;
     }
 
     return KeyEventResult.ignored;
@@ -1468,12 +1492,10 @@ class _CartItemActionsDialogState extends State<_CartItemActionsDialog> {
         horizontalMargin,
         media.size.width - menuWidth - horizontalMargin,
       );
-
       top = (anchorBottomRight.dy + 6).clamp(
         verticalMargin,
         media.size.height - 240,
       );
-
       if (top > media.size.height - 220) {
         top = (anchorTopLeft.dy - 196).clamp(
           verticalMargin,
@@ -1489,7 +1511,7 @@ class _CartItemActionsDialogState extends State<_CartItemActionsDialog> {
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.of(context).pop(),
+              onTap: () => Navigator.of(context, rootNavigator: false).pop(),
             ),
           ),
           Positioned(
@@ -1498,6 +1520,7 @@ class _CartItemActionsDialogState extends State<_CartItemActionsDialog> {
             width: menuWidth,
             child: Focus(
               focusNode: _focusNode,
+              autofocus: true,
               onKeyEvent: _handleKey,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: menuWidth),
@@ -1543,9 +1566,9 @@ class _CartItemActionsDialogState extends State<_CartItemActionsDialog> {
                           action: widget.actions[i],
                           selected: i == _selectedIndex,
                           onTap: widget.actions[i].enabled
-                              ? () => Navigator.of(context).pop(
-                                    widget.actions[i].value,
-                                  )
+                              ? () =>
+                                  Navigator.of(context, rootNavigator: false)
+                                      .pop(widget.actions[i].value)
                               : null,
                         ),
                     ],
