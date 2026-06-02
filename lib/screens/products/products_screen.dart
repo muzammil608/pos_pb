@@ -12,7 +12,14 @@ import '../../widgets/app_navigation.dart';
 import '../../widgets/responsive_layout.dart';
 
 class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({super.key});
+  const ProductsScreen({
+    super.key,
+    this.inventoryMode = false,
+    this.openAddOnStart = false,
+  });
+
+  final bool inventoryMode;
+  final bool openAddOnStart;
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
@@ -22,6 +29,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedCategory = 'All';
+  bool _openedInitialAddForm = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!widget.openAddOnStart || _openedInitialAddForm) return;
+    _openedInitialAddForm = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showProductForm(context);
+    });
+  }
 
   @override
   void dispose() {
@@ -121,17 +139,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Center(
-                            child: Container(
-                              width: 40,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
                           Row(
                             children: [
                               Container(
@@ -150,17 +157,28 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              Text(
-                                isEdit ? 'Edit Product' : 'Add Product',
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
+                              Expanded(
+                                child: Text(
+                                  isEdit ? 'Edit Product' : 'Add Product',
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: CafeColors.charcoal,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Close',
+                                mouseCursor: SystemMouseCursors.click,
+                                onPressed: () => Navigator.pop(sheetContext),
+                                icon: const Icon(
+                                  Icons.close_rounded,
                                   color: CafeColors.charcoal,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 18),
                           _StyledField(
                             controller: nameController,
                             label: 'Product Name',
@@ -612,21 +630,25 @@ class _ProductsScreenState extends State<ProductsScreen> {
           backgroundColor: NovaColors.bgTertiary,
           drawer: AppNavigationShell.isDesktop(context)
               ? null
-              : AppNavigationDrawer(auth: auth, currentRoute: '/products'),
+              : AppNavigationDrawer(
+                  auth: auth,
+                  currentRoute: widget.inventoryMode ? '/inventory' : '',
+                ),
           appBar: AppNavigationAppBar(
-            title: 'Products',
+            title: widget.inventoryMode ? 'Inventory Products' : 'Products',
             icon: Icons.inventory_2_rounded,
             photoUrl: photoUrl,
             userName: userName,
           ),
           body: AppNavigationShell(
             auth: auth,
-            currentRoute: '/products',
-            child: ResponsiveCenter(
+            currentRoute: widget.inventoryMode ? '/inventory' : '',
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               child: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(top: 16),
+                    padding: const EdgeInsets.only(top: 0),
                     child: Row(
                       children: [
                         Expanded(

@@ -344,6 +344,7 @@ class PosKeyboardScope extends StatefulWidget {
   final VoidCallback? onArrowLeft;
   final VoidCallback? onArrowRight;
   final VoidCallback? onRefresh;
+  final VoidCallback? onEscape;
 
   final ValueChanged<String>? onSelectPaymentMethod;
 
@@ -366,6 +367,7 @@ class PosKeyboardScope extends StatefulWidget {
     this.onArrowLeft,
     this.onArrowRight,
     this.onRefresh,
+    this.onEscape,
     this.onSelectPaymentMethod,
   });
 
@@ -374,6 +376,9 @@ class PosKeyboardScope extends StatefulWidget {
 }
 
 class _PosKeyboardScopeState extends State<PosKeyboardScope> {
+  LogicalKeyboardKey? _lastHardwareShortcutKey;
+  int _lastHardwareShortcutMicros = 0;
+
   @override
   void initState() {
     super.initState();
@@ -384,6 +389,22 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     super.dispose();
+  }
+
+  void _markHardwareShortcut(LogicalKeyboardKey key) {
+    _lastHardwareShortcutKey = key;
+    _lastHardwareShortcutMicros = DateTime.now().microsecondsSinceEpoch;
+  }
+
+  bool _consumeHardwareShortcut(LogicalKeyboardKey key) {
+    final now = DateTime.now().microsecondsSinceEpoch;
+    if (_lastHardwareShortcutKey != key ||
+        now - _lastHardwareShortcutMicros > 100000) {
+      return false;
+    }
+    _lastHardwareShortcutKey = null;
+    _lastHardwareShortcutMicros = 0;
+    return true;
   }
 
   bool _handleHardwareKey(KeyEvent event) {
@@ -404,12 +425,34 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
     }
 
     if (event.logicalKey == LogicalKeyboardKey.escape) {
-      searchBar?.clear();
+      if (widget.onEscape != null) {
+        widget.onEscape!.call();
+      } else {
+        searchBar?.clear();
+      }
       return true;
     }
 
     if (event.logicalKey == LogicalKeyboardKey.f5) {
       widget.onRefresh?.call();
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.enter &&
+        HardwareKeyboard.instance.isControlPressed) {
+      widget.onCheckout?.call();
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _markHardwareShortcut(event.logicalKey);
+      widget.onArrowUp?.call();
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _markHardwareShortcut(event.logicalKey);
+      widget.onArrowDown?.call();
       return true;
     }
 
@@ -430,7 +473,11 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
           ),
           ClearSearchIntent: CallbackAction<ClearSearchIntent>(
             onInvoke: (_) {
-              widget.searchBarKey?.currentState?.clear();
+              if (widget.onEscape != null) {
+                widget.onEscape!.call();
+              } else {
+                widget.searchBarKey?.currentState?.clear();
+              }
               return null;
             },
           ),
@@ -508,12 +555,18 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
           ),
           ArrowUpIntent: CallbackAction<ArrowUpIntent>(
             onInvoke: (_) {
+              if (_consumeHardwareShortcut(LogicalKeyboardKey.arrowUp)) {
+                return null;
+              }
               widget.onArrowUp?.call();
               return null;
             },
           ),
           ArrowDownIntent: CallbackAction<ArrowDownIntent>(
             onInvoke: (_) {
+              if (_consumeHardwareShortcut(LogicalKeyboardKey.arrowDown)) {
+                return null;
+              }
               widget.onArrowDown?.call();
               return null;
             },
@@ -568,6 +621,7 @@ class CheckoutKeyboardScope extends StatefulWidget {
   final VoidCallback? onArrowDown;
 
   final ValueChanged<String>? onSelectPaymentMethod;
+  final bool autofocusCash;
 
   const CheckoutKeyboardScope({
     super.key,
@@ -583,6 +637,7 @@ class CheckoutKeyboardScope extends StatefulWidget {
     this.onArrowUp,
     this.onArrowDown,
     this.onSelectPaymentMethod,
+    this.autofocusCash = true,
   });
 
   @override
@@ -597,7 +652,9 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
     super.initState();
     HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) widget.cashFocusNode?.requestFocus();
+      if (mounted && widget.autofocusCash) {
+        widget.cashFocusNode?.requestFocus();
+      }
     });
   }
 
@@ -623,8 +680,6 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
       return true;
     }
 
-    if (isTextEditing) return false;
-
     if (logicalKey == LogicalKeyboardKey.arrowUp) {
       widget.onArrowUp?.call();
       return true;
@@ -633,6 +688,9 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
       widget.onArrowDown?.call();
       return true;
     }
+
+    if (isTextEditing) return false;
+
     if (logicalKey == LogicalKeyboardKey.keyE) {
       widget.onEditFocusedItem?.call();
       return true;
@@ -740,7 +798,7 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
         },
         child: Focus(
           focusNode: widget.shortcutFocusNode,
-          autofocus: true,
+          autofocus: false,
           child: widget.child,
         ),
       ),

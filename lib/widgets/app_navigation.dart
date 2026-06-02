@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/cafe_colors.dart';
@@ -111,10 +112,12 @@ class AppNavigationDrawer extends StatelessWidget {
     super.key,
     required this.auth,
     required this.currentRoute,
+    this.compact = false,
   });
 
   final AuthProvider auth;
   final String currentRoute;
+  final bool compact;
 
   Color _roleBgColor(String role) {
     switch (role.toLowerCase()) {
@@ -140,244 +143,273 @@ class AppNavigationDrawer extends StatelessWidget {
         (userEmail.contains('@') ? userEmail.split('@').first : userEmail);
     final photoUrl = user?.photoURL;
 
+    final navItems = [
+      if (auth.isAdmin || auth.isCashier)
+        _DrawerItem(
+          icon: Icons.storefront_rounded,
+          title: 'Order Station',
+          route: '/pos',
+          currentRoute: currentRoute,
+          compact: compact,
+        ),
+      if (auth.isAdmin)
+        _DrawerItem(
+          icon: Icons.analytics_rounded,
+          title: 'Admin Dashboard',
+          route: '/admin',
+          currentRoute: currentRoute,
+          compact: compact,
+        ),
+      if (auth.isAdmin)
+        _DrawerItem(
+          icon: Icons.inventory_rounded,
+          title: 'Inventory',
+          route: '/inventory',
+          currentRoute: currentRoute,
+          compact: compact,
+        ),
+      if (auth.isAdmin)
+        _DrawerItem(
+          icon: Icons.people_rounded,
+          title: 'Employee Manager',
+          route: '/employees',
+          currentRoute: currentRoute,
+          compact: compact,
+        ),
+    ];
+
     return Drawer(
+      width: compact ? 76 : 300,
       backgroundColor: CafeColors.steam,
       child: Column(
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 52, 20, 24),
+            padding: EdgeInsets.fromLTRB(
+              compact ? 10 : 20,
+              52,
+              compact ? 10 : 20,
+              compact ? 16 : 24,
+            ),
             decoration: const BoxDecoration(
               gradient: CafeColors.headerGradient,
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/orion.png',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(
-                            Icons.storefront_rounded,
-                            color: CafeColors.flame,
-                            size: 30,
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Orion POS',
-                      style: TextStyle(
+            child: compact
+                ? Center(
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
                         color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
+                        shape: BoxShape.circle,
                       ),
-                    ),
-                    Text(
-                      'POS',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-              children: [
-                if (auth.isAdmin || auth.isCashier)
-                  _DrawerItem(
-                    icon: Icons.storefront_rounded,
-                    title: 'Order Station',
-                    route: '/pos',
-                    currentRoute: currentRoute,
-                  ),
-                if (auth.isAdmin)
-                  _DrawerItem(
-                    icon: Icons.analytics_rounded,
-                    title: 'Admin Dashboard',
-                    route: '/admin',
-                    currentRoute: currentRoute,
-                  ),
-                if (auth.isAdmin)
-                  _DrawerItem(
-                    icon: Icons.receipt_long_rounded,
-                    title: 'Orders Report',
-                    route: '/orders',
-                    currentRoute: currentRoute,
-                  ),
-                if (auth.isAdmin)
-                  _DrawerItem(
-                    icon: Icons.inventory_rounded,
-                    title: 'Inventory',
-                    route: '/inventory',
-                    currentRoute: currentRoute,
-                  ),
-                if (auth.isAdmin)
-                  _DrawerItem(
-                    icon: Icons.inventory_2_rounded,
-                    title: 'Products',
-                    route: '/products',
-                    currentRoute: currentRoute,
-                  ),
-                if (auth.isAdmin)
-                  _DrawerItem(
-                    icon: Icons.people_rounded,
-                    title: 'Employee Manager',
-                    route: '/employees',
-                    currentRoute: currentRoute,
-                  ),
-              ],
-            ),
-          ),
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-            padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: CafeColors.flame.withOpacity(0.08),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    AppUserAvatar(
-                      photoUrl: photoUrl,
-                      userName: userName,
-                      radius: 24,
-                      fontSize: 18,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            userName,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: CafeColors.charcoal,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/images/orion.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.storefront_rounded,
+                                color: CafeColors.flame,
+                                size: 24,
+                              );
+                            },
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            userEmail,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: CafeColors.charcoal.withOpacity(0.45),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _roleBgColor(auth.role),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        auth.role.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: _roleTextColor(auth.role),
                         ),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFF3B3B), Color(0xFFFF6B6B)],
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.red.withOpacity(0.25),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
+                  )
+                : Row(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: ClipOval(
+                            child: Image.asset(
+                              'assets/images/orion.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(
+                                  Icons.storefront_rounded,
+                                  color: CafeColors.flame,
+                                  size: 30,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Orion POS',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          Text(
+                            'POS',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      await Provider.of<AuthProvider>(context, listen: false)
-                          .logout();
-                      if (context.mounted) {
-                        Navigator.of(context).pushNamedAndRemoveUntil(
-                          '/login',
-                          (route) => false,
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      minimumSize: const Size(double.infinity, 46),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
+          ),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.symmetric(
+                vertical: 10,
+                horizontal: compact ? 8 : 12,
+              ),
+              children: navItems,
+            ),
+          ),
+          if (!compact)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: CafeColors.flame.withOpacity(0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      AppUserAvatar(
+                        photoUrl: photoUrl,
+                        userName: userName,
+                        radius: 24,
+                        fontSize: 18,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              userName,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: CafeColors.charcoal,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              userEmail,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: CafeColors.charcoal.withOpacity(0.45),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _roleBgColor(auth.role),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          auth.role.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: _roleTextColor(auth.role),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF3B3B), Color(0xFFFF6B6B)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
-                    icon: const Icon(Icons.logout_rounded,
-                        color: Colors.white, size: 18),
-                    label: const Text(
-                      'Logout',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        await Provider.of<AuthProvider>(context, listen: false)
+                            .logout();
+                        if (context.mounted) {
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            '/login',
+                            (route) => false,
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        minimumSize: const Size(double.infinity, 46),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.logout_rounded,
+                          color: Colors.white, size: 18),
+                      label: const Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -493,7 +525,7 @@ class AppNavigationAppBar extends StatelessWidget
   }
 }
 
-class AppNavigationShell extends StatelessWidget {
+class AppNavigationShell extends StatefulWidget {
   const AppNavigationShell({
     super.key,
     required this.auth,
@@ -510,19 +542,63 @@ class AppNavigationShell extends StatelessWidget {
   }
 
   @override
+  State<AppNavigationShell> createState() => _AppNavigationShellState();
+}
+
+class _AppNavigationShellState extends State<AppNavigationShell> {
+  bool _hovered = false;
+  bool _navigatingToPos = false;
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_handleKeyboard);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyboard);
+    super.dispose();
+  }
+
+  bool _handleKeyboard(KeyEvent event) {
+    if (!mounted || event is! KeyDownEvent) return false;
+    if (ModalRoute.of(context)?.isCurrent != true) return false;
+    if (event.logicalKey != LogicalKeyboardKey.f9) return false;
+
+    _goToOrderStation();
+    return true;
+  }
+
+  Future<void> _goToOrderStation() async {
+    if (_navigatingToPos || widget.currentRoute == '/pos') return;
+    _navigatingToPos = true;
+
+    final navigator = Navigator.of(context);
+    await navigator.pushNamedAndRemoveUntil('/pos', (route) => false);
+
+    _navigatingToPos = false;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (!isDesktop(context)) return child;
+    if (!AppNavigationShell.isDesktop(context)) return widget.child;
 
     return Row(
       children: [
-        SizedBox(
-          width: 300,
-          child: AppNavigationDrawer(
-            auth: auth,
-            currentRoute: currentRoute,
+        MouseRegion(
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: SizedBox(
+            width: _hovered ? 300 : 76,
+            child: AppNavigationDrawer(
+              auth: widget.auth,
+              currentRoute: widget.currentRoute,
+              compact: !_hovered,
+            ),
           ),
         ),
-        Expanded(child: child),
+        Expanded(child: widget.child),
       ],
     );
   }
@@ -534,12 +610,14 @@ class _DrawerItem extends StatefulWidget {
     required this.title,
     required this.route,
     required this.currentRoute,
+    this.compact = false,
   });
 
   final IconData icon;
   final String title;
   final String route;
   final String currentRoute;
+  final bool compact;
 
   @override
   State<_DrawerItem> createState() => _DrawerItemState();
@@ -575,7 +653,111 @@ class _DrawerItemState extends State<_DrawerItem> {
   Widget build(BuildContext context) {
     final selected = widget.route == widget.currentRoute;
 
-    return Container(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = widget.compact || constraints.maxWidth < 150;
+
+        if (compact) {
+          return Tooltip(
+            message: widget.title,
+            child: _NavIconTile(
+              icon: widget.icon,
+              selected: selected,
+              isNavigating: _isNavigating,
+              onTap: () => _handleTap(context),
+            ),
+          );
+        }
+
+        return _NavExpandedTile(
+          icon: widget.icon,
+          title: widget.title,
+          selected: selected,
+          isNavigating: _isNavigating,
+          onTap: () => _handleTap(context),
+        );
+      },
+    );
+  }
+}
+
+class _NavIconTile extends StatelessWidget {
+  const _NavIconTile({
+    required this.icon,
+    required this.selected,
+    required this.isNavigating,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool selected;
+  final bool isNavigating;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final compactTile = Container(
+      width: double.infinity,
+      height: 52,
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        gradient: selected ? CafeColors.headerGradient : null,
+        color: selected ? null : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: selected
+            ? [
+                BoxShadow(
+                  color: CafeColors.flame.withOpacity(0.25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                )
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          mouseCursor: isNavigating
+              ? SystemMouseCursors.basic
+              : SystemMouseCursors.click,
+          onTap: isNavigating ? null : onTap,
+          child: Center(
+            child: Icon(
+              icon,
+              color: selected
+                  ? Colors.white
+                  : CafeColors.charcoal.withOpacity(0.55),
+              size: 22,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return compactTile;
+  }
+}
+
+class _NavExpandedTile extends StatelessWidget {
+  const _NavExpandedTile({
+    required this.icon,
+    required this.title,
+    required this.selected,
+    required this.isNavigating,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final bool selected;
+  final bool isNavigating;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tile = Container(
+      height: 52,
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
         gradient: selected ? CafeColors.headerGradient : null,
@@ -591,36 +773,58 @@ class _DrawerItemState extends State<_DrawerItem> {
               ]
             : null,
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        leading: Icon(
-          widget.icon,
-          color: selected ? Colors.white : CafeColors.charcoal.withOpacity(0.5),
-          size: 22,
-        ),
-        title: Text(
-          widget.title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            color:
-                selected ? Colors.white : CafeColors.charcoal.withOpacity(0.75),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          mouseCursor: isNavigating
+              ? SystemMouseCursors.basic
+              : SystemMouseCursors.click,
+          onTap: isNavigating ? null : onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: selected
+                      ? Colors.white
+                      : CafeColors.charcoal.withOpacity(0.5),
+                  size: 22,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected
+                          ? Colors.white
+                          : CafeColors.charcoal.withOpacity(0.75),
+                    ),
+                  ),
+                ),
+                if (selected) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
-        trailing: selected
-            ? Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-              )
-            : null,
-        onTap: _isNavigating ? null : () => _handleTap(context),
       ),
     );
+    return tile;
   }
 }
 

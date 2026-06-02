@@ -10,15 +10,19 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/theme/cafe_colors.dart';
+import '../../core/theme/receipt_fonts.dart';
 import '../../core/theme/nova_theme.dart';
 import '../../core/utils/app_notice.dart';
 import '../../models/inventory_transaction_model.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/utils/no_animation_route.dart';
+import '../../screens/products/products_screen.dart';
 import '../../services/pocketbase/inventory_service.dart';
+import '../../services/pocketbase/report_service.dart';
 import '../../widgets/app_navigation.dart';
-import '../../widgets/responsive_layout.dart';
+import '../../widgets/receipt_dialog.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -65,6 +69,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             photoUrl: photoUrl,
             userName: userName,
             actions: [
+              if (_service != null) _StockAlertBadge(service: _service!),
               IconButton(
                 tooltip: 'Refresh',
                 mouseCursor: SystemMouseCursors.click,
@@ -74,22 +79,474 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
             ],
           ),
-          body: Center(
-            child: Container(
-              width: double.infinity,
-              alignment: Alignment.topCenter,
-              child: AppNavigationShell(
-                auth: auth,
-                currentRoute: '/inventory',
-                child: ResponsiveCenter(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                  child: _InventoryBody(service: _service!),
+          body: AppNavigationShell(
+            auth: auth,
+            currentRoute: '/inventory',
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: _InventoryBody(service: _service!),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StockAlertBadge extends StatefulWidget {
+  const _StockAlertBadge({required this.service});
+
+  final InventoryService service;
+
+  @override
+  State<_StockAlertBadge> createState() => _StockAlertBadgeState();
+}
+
+class _StockAlertBadgeState extends State<_StockAlertBadge> {
+  final LayerLink _layerLink = LayerLink();
+  OverlayEntry? _overlayEntry;
+  Timer? _hideTimer;
+  List<Product> _latestAlerts = const <Product>[];
+  bool _overlaySyncQueued = false;
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    _removeOverlay();
+    super.dispose();
+  }
+
+  void _showOverlay() {
+    if (_latestAlerts.isEmpty) return;
+    _hideTimer?.cancel();
+    if (_overlayEntry != null) {
+      _overlayEntry!.markNeedsBuild();
+      return;
+    }
+
+    _overlayEntry = OverlayEntry(
+      builder: (overlayContext) {
+        final size = MediaQuery.sizeOf(overlayContext);
+        final menuWidth = (size.width - 24).clamp(280.0, 360.0).toDouble();
+        final outCount = _latestAlerts.where((p) => p.stockQty <= 0).length;
+        final lowCount = _latestAlerts.length - outCount;
+        final urgentColor = outCount > 0 ? NovaColors.danger : NovaColors.amber;
+
+        return Positioned.fill(
+          child: Stack(
+            children: [
+              CompositedTransformFollower(
+                link: _layerLink,
+                showWhenUnlinked: false,
+                targetAnchor: Alignment.bottomRight,
+                followerAnchor: Alignment.topRight,
+                offset: const Offset(0, 8),
+                child: UnconstrainedBox(
+                  alignment: Alignment.topRight,
+                  child: MouseRegion(
+                    onEnter: (_) => _hideTimer?.cancel(),
+                    onExit: (_) => _scheduleHideOverlay(),
+                    child: SafeArea(
+                      minimum: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: _StockAlertDropdown(
+                          width: menuWidth,
+                          alerts: _latestAlerts,
+                          outCount: outCount,
+                          lowCount: lowCount,
+                          urgentColor: urgentColor,
+                          onManage: () {
+                            _removeOverlay();
+                            if (!mounted) return;
+                            Navigator.of(context).push(
+                              NoAnimationPageRoute(
+                                builder: (_) =>
+                                    const ProductsScreen(inventoryMode: true),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _scheduleHideOverlay() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(milliseconds: 180), _removeOverlay);
+  }
+
+  void _removeOverlay() {
+    _hideTimer?.cancel();
+    _hideTimer = null;
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  void _syncOverlayAfterBuild(bool hasAlerts) {
+    if (_overlaySyncQueued) return;
+    _overlaySyncQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _overlaySyncQueued = false;
+      if (!mounted) return;
+      if (!hasAlerts) {
+        _removeOverlay();
+        return;
+      }
+      _overlayEntry?.markNeedsBuild();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Product>>(
+      stream: widget.service.streamProducts(),
+      builder: (context, snapshot) {
+        final products = snapshot.data ?? const <Product>[];
+        final alerts = products
+            .where((p) => p.stockQty <= p.lowStockThreshold)
+            .toList()
+          ..sort((a, b) => a.stockQty.compareTo(b.stockQty));
+        final totalAlerts = alerts.length;
+        final outCount = alerts.where((p) => p.stockQty <= 0).length;
+        final lowCount = totalAlerts - outCount;
+        final hasAlerts = totalAlerts > 0;
+        _latestAlerts = alerts;
+        _syncOverlayAfterBuild(hasAlerts);
+
+        return CompositedTransformTarget(
+          link: _layerLink,
+          child: MouseRegion(
+            onEnter: (_) => _showOverlay(),
+            onExit: (_) => _scheduleHideOverlay(),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 2),
+              child: IconButton(
+                tooltip: hasAlerts
+                    ? '$outCount out of stock, $lowCount low stock'
+                    : 'No stock alerts',
+                mouseCursor: hasAlerts
+                    ? SystemMouseCursors.click
+                    : SystemMouseCursors.basic,
+                onPressed: hasAlerts ? _showOverlay : null,
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      hasAlerts
+                          ? Icons.notifications_active_rounded
+                          : Icons.notifications_none_rounded,
+                      color: Colors.white70,
+                      size: 22,
+                    ),
+                    if (hasAlerts)
+                      Positioned(
+                        right: -6,
+                        top: -6,
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Color(0xFFE11D2E),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1),
+                            ),
+                            child: Center(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 1),
+                                  child: Text(
+                                    totalAlerts > 99 ? '99+' : '$totalAlerts',
+                                    maxLines: 1,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                      height: 1,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _StockAlertDropdown extends StatelessWidget {
+  const _StockAlertDropdown({
+    required this.width,
+    required this.alerts,
+    required this.outCount,
+    required this.lowCount,
+    required this.urgentColor,
+    required this.onManage,
+  });
+
+  final double width;
+  final List<Product> alerts;
+  final int outCount;
+  final int lowCount;
+  final Color urgentColor;
+  final VoidCallback onManage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      decoration: BoxDecoration(
+        color: NovaColors.bgPrimary,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: NovaColors.borderTertiary),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            child: Row(
+              children: [
+                Icon(Icons.notifications_active_rounded,
+                    color: urgentColor, size: 19),
+                const SizedBox(width: 9),
+                const Expanded(
+                  child: Text(
+                    'Stock Notifications',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: NovaColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  '$outCount out | $lowCount low',
+                  style: const TextStyle(
+                    color: NovaColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: NovaColors.borderTertiary),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 320),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final product in alerts)
+                    _StockAlertProductTile(product: product),
+                ],
+              ),
+            ),
+          ),
+          const Divider(height: 1, color: NovaColors.borderTertiary),
+          InkWell(
+            onTap: onManage,
+            mouseCursor: SystemMouseCursors.click,
+            borderRadius:
+                const BorderRadius.vertical(bottom: Radius.circular(12)),
+            child: const Padding(
+              padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+              child: Row(
+                children: [
+                  Icon(Icons.inventory_2_rounded,
+                      size: 18, color: NovaColors.violet),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Manage Products',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: NovaColors.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StockAlertProductTile extends StatelessWidget {
+  const _StockAlertProductTile({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    final out = product.stockQty <= 0;
+    final color = out ? NovaColors.danger : NovaColors.amber;
+    final backgroundColor =
+        out ? NovaColors.dangerLight : NovaColors.amberLight;
+    final statusText = out ? 'Out of stock' : 'Low stock';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: NovaColors.bgPrimary,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: NovaColors.borderTertiary),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(
+              out ? Icons.block_rounded : Icons.priority_high_rounded,
+              color: color,
+              size: 19,
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: NovaColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    _StockMiniPill(
+                      label: statusText,
+                      color: color,
+                      backgroundColor: backgroundColor,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${product.category} | Alert ${product.lowStockThreshold}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: NovaColors.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            constraints: const BoxConstraints(minWidth: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '${product.stockQty}',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: color,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StockMiniPill extends StatelessWidget {
+  const _StockMiniPill({
+    required this.label,
+    required this.color,
+    required this.backgroundColor,
+  });
+
+  final String label;
+  final Color color;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 }
@@ -167,15 +624,7 @@ class _InventoryBodyState extends State<_InventoryBody> {
         final categories = categorySet.where((e) => e.isNotEmpty).toList()
           ..sort();
 
-        final lowStock = products
-            .where((p) => p.stockQty <= p.lowStockThreshold)
-            .toList()
-          ..sort((a, b) => a.stockQty.compareTo(b.stockQty));
-
         return LayoutBuilder(builder: (context, c) {
-          final isDesktop = c.maxWidth >= 1000;
-          final isTablet = c.maxWidth >= AppBreakpoints.mobile;
-
           return ListView(
             children: [
               _HeaderRow(
@@ -197,94 +646,14 @@ class _InventoryBodyState extends State<_InventoryBody> {
                     setState(() => _profitExpanded = !_profitExpanded),
               ),
               const SizedBox(height: 12),
-              if (isDesktop)
-                Builder(builder: (context) {
-                  final cards = _buildMetricCards(summary, products);
-
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          children: [
-                            IntrinsicHeight(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  for (var i = 0; i < 3; i++) ...[
-                                    if (i > 0) const SizedBox(width: 10),
-                                    Expanded(child: cards[i]),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            _InventoryTablePanel(
-                              products: products,
-                              categories: categories,
-                              service: widget.service,
-                              onMutated: _refresh,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        flex: 1,
-                        child: Column(
-                          children: [
-                            cards[3],
-                            const SizedBox(height: 14),
-                            _SidePanels(
-                              lowStock: lowStock,
-                              txStream: widget.service.streamTransactions(),
-                              isTablet: false,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                })
-              else if (isTablet)
-                Column(
-                  children: [
-                    _MetricsGrid(summary: summary, products: products),
-                    const SizedBox(height: 14),
-                    _InventoryTablePanel(
-                      products: products,
-                      categories: categories,
-                      service: widget.service,
-                      onMutated: _refresh,
-                    ),
-                    const SizedBox(height: 14),
-                    _SidePanels(
-                      lowStock: lowStock,
-                      txStream: widget.service.streamTransactions(),
-                      isTablet: true,
-                    ),
-                  ],
-                )
-              else
-                Column(
-                  children: [
-                    _MetricsGrid(summary: summary, products: products),
-                    const SizedBox(height: 14),
-                    _InventoryTablePanel(
-                      products: products,
-                      categories: categories,
-                      service: widget.service,
-                      onMutated: _refresh,
-                    ),
-                    const SizedBox(height: 14),
-                    _SidePanels(
-                      lowStock: lowStock,
-                      txStream: widget.service.streamTransactions(),
-                      isTablet: false,
-                    ),
-                  ],
-                ),
+              _MetricsGrid(summary: summary, products: products),
+              const SizedBox(height: 14),
+              _InventoryTablePanel(
+                products: products,
+                categories: categories,
+                service: widget.service,
+                onMutated: _refresh,
+              ),
             ],
           );
         });
@@ -323,26 +692,146 @@ class _HeaderRow extends StatelessWidget {
         ],
       );
 
-      final actions = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FilledButton.icon(
-            onPressed: () => Navigator.pushNamed(context, '/products')
-                .then((_) => onRefresh()),
-            icon: const Icon(Icons.add_rounded, size: 16),
-            label: const Text('Add Product'),
-            style: FilledButton.styleFrom(
-              backgroundColor: NovaColors.teal,
-              foregroundColor: Colors.white,
-              textStyle:
-                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            ).copyWith(
-              mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
-            ),
-          ),
-        ],
-      );
+      final actionButtonWidth = isMobile ? double.infinity : 148.0;
+      const actionButtonHeight = 40.0;
+
+      Widget buildActionButton({required Widget child}) {
+        return SizedBox(
+          width: actionButtonWidth,
+          height: actionButtonHeight,
+          child: child,
+        );
+      }
+
+      final actions = isMobile
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                buildActionButton(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        NoAnimationPageRoute<void>(
+                          builder: (_) => const InventoryOrdersReportScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                    label: const Text('Orders Report'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: NovaColors.violet,
+                      side: const BorderSide(color: NovaColors.violet),
+                      backgroundColor: NovaColors.bgPrimary,
+                      textStyle: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ).copyWith(
+                      mouseCursor:
+                          WidgetStateProperty.all(SystemMouseCursors.click),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                buildActionButton(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context)
+                          .push(
+                            NoAnimationPageRoute<void>(
+                              builder: (_) => const ProductsScreen(
+                                inventoryMode: true,
+                                openAddOnStart: true,
+                              ),
+                            ),
+                          )
+                          .then((_) => onRefresh());
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: const Text('Add Product'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: NovaColors.violet,
+                      foregroundColor: Colors.white,
+                      textStyle: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w700),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ).copyWith(
+                      mouseCursor:
+                          WidgetStateProperty.all(SystemMouseCursors.click),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                buildActionButton(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        NoAnimationPageRoute<void>(
+                          builder: (_) => const InventoryOrdersReportScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                    label: const Text('Orders Report'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: NovaColors.violet,
+                      side: const BorderSide(color: NovaColors.violet),
+                      backgroundColor: NovaColors.bgPrimary,
+                      textStyle: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ).copyWith(
+                      mouseCursor:
+                          WidgetStateProperty.all(SystemMouseCursors.click),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                buildActionButton(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context)
+                          .push(
+                            NoAnimationPageRoute<void>(
+                              builder: (_) => const ProductsScreen(
+                                inventoryMode: true,
+                                openAddOnStart: true,
+                              ),
+                            ),
+                          )
+                          .then((_) => onRefresh());
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: const Text('Add Product'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: NovaColors.violet,
+                      foregroundColor: Colors.white,
+                      textStyle: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w700),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ).copyWith(
+                      mouseCursor:
+                          WidgetStateProperty.all(SystemMouseCursors.click),
+                    ),
+                  ),
+                ),
+              ],
+            );
 
       if (isMobile) {
         return Column(
@@ -355,6 +844,1008 @@ class _HeaderRow extends StatelessWidget {
         children: [titleCol, actions],
       );
     });
+  }
+}
+
+class InventoryOrdersReportScreen extends StatefulWidget {
+  const InventoryOrdersReportScreen({super.key});
+
+  @override
+  State<InventoryOrdersReportScreen> createState() =>
+      _InventoryOrdersReportScreenState();
+}
+
+class _InventoryOrdersReportScreenState
+    extends State<InventoryOrdersReportScreen> {
+  ReportService? _reportService;
+  String _period = 'weekly';
+  String _selectedCashierId = 'all';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = context.read<AuthProvider>();
+    _reportService ??= ReportService(auth.ownerId);
+  }
+
+  String _periodLabel(String value) {
+    return switch (value) {
+      'weekly' => 'Weekly',
+      'monthly' => 'Monthly',
+      'yearly' => 'Yearly',
+      _ => 'Weekly',
+    };
+  }
+
+  String _formatDate(DateTime date) {
+    final local = date.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$day/$month/${local.year} $hour:$minute';
+  }
+
+  Map<String, String> _cashierNames(
+    AuthProvider auth,
+    List<Map<String, dynamic>> employees,
+  ) {
+    final names = <String, String>{};
+    final adminEmail = auth.user?.email ?? '';
+    final adminName = (auth.user?.displayName ?? '').trim();
+    if (auth.currentUid.isNotEmpty && auth.currentUid != 'guest') {
+      names[auth.currentUid] =
+          adminName.isNotEmpty ? adminName : adminEmail.split('@').first;
+    }
+
+    for (final employee in employees) {
+      final id = employee['id']?.toString() ?? '';
+      if (id.isEmpty) continue;
+      final rawName = (employee['name']?.toString() ?? '').trim();
+      final email = employee['email']?.toString() ?? '';
+      names[id] = rawName.isNotEmpty ? rawName : email.split('@').first;
+    }
+    return names;
+  }
+
+  String _cashierName(Map<String, String> names, Map<String, dynamic> order) {
+    final id = order['createdBy']?.toString() ?? '';
+    if (id.isEmpty) return 'Unassigned';
+    return names[id] ?? 'Unknown Cashier';
+  }
+
+  List<Map<String, dynamic>> _filteredOrders(
+    List<Map<String, dynamic>> orders,
+  ) {
+    if (_selectedCashierId == 'all') return orders;
+    return orders
+        .where((order) =>
+            (order['createdBy']?.toString() ?? '') == _selectedCashierId)
+        .toList();
+  }
+
+  Future<void> _openReceipt(
+    BuildContext context,
+    Map<String, dynamic> order,
+    String cashier,
+  ) {
+    final orderNumber = (order['orderNumber'] as num?)?.toInt() ?? 0;
+    final total = (order['total'] as num?)?.toDouble() ?? 0.0;
+    final tendered = (order['tenderedAmount'] as num?)?.toDouble() ?? total;
+    final change = (order['change'] as num?)?.toDouble() ?? 0.0;
+    final createdAt = order['createdAtDate'] as DateTime? ?? DateTime.now();
+    final customerName = (order['customerName']?.toString() ?? '').trim();
+    final items = List<Map<String, dynamic>>.from(
+      (order['items'] as List? ?? const []).map(
+        (item) => Map<String, dynamic>.from(item as Map),
+      ),
+    );
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ReceiptDialog(
+        companyName: 'Orion POS',
+        phone: '+92-317-7921817',
+        email: 'info@orion.com',
+        website: 'www.orion.com',
+        servedBy: cashier,
+        customerName: customerName.isEmpty ? 'Walk-in Customer' : customerName,
+        orderType: order['orderType']?.toString() ?? 'dine_in',
+        items: items,
+        total: total,
+        cash: tendered,
+        change: change,
+        tax: 0.0,
+        paymentMethod: order['paymentMethod']?.toString() ?? 'cash',
+        orderNo: 'ORDER-$orderNumber',
+        date: _formatDate(createdAt),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        if (auth.user == null) return const _LoadingScaffold();
+        if (!auth.isAdmin) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushReplacementNamed(context, '/pos');
+          });
+          return const _LoadingScaffold();
+        }
+
+        final userEmail = auth.user?.email ?? '';
+        final userName = auth.user?.displayName ?? userEmail.split('@').first;
+        final photoUrl = auth.user?.photoURL;
+
+        return Scaffold(
+          backgroundColor: NovaColors.bgTertiary,
+          appBar: AppNavigationAppBar(
+            title: 'Inventory Order Reports',
+            icon: Icons.receipt_long_rounded,
+            photoUrl: photoUrl,
+            userName: userName,
+          ),
+          body: AppNavigationShell(
+            auth: auth,
+            currentRoute: '/inventory',
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: StreamBuilder<List<Map<String, dynamic>>>(
+                stream: auth.getEmployees(),
+                builder: (context, employeeSnapshot) {
+                  if (employeeSnapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Error loading cashiers:\n${employeeSnapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: NovaColors.textSecondary, fontSize: 13),
+                      ),
+                    );
+                  }
+
+                  final employees = employeeSnapshot.data ?? const [];
+                  final cashierNames = _cashierNames(auth, employees);
+
+                  return StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: _reportService!.getOrdersByPeriod(_period),
+                    builder: (context, orderSnapshot) {
+                      if (!orderSnapshot.hasData) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                              color: NovaColors.violet),
+                        );
+                      }
+
+                      final orders = orderSnapshot.data!;
+                      final visibleOrders = _filteredOrders(orders);
+                      final grandTotal = visibleOrders.fold<double>(
+                        0,
+                        (sum, order) =>
+                            sum + ((order['total'] as num?)?.toDouble() ?? 0.0),
+                      );
+                      final cashierStats = _buildCashierStats(
+                        orders,
+                        cashierNames,
+                      );
+
+                      return LayoutBuilder(builder: (context, c) {
+                        final isWide = c.maxWidth >= 1100;
+                        final availableHeight = c.hasBoundedHeight
+                            ? c.maxHeight
+                            : MediaQuery.sizeOf(context).height;
+
+                        final topBar = _OrdersReportTopBar(
+                          period: _period,
+                          periodLabel: _periodLabel,
+                          onPeriodChanged: (value) {
+                            setState(() {
+                              _period = value;
+                              _selectedCashierId = 'all';
+                            });
+                          },
+                          total: grandTotal,
+                          count: visibleOrders.length,
+                        );
+
+                        final cashierSidebar = _CashierReportSidebar(
+                          stats: cashierStats,
+                          selectedCashierId: _selectedCashierId,
+                          allOrderCount: orders.length,
+                          allTotal: orders.fold<double>(
+                            0,
+                            (sum, order) =>
+                                sum +
+                                ((order['total'] as num?)?.toDouble() ?? 0.0),
+                          ),
+                          onSelected: (id) =>
+                              setState(() => _selectedCashierId = id),
+                        );
+
+                        final orderList = _OrdersReportList(
+                          orders: visibleOrders,
+                          cashierNames: cashierNames,
+                          formatDate: _formatDate,
+                          cashierName: _cashierName,
+                          onOpen: (order, cashier) =>
+                              _openReceipt(context, order, cashier),
+                          scrollable: isWide,
+                        );
+
+                        if (isWide) {
+                          return SizedBox(
+                            height: availableHeight,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                topBar,
+                                const SizedBox(height: 12),
+                                Expanded(
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      SizedBox(
+                                        width: 280,
+                                        child: cashierSidebar,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(child: orderList),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return ListView(
+                          children: [
+                            topBar,
+                            const SizedBox(height: 12),
+                            _CashierReportCategories(
+                              stats: cashierStats,
+                              selectedCashierId: _selectedCashierId,
+                              allOrderCount: orders.length,
+                              allTotal: orders.fold<double>(
+                                0,
+                                (sum, order) =>
+                                    sum +
+                                    ((order['total'] as num?)?.toDouble() ??
+                                        0.0),
+                              ),
+                              onSelected: (id) =>
+                                  setState(() => _selectedCashierId = id),
+                            ),
+                            const SizedBox(height: 12),
+                            orderList,
+                          ],
+                        );
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+List<_CashierOrderStats> _buildCashierStats(
+  List<Map<String, dynamic>> orders,
+  Map<String, String> cashierNames,
+) {
+  final stats = <String, _CashierOrderStats>{};
+  for (final order in orders) {
+    final id = order['createdBy']?.toString() ?? '';
+    final key = id.isEmpty ? 'unassigned' : id;
+    final name =
+        id.isEmpty ? 'Unassigned' : (cashierNames[id] ?? 'Unknown Cashier');
+    final total = (order['total'] as num?)?.toDouble() ?? 0.0;
+    final current = stats[key] ?? _CashierOrderStats(id: key, name: name);
+    stats[key] = current.copyWith(
+      orderCount: current.orderCount + 1,
+      total: current.total + total,
+    );
+  }
+  final values = stats.values.toList()
+    ..sort((a, b) => b.total.compareTo(a.total));
+  return values;
+}
+
+class _CashierOrderStats {
+  const _CashierOrderStats({
+    required this.id,
+    required this.name,
+    this.orderCount = 0,
+    this.total = 0,
+  });
+
+  final String id;
+  final String name;
+  final int orderCount;
+  final double total;
+
+  _CashierOrderStats copyWith({int? orderCount, double? total}) {
+    return _CashierOrderStats(
+      id: id,
+      name: name,
+      orderCount: orderCount ?? this.orderCount,
+      total: total ?? this.total,
+    );
+  }
+}
+
+class _OrdersReportTopBar extends StatelessWidget {
+  const _OrdersReportTopBar({
+    required this.period,
+    required this.periodLabel,
+    required this.onPeriodChanged,
+    required this.total,
+    required this.count,
+  });
+
+  final String period;
+  final String Function(String) periodLabel;
+  final ValueChanged<String> onPeriodChanged;
+  final double total;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: NovaColors.bgPrimary,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: NovaColors.borderTertiary),
+      ),
+      child: LayoutBuilder(builder: (context, c) {
+        final compact = c.maxWidth < AppBreakpoints.mobile;
+        final summary = Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: NovaColors.violetLight,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.summarize_rounded,
+                  color: NovaColors.violetDeep, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${periodLabel(period)} Orders',
+                    style: const TextStyle(
+                      color: NovaColors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '$count orders | ${_formatMoney(total)}',
+                    style: const TextStyle(
+                      color: NovaColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+
+        final selector = SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'weekly', label: Text('Weekly')),
+            ButtonSegment(value: 'monthly', label: Text('Monthly')),
+            ButtonSegment(value: 'yearly', label: Text('Yearly')),
+          ],
+          selected: {period},
+          onSelectionChanged: (values) => onPeriodChanged(values.first),
+          style: ButtonStyle(
+            visualDensity: VisualDensity.compact,
+            foregroundColor: WidgetStateProperty.resolveWith((states) {
+              return states.contains(WidgetState.selected)
+                  ? Colors.white
+                  : NovaColors.textSecondary;
+            }),
+            backgroundColor: WidgetStateProperty.resolveWith((states) {
+              return states.contains(WidgetState.selected)
+                  ? NovaColors.violet
+                  : NovaColors.bgSecondary;
+            }),
+          ),
+        );
+
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [summary, const SizedBox(height: 12), selector],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: summary),
+            const SizedBox(width: 12),
+            selector,
+          ],
+        );
+      }),
+    );
+  }
+}
+
+class _CashierReportCategories extends StatelessWidget {
+  const _CashierReportCategories({
+    required this.stats,
+    required this.selectedCashierId,
+    required this.allOrderCount,
+    required this.allTotal,
+    required this.onSelected,
+  });
+
+  final List<_CashierOrderStats> stats;
+  final String selectedCashierId;
+  final int allOrderCount;
+  final double allTotal;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = [
+      _CashierOrderStats(
+        id: 'all',
+        name: 'All Cashiers',
+        orderCount: allOrderCount,
+        total: allTotal,
+      ),
+      ...stats,
+    ];
+
+    return SizedBox(
+      height: 104,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final stat = categories[index];
+          final selected = stat.id == selectedCashierId;
+          return InkWell(
+            borderRadius: BorderRadius.circular(12),
+            mouseCursor: SystemMouseCursors.click,
+            onTap: () => onSelected(stat.id),
+            child: Container(
+              width: 210,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: selected ? NovaColors.violetLight : NovaColors.bgPrimary,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color:
+                      selected ? NovaColors.violet : NovaColors.borderTertiary,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        selected
+                            ? Icons.radio_button_checked_rounded
+                            : Icons.person_pin_rounded,
+                        color: selected
+                            ? NovaColors.violetDeep
+                            : NovaColors.textTertiary,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          stat.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: NovaColors.textPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    _formatMoney(stat.total),
+                    style: NovaFonts.price(
+                      color: NovaColors.textPrimary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${stat.orderCount} order${stat.orderCount == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      color: NovaColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CashierReportSidebar extends StatelessWidget {
+  const _CashierReportSidebar({
+    required this.stats,
+    required this.selectedCashierId,
+    required this.allOrderCount,
+    required this.allTotal,
+    required this.onSelected,
+  });
+
+  final List<_CashierOrderStats> stats;
+  final String selectedCashierId;
+  final int allOrderCount;
+  final double allTotal;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = [
+      _CashierOrderStats(
+        id: 'all',
+        name: 'All Cashiers',
+        orderCount: allOrderCount,
+        total: allTotal,
+      ),
+      ...stats,
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: NovaColors.bgPrimary,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: NovaColors.borderTertiary),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Cashiers',
+            style: TextStyle(
+              color: NovaColors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: ListView.separated(
+              itemCount: categories.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final stat = categories[index];
+                final selected = stat.id == selectedCashierId;
+                return InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  mouseCursor: SystemMouseCursors.click,
+                  onTap: () => onSelected(stat.id),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? NovaColors.violetLight
+                          : NovaColors.bgSecondary,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: selected
+                            ? NovaColors.violet
+                            : NovaColors.borderTertiary,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selected
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.person_pin_rounded,
+                          color: selected
+                              ? NovaColors.violetDeep
+                              : NovaColors.textTertiary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                stat.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: NovaColors.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${stat.orderCount} order${stat.orderCount == 1 ? '' : 's'}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: NovaColors.textSecondary,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatMoney(stat.total),
+                          style: NovaFonts.price(
+                            color: NovaColors.violetDeep,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrdersReportList extends StatelessWidget {
+  const _OrdersReportList({
+    required this.orders,
+    required this.cashierNames,
+    required this.formatDate,
+    required this.cashierName,
+    required this.onOpen,
+    this.scrollable = false,
+  });
+
+  final List<Map<String, dynamic>> orders;
+  final Map<String, String> cashierNames;
+  final String Function(DateTime) formatDate;
+  final String Function(Map<String, String>, Map<String, dynamic>) cashierName;
+  final void Function(Map<String, dynamic>, String) onOpen;
+  final bool scrollable;
+
+  @override
+  Widget build(BuildContext context) {
+    if (orders.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 42, horizontal: 18),
+        decoration: BoxDecoration(
+          color: NovaColors.bgPrimary,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: NovaColors.borderTertiary),
+        ),
+        child: const Column(
+          children: [
+            Icon(Icons.receipt_long_outlined,
+                color: NovaColors.textTertiary, size: 42),
+            SizedBox(height: 10),
+            Text(
+              'No orders found',
+              style: TextStyle(
+                color: NovaColors.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Orders will appear here after checkout.',
+              style: TextStyle(color: NovaColors.textSecondary, fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final listItems = List<Widget>.generate(orders.length * 2 - 1, (index) {
+      if (index.isOdd) return const SizedBox(height: 10);
+      final order = orders[index ~/ 2];
+      final cashier = cashierName(cashierNames, order);
+      return _InventoryOrderReportCard(
+        order: order,
+        cashier: cashier,
+        formatDate: formatDate,
+        onTap: () => onOpen(order, cashier),
+      );
+    });
+
+    if (scrollable) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: NovaColors.bgPrimary,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: NovaColors.borderTertiary),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(left: 2, bottom: 8),
+              child: Text(
+                'Order Receipts',
+                style: TextStyle(
+                  color: NovaColors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                children: listItems,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 2, bottom: 8),
+          child: Text(
+            'Order Receipts',
+            style: TextStyle(
+              color: NovaColors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        ...listItems,
+      ],
+    );
+  }
+}
+
+class _InventoryOrderReportCard extends StatelessWidget {
+  const _InventoryOrderReportCard({
+    required this.order,
+    required this.cashier,
+    required this.formatDate,
+    required this.onTap,
+  });
+
+  final Map<String, dynamic> order;
+  final String cashier;
+  final String Function(DateTime) formatDate;
+  final VoidCallback onTap;
+
+  Color get _statusColor {
+    return switch (order['status']?.toString() ?? '') {
+      'completed' => NovaColors.tealDeep,
+      'ready' => NovaColors.amberDeep,
+      'pending' => NovaColors.danger,
+      _ => NovaColors.textSecondary,
+    };
+  }
+
+  Color get _statusBg {
+    return switch (order['status']?.toString() ?? '') {
+      'completed' => NovaColors.tealLight,
+      'ready' => NovaColors.amberLight,
+      'pending' => NovaColors.dangerLight,
+      _ => NovaColors.bgSecondary,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final createdAt = order['createdAtDate'] as DateTime? ?? DateTime.now();
+    final orderNumber = (order['orderNumber'] as num?)?.toInt() ?? 0;
+    final total = (order['total'] as num?)?.toDouble() ?? 0.0;
+    final items = (order['items'] as List? ?? const []).length;
+    final status = order['status']?.toString() ?? 'unknown';
+    final payment = order['paymentMethod']?.toString() ?? 'cash';
+
+    return Material(
+      color: NovaColors.bgPrimary,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        mouseCursor: SystemMouseCursors.click,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: NovaColors.borderTertiary),
+          ),
+          child: LayoutBuilder(builder: (context, c) {
+            final compact = c.maxWidth < AppBreakpoints.mobile;
+            final leading = Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: NovaColors.violetLight,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.receipt_rounded,
+                  color: NovaColors.violetDeep, size: 21),
+            );
+
+            final details = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Order #$orderNumber',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: NovaColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatMoney(total),
+                      style: const TextStyle(
+                        color: NovaColors.violetDeep,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Cashier: $cashier',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: NovaColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    _OrderReportChip(
+                      icon: Icons.schedule_rounded,
+                      label: formatDate(createdAt),
+                    ),
+                    _OrderReportChip(
+                      icon: Icons.shopping_bag_outlined,
+                      label: '$items items',
+                    ),
+                    _OrderReportChip(
+                      icon: Icons.payment_rounded,
+                      label: payment.toUpperCase(),
+                    ),
+                    _OrderReportChip(
+                      label: status.toUpperCase(),
+                      color: _statusColor,
+                      backgroundColor: _statusBg,
+                    ),
+                  ],
+                ),
+              ],
+            );
+
+            final openIcon = IconButton(
+              tooltip: 'Open receipt',
+              onPressed: onTap,
+              icon: const Icon(Icons.open_in_new_rounded,
+                  color: NovaColors.textSecondary, size: 20),
+            );
+
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [leading, const Spacer(), openIcon]),
+                  const SizedBox(height: 10),
+                  details,
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                leading,
+                const SizedBox(width: 12),
+                Expanded(child: details),
+                const SizedBox(width: 8),
+                openIcon,
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+class _OrderReportChip extends StatelessWidget {
+  const _OrderReportChip({
+    required this.label,
+    this.icon,
+    this.color = NovaColors.textSecondary,
+    this.backgroundColor = NovaColors.bgSecondary,
+  });
+
+  final String label;
+  final IconData? icon;
+  final Color color;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -800,7 +2291,7 @@ class _ProfitExpansionPanel extends StatelessWidget {
                   ),
                   Text(
                     _formatMoney(profit),
-                    style: TextStyle(
+                    style: NovaFonts.price(
                       color: profit >= 0
                           ? NovaColors.tealDeep
                           : const Color(0xFFB54724),
@@ -1179,7 +2670,9 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
       final reorderWidth = compactTable ? 42.0 : 62.0;
       final statusWidth = compactTable ? 82.0 : 94.0;
       final actionsWidth = compactTable ? 102.0 : 120.0;
-      final double contentHeight = (visible.length * 60.0).clamp(200.0, 600.0);
+      final viewportHeight = MediaQuery.sizeOf(context).height;
+      final double contentHeight =
+          (viewportHeight - (isMobile ? 360 : 330)).clamp(320.0, 900.0);
 
       return Container(
         clipBehavior: Clip.hardEdge,
@@ -1243,7 +2736,7 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                     hintStyle: const TextStyle(
                         color: NovaColors.textTertiary, fontSize: 12),
                     prefixIcon: const Icon(Icons.search_rounded,
-                        color: NovaColors.textSecondary, size: 18),
+                        color: NovaColors.violet, size: 18),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
                             tooltip: 'Clear search',
@@ -1269,7 +2762,7 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: NovaColors.teal),
+                      borderSide: const BorderSide(color: NovaColors.violet),
                     ),
                   ),
                 ),
@@ -1318,7 +2811,7 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                       headingTextStyle: const TextStyle(
                         color: NovaColors.textSecondary,
                         fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w800,
                       ),
                       columns: [
                         DataColumn(
@@ -1397,17 +2890,20 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: NovaColors.textPrimary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
                                     ),
                                   ),
                                   Text(
-                                    p.barcode.isNotEmpty ? p.barcode : p.id,
+                                    p.barcode.isNotEmpty
+                                        ? '${p.category} | ${p.barcode}'
+                                        : p.category,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: NovaColors.textSecondary,
-                                      fontSize: 11,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ],
@@ -1422,8 +2918,10 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                    color: NovaColors.textSecondary,
-                                    fontSize: 12),
+                                  color: NovaColors.textPrimary,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
                           ),
@@ -1454,8 +2952,10 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                             child: Text(
                               '${p.lowStockThreshold}',
                               style: const TextStyle(
-                                  color: NovaColors.textSecondary,
-                                  fontSize: 12),
+                                color: NovaColors.textPrimary,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           )),
                           DataCell(SizedBox(
@@ -1537,25 +3037,27 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: NovaColors.bgPrimary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          'Restock — ${p.name}',
-          style: const TextStyle(
-              color: NovaColors.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w600),
-        ),
-        content: Form(
+      builder: (ctx) => _StockActionSheet(
+        icon: Icons.add_circle_outline_rounded,
+        iconColor: NovaColors.violet,
+        title: 'Restock',
+        product: p,
+        subtitle: 'Use a positive quantity to add stock.',
+        actionLabel: 'Confirm Restock',
+        actionColor: NovaColors.violet,
+        onCancel: () => Navigator.pop(ctx, false),
+        onConfirm: () {
+          if (formKey.currentState!.validate()) {
+            Navigator.pop(ctx, true);
+          }
+        },
+        child: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Current stock: ${p.stockQty}',
-                  style: const TextStyle(
-                      color: NovaColors.textSecondary, fontSize: 12)),
-              const SizedBox(height: 12),
+              _CurrentStockChip(product: p),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: qtyCtrl,
                 keyboardType: TextInputType.number,
@@ -1579,27 +3081,6 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: NovaColors.textSecondary)),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(ctx, true);
-              }
-            },
-            style: FilledButton.styleFrom(
-                    backgroundColor: NovaColors.teal,
-                    foregroundColor: Colors.white)
-                .copyWith(
-              mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
-            ),
-            child: const Text('Confirm'),
-          ),
-        ],
       ),
     );
 
@@ -1642,29 +3123,27 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: NovaColors.bgPrimary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          'Adjust Stock — ${p.name}',
-          style: const TextStyle(
-              color: NovaColors.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w600),
-        ),
-        content: Form(
+      builder: (ctx) => _StockActionSheet(
+        icon: Icons.tune_rounded,
+        iconColor: NovaColors.violet,
+        title: 'Adjust Stock',
+        product: p,
+        subtitle: 'Use +10 to add or -5 to remove.',
+        actionLabel: 'Apply Adjustment',
+        actionColor: NovaColors.violet,
+        onCancel: () => Navigator.pop(ctx, false),
+        onConfirm: () {
+          if (formKey.currentState!.validate()) {
+            Navigator.pop(ctx, true);
+          }
+        },
+        child: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Current stock: ${p.stockQty}',
-                  style: const TextStyle(
-                      color: NovaColors.textSecondary, fontSize: 12)),
-              const SizedBox(height: 4),
-              const Text('Enter +10 to add, -5 to remove.',
-                  style:
-                      TextStyle(color: NovaColors.textTertiary, fontSize: 11)),
-              const SizedBox(height: 12),
+              _CurrentStockChip(product: p),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: deltaCtrl,
                 keyboardType:
@@ -1689,27 +3168,6 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: NovaColors.textSecondary)),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(ctx, true);
-              }
-            },
-            style: FilledButton.styleFrom(
-                    backgroundColor: NovaColors.violet,
-                    foregroundColor: Colors.white)
-                .copyWith(
-              mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
-            ),
-            child: const Text('Apply'),
-          ),
-        ],
       ),
     );
 
@@ -1739,12 +3197,14 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
         labelText: label,
         labelStyle:
             const TextStyle(color: NovaColors.textSecondary, fontSize: 12),
+        filled: true,
+        fillColor: NovaColors.bgSecondary,
         enabledBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: NovaColors.borderSecondary),
+          borderSide: const BorderSide(color: NovaColors.borderTertiary),
           borderRadius: BorderRadius.circular(8),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: NovaColors.teal),
+          borderSide: const BorderSide(color: NovaColors.violet),
           borderRadius: BorderRadius.circular(8),
         ),
         errorBorder: OutlineInputBorder(
@@ -1758,6 +3218,270 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       );
+}
+
+class _StockActionSheet extends StatelessWidget {
+  const _StockActionSheet({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.product,
+    this.subtitle,
+    required this.child,
+    required this.actionLabel,
+    required this.actionColor,
+    required this.onCancel,
+    required this.onConfirm,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final Product product;
+  final String? subtitle;
+  final Widget child;
+  final String actionLabel;
+  final Color actionColor;
+  final VoidCallback onCancel;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(14, 16, 14, 16 + bottomInset),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+              decoration: BoxDecoration(
+                color: NovaColors.bgPrimary,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    blurRadius: 20,
+                    offset: Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: NovaColors.borderSecondary,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          gradient: CafeColors.headerGradient,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(icon, color: Colors.white, size: 17),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: CafeColors.charcoal,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              subtitle ?? product.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: NovaColors.textSecondary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        mouseCursor: SystemMouseCursors.click,
+                        visualDensity: VisualDensity.compact,
+                        onPressed: onCancel,
+                        icon: const Icon(Icons.close_rounded,
+                            color: NovaColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  child,
+                  const SizedBox(height: 10),
+                  LayoutBuilder(builder: (context, constraints) {
+                    final compact = constraints.maxWidth < 420;
+                    final cancelButton = OutlinedButton(
+                      onPressed: onCancel,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: NovaColors.textSecondary,
+                        side:
+                            const BorderSide(color: NovaColors.borderSecondary),
+                        minimumSize: const Size.fromHeight(38),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ).copyWith(
+                        mouseCursor: WidgetStateProperty.all(
+                          SystemMouseCursors.click,
+                        ),
+                      ),
+                      child: const Text('Cancel'),
+                    );
+                    final actionButton = FilledButton(
+                      onPressed: onConfirm,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: actionColor,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(38),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ).copyWith(
+                        mouseCursor: WidgetStateProperty.all(
+                          SystemMouseCursors.click,
+                        ),
+                      ),
+                      child: Text(
+                        actionLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+
+                    if (compact) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          actionButton,
+                          const SizedBox(height: 8),
+                          cancelButton,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(child: cancelButton),
+                        const SizedBox(width: 10),
+                        Expanded(child: actionButton),
+                      ],
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CurrentStockChip extends StatelessWidget {
+  const _CurrentStockChip({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: CafeColors.cardGradient,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: NovaColors.borderTertiary),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: NovaColors.tealLight,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(product.icon, color: NovaColors.tealDeep, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: NovaColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  product.category,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: NovaColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            constraints: const BoxConstraints(minWidth: 46),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: NovaColors.bgPrimary,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: NovaColors.borderTertiary),
+            ),
+            child: Text(
+              '${product.stockQty}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: NovaColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 // Mobile product card list
 
@@ -1778,299 +3502,103 @@ class _ProductCardList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: products.map((p) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: const BoxDecoration(
-            border:
-                Border(bottom: BorderSide(color: NovaColors.borderTertiary)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      p.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: NovaColors.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      p.barcode.isNotEmpty ? p.barcode : p.id,
-                      style: const TextStyle(
-                          color: NovaColors.textTertiary, fontSize: 11),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Buy ${_formatMoney(p.purchasePrice)}  |  Sell ${_formatMoney(p.price)}  |  Profit ${_formatMoney(_unitProfit(p))}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: NovaColors.textSecondary, fontSize: 11),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            mouseCursor: SystemMouseCursors.click,
+            onTap: () => onRestock(p),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: const BoxDecoration(
+                border: Border(
+                    bottom: BorderSide(color: NovaColors.borderTertiary)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _StatusPill(product: p),
-                        const SizedBox(width: 8),
-                        Flexible(child: _StockCell(product: p)),
+                        Text(
+                          p.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: NovaColors.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          p.barcode.isNotEmpty
+                              ? '${p.category} | ${p.barcode}'
+                              : p.category,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: NovaColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Buy ${_formatMoney(p.purchasePrice)}  |  Sell ${_formatMoney(p.price)}  |  Profit ${_formatMoney(_unitProfit(p))}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: NovaColors.textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            _StatusPill(product: p),
+                            const SizedBox(width: 8),
+                            Flexible(child: _StockCell(product: p)),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    tooltip: 'Restock',
-                    mouseCursor: SystemMouseCursors.click,
-                    icon: const Icon(Icons.add_circle_outline_rounded,
-                        size: 20, color: NovaColors.teal),
-                    onPressed: () => onRestock(p),
                   ),
-                  IconButton(
-                    tooltip: 'Adjust',
-                    mouseCursor: SystemMouseCursors.click,
-                    icon: const Icon(Icons.tune_rounded,
-                        size: 20, color: NovaColors.textSecondary),
-                    onPressed: () => onAdjust(p),
-                  ),
-                  IconButton(
-                    tooltip: 'Supplier order',
-                    mouseCursor: SystemMouseCursors.click,
-                    icon: const Icon(Icons.local_shipping_outlined,
-                        size: 20, color: NovaColors.violet),
-                    onPressed: () => onOrder(p),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        tooltip: 'Restock',
+                        mouseCursor: SystemMouseCursors.click,
+                        icon: const Icon(Icons.add_circle_outline_rounded,
+                            size: 20, color: NovaColors.teal),
+                        onPressed: () => onRestock(p),
+                      ),
+                      IconButton(
+                        tooltip: 'Adjust',
+                        mouseCursor: SystemMouseCursors.click,
+                        icon: const Icon(Icons.tune_rounded,
+                            size: 20, color: NovaColors.textSecondary),
+                        onPressed: () => onAdjust(p),
+                      ),
+                      IconButton(
+                        tooltip: 'Supplier order',
+                        mouseCursor: SystemMouseCursors.click,
+                        icon: const Icon(Icons.local_shipping_outlined,
+                            size: 20, color: NovaColors.violet),
+                        onPressed: () => onOrder(p),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         );
       }).toList(),
     );
   }
-}
-
-class _SidePanels extends StatelessWidget {
-  const _SidePanels({
-    required this.lowStock,
-    required this.txStream,
-    required this.isTablet,
-  });
-
-  final List<Product> lowStock;
-  final Stream<List<InventoryTransaction>> txStream;
-  final bool isTablet;
-
-  @override
-  Widget build(BuildContext context) {
-    final noticePanel = _StockNotificationsPanel(lowStock: lowStock);
-
-    final alertsPanel = _PanelCard(
-      title: 'Reorder Alerts',
-      actionText: 'View all',
-      onActionTap: lowStock.isEmpty
-          ? null
-          : () => _showAllReorderAlertsDialog(context, lowStock),
-      child: lowStock.isEmpty
-          ? const _MutedText(text: 'No reorder alerts right now.')
-          : Column(
-              children: lowStock.take(8).map((p) {
-                return _ThinListItem(
-                  icon: p.stockQty <= 0
-                      ? Icons.error_outline
-                      : Icons.warning_rounded,
-                  iconBg: p.stockQty <= 0
-                      ? const Color(0xFFFFEDE8)
-                      : NovaColors.violetLight,
-                  iconColor: p.stockQty <= 0
-                      ? const Color(0xFFB54724)
-                      : NovaColors.violetDeep,
-                  title: p.name,
-                  subtitle:
-                      '${p.stockQty} units left · Min: ${p.lowStockThreshold}',
-                  trailing: _ReorderButton(product: p, products: lowStock),
-                );
-              }).toList(),
-            ),
-    );
-
-    final activityPanel = _PanelCard(
-      title: 'Recent Activity',
-      child: StreamBuilder<List<InventoryTransaction>>(
-        stream: txStream,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return _MutedText(text: 'Error: ${snapshot.error}');
-          }
-          final txs = snapshot.data ?? const <InventoryTransaction>[];
-          final cutoff = DateTime.now().subtract(const Duration(hours: 12));
-          final recent = txs
-              .where((tx) => tx.createdAt.toLocal().isAfter(cutoff))
-              .toList();
-          if (recent.isEmpty) {
-            return const _MutedText(text: 'No recent inventory activity.');
-          }
-          return Column(
-            children:
-                recent.take(8).map((tx) => _ActivityItem(tx: tx)).toList(),
-          );
-        },
-      ),
-    );
-
-    if (isTablet) {
-      return Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: alertsPanel),
-              const SizedBox(width: 12),
-              Expanded(child: noticePanel),
-            ],
-          ),
-          const SizedBox(height: 12),
-          activityPanel,
-        ],
-      );
-    }
-
-    return Column(
-      children: [
-        alertsPanel,
-        const SizedBox(height: 12),
-        noticePanel,
-        const SizedBox(height: 12),
-        activityPanel,
-      ],
-    );
-  }
-}
-
-class _ReorderButton extends StatelessWidget {
-  const _ReorderButton({required this.product, this.products});
-  final Product product;
-  final List<Product>? products;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 32,
-      child: FilledButton.icon(
-        onPressed: () {
-          Navigator.of(context).push(
-            NoAnimationPageRoute(
-              builder: (_) => SupplierOrderScreen(
-                product: product,
-                products: products,
-              ),
-            ),
-          );
-        },
-        icon: const Icon(Icons.local_shipping_outlined, size: 14),
-        label: const Text('Order'),
-        style: FilledButton.styleFrom(
-          backgroundColor: NovaColors.teal,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ).copyWith(
-          mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
-        ),
-      ),
-    );
-  }
-}
-
-Future<void> _showAllReorderAlertsDialog(
-  BuildContext context,
-  List<Product> lowStock,
-) async {
-  final sorted = [...lowStock]
-    ..sort((a, b) => a.stockQty.compareTo(b.stockQty));
-
-  await showDialog<void>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: NovaColors.bgPrimary,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      title: const Text(
-        'All Reorder Alerts',
-        style: TextStyle(
-          color: NovaColors.textPrimary,
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      content: SizedBox(
-        width: 520,
-        child: sorted.isEmpty
-            ? const Text(
-                'No reorder alerts right now.',
-                style: TextStyle(color: NovaColors.textSecondary, fontSize: 12),
-              )
-            : ListView.separated(
-                shrinkWrap: true,
-                itemCount: sorted.length,
-                separatorBuilder: (_, __) =>
-                    const Divider(height: 1, color: NovaColors.borderTertiary),
-                itemBuilder: (_, i) {
-                  final p = sorted[i];
-                  final out = p.stockQty <= 0;
-                  return ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      out
-                          ? Icons.error_outline_rounded
-                          : Icons.warning_amber_rounded,
-                      color: out
-                          ? const Color(0xFFB54724)
-                          : const Color(0xFFEF6C00),
-                      size: 18,
-                    ),
-                    title: Text(
-                      p.name,
-                      style: const TextStyle(
-                        color: NovaColors.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: Text(
-                      '${p.stockQty} left • Min ${p.lowStockThreshold}',
-                      style: const TextStyle(
-                        color: NovaColors.textSecondary,
-                        fontSize: 11,
-                      ),
-                    ),
-                    trailing: _ReorderButton(product: p, products: sorted),
-                  );
-                },
-              ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text(
-            'Close',
-            style: TextStyle(color: NovaColors.textSecondary),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 class SupplierOrderScreen extends StatefulWidget {
@@ -2574,16 +4102,38 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
     return Scaffold(
       backgroundColor: NovaColors.bgTertiary,
       appBar: AppBar(
-        backgroundColor: NovaColors.violetDeep,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'Supplier Order',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: CafeColors.headerGradient,
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x33FF4D1C),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.local_shipping_outlined,
+                color: Colors.white70, size: 21),
+            SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                'Supplier Order',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
@@ -2592,7 +4142,7 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 860),
+          constraints: const BoxConstraints(maxWidth: 980),
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -3464,15 +5014,25 @@ class _StockCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final threshold =
         product.lowStockThreshold <= 0 ? 1 : product.lowStockThreshold;
-    final ratio = (product.stockQty / (threshold * 4)).clamp(0.0, 1.0);
+    final isOut = product.stockQty <= 0;
+    final ratio =
+        isOut ? 1.0 : (product.stockQty / (threshold * 4)).clamp(0.0, 1.0);
 
     Color barColor;
-    if (product.stockQty <= 0) {
+    Color trackColor;
+    Color qtyColor;
+    if (isOut) {
       barColor = const Color(0xFFE53935); // red
+      trackColor = const Color(0xFFFFEDE8);
+      qtyColor = const Color(0xFFE53935);
     } else if (product.stockQty <= product.lowStockThreshold) {
       barColor = const Color(0xFFFB8C00); // orange
+      trackColor = const Color(0xFFFFF3E0);
+      qtyColor = const Color(0xFFEF6C00);
     } else {
       barColor = const Color(0xFF2E7D32); // green
+      trackColor = NovaColors.bgSecondary;
+      qtyColor = NovaColors.textPrimary;
     }
 
     return LayoutBuilder(
@@ -3492,7 +5052,7 @@ class _StockCell extends StatelessWidget {
                 width: barWidth,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: NovaColors.bgSecondary,
+                  color: trackColor,
                   borderRadius: BorderRadius.circular(99),
                 ),
                 child: FractionallySizedBox(
@@ -3515,9 +5075,10 @@ class _StockCell extends StatelessWidget {
                   child: Text(
                     '${product.stockQty}',
                     maxLines: 1,
-                    style: const TextStyle(
-                      color: NovaColors.textPrimary,
-                      fontSize: 12,
+                    style: TextStyle(
+                      color: qtyColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
@@ -3566,14 +5127,14 @@ class _MoneyCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       _formatMoney(value),
-      style: TextStyle(
+      style: NovaFonts.price(
         color: emphasize && value < 0
             ? const Color(0xFFB54724)
             : emphasize
                 ? NovaColors.tealDeep
-                : NovaColors.textSecondary,
-        fontSize: 12,
-        fontWeight: emphasize ? FontWeight.w700 : FontWeight.w500,
+                : NovaColors.textPrimary,
+        fontSize: 13,
+        fontWeight: emphasize ? FontWeight.w900 : FontWeight.w800,
       ),
     );
   }
@@ -3620,134 +5181,6 @@ class _StatusPill extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _StockNotificationsPanel extends StatelessWidget {
-  const _StockNotificationsPanel({required this.lowStock});
-  final List<Product> lowStock;
-
-  String _namesPreview(List<Product> items) {
-    if (items.isEmpty) return '';
-    final names = items.map((e) => e.name).toList();
-    final shown = names.take(3).join(', ');
-    final remaining = names.length - 3;
-    if (remaining > 0) return '$shown +$remaining more';
-    return shown;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final outOfStock = lowStock.where((p) => p.stockQty <= 0).toList();
-    final lowOnly = lowStock.where((p) => p.stockQty > 0).toList();
-
-    return _PanelCard(
-      title: 'Stock Notifications',
-      child: lowStock.isEmpty
-          ? const _MutedText(text: 'No stock notifications right now.')
-          : Column(
-              children: [
-                if (outOfStock.isNotEmpty)
-                  _ThinListItem(
-                    icon: Icons.error_outline_rounded,
-                    iconBg: const Color(0xFFFFEDE8),
-                    iconColor: const Color(0xFFB54724),
-                    title: 'Out of stock items',
-                    subtitle:
-                        '${outOfStock.length} product(s): ${_namesPreview(outOfStock)}',
-                    trailing: Text(
-                      '${outOfStock.length}',
-                      style: const TextStyle(
-                        color: Color(0xFFB54724),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                if (lowOnly.isNotEmpty)
-                  _ThinListItem(
-                    icon: Icons.warning_amber_rounded,
-                    iconBg: const Color(0xFFFFF3E0),
-                    iconColor: const Color(0xFFEF6C00),
-                    title: 'Low stock items',
-                    subtitle:
-                        '${lowOnly.length} product(s): ${_namesPreview(lowOnly)}',
-                    trailing: Text(
-                      '${lowOnly.length}',
-                      style: const TextStyle(
-                        color: Color(0xFFEF6C00),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-    );
-  }
-}
-
-class _ActivityItem extends StatelessWidget {
-  const _ActivityItem({required this.tx});
-  final InventoryTransaction tx;
-
-  @override
-  Widget build(BuildContext context) {
-    Color dot;
-    switch (tx.type.toLowerCase()) {
-      case 'sale':
-        dot = const Color(0xFF378ADD);
-        break;
-      case 'adjustment':
-        dot = NovaColors.amber;
-        break;
-      case 'restock':
-      case 'purchase':
-        dot = NovaColors.teal;
-        break;
-      case 'damage':
-        dot = const Color(0xFFD85A30);
-        break;
-      default:
-        dot = NovaColors.textTertiary;
-    }
-
-    final time =
-        '${tx.createdAt.hour.toString().padLeft(2, '0')}:${tx.createdAt.minute.toString().padLeft(2, '0')}';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            margin: const EdgeInsets.only(top: 4),
-            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${tx.productName} • ${tx.type.toUpperCase()} • Qty ${tx.quantity}',
-                  style: const TextStyle(
-                      color: NovaColors.textPrimary, fontSize: 12),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${tx.previousStock} → ${tx.newStock} · $time',
-                  style: const TextStyle(
-                      color: NovaColors.textTertiary, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -3821,14 +5254,10 @@ class _PanelCard extends StatelessWidget {
   const _PanelCard({
     required this.title,
     required this.child,
-    this.actionText,
-    this.onActionTap,
   });
 
   final String title;
   final Widget child;
-  final String? actionText;
-  final VoidCallback? onActionTap;
 
   @override
   Widget build(BuildContext context) {
@@ -3858,105 +5287,11 @@ class _PanelCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (actionText != null)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: InkWell(
-                      onTap: onActionTap,
-                      mouseCursor: onActionTap == null
-                          ? SystemMouseCursors.basic
-                          : SystemMouseCursors.click,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Text(
-                        actionText!,
-                        style: TextStyle(
-                          color: onActionTap == null
-                              ? NovaColors.textTertiary
-                              : NovaColors.teal,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          decoration: onActionTap == null
-                              ? TextDecoration.none
-                              : TextDecoration.underline,
-                        ),
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),
           const Divider(height: 1, color: NovaColors.borderTertiary),
           child,
-        ],
-      ),
-    );
-  }
-}
-
-class _ThinListItem extends StatelessWidget {
-  const _ThinListItem({
-    required this.icon,
-    required this.iconBg,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    required this.trailing,
-  });
-
-  final IconData icon;
-  final Color iconBg;
-  final Color iconColor;
-  final String title;
-  final String subtitle;
-  final Widget trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: NovaColors.borderTertiary)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: iconBg,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: iconColor, size: 16),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: NovaColors.textPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: NovaColors.textSecondary, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
-          trailing,
         ],
       ),
     );

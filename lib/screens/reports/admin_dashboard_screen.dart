@@ -532,11 +532,11 @@ class _QuickActionsRow extends StatelessWidget {
         Expanded(
           child: _QuickActionCard(
             icon: Icons.receipt_long_rounded,
-            label: 'Orders',
-            subtitle: 'Ready & Pending',
+            label: 'Inventory',
+            subtitle: 'Reports & Stock',
             color: NovaColors.teal,
             bgColor: NovaColors.tealLight,
-            onTap: () => Navigator.pushNamed(context, '/orders'),
+            onTap: () => Navigator.pushNamed(context, '/inventory'),
           ),
         ),
       ],

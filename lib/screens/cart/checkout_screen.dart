@@ -6,6 +6,7 @@ import '../../core/theme/nova_theme.dart';
 import '../../core/utils/app_notice.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
+import '../../services/printer/thermal_printer_service.dart';
 import '../../services/pocketbase/order_service.dart';
 import '../../services/pocketbase/inventory_service.dart';
 import '../../widgets/app_navigation.dart';
@@ -366,7 +367,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _deleteFocusedCartItem(CartProvider cart) async {
     if (cart.items.isEmpty) return;
     await _deleteCartItem(cart, cart.items[_safeCartIndex(cart)]);
-    if (mounted) _focusCartShortcuts();
+    if (!mounted) return;
+    if (cart.items.isEmpty) {
+      _navigateBackToPos();
+      return;
+    }
+    _focusCartShortcuts();
   }
 
   Future<void> _editCartItemQuantity(
@@ -516,6 +522,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     final changeAmount =
         _paymentMethod == 'cash' ? _tenderedAmount - cart.total : 0.0;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final navigator = Navigator.of(context);
 
     setState(() => _isSubmitting = true);
 
@@ -549,7 +557,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
 
-      await _orderService.createOrder(
+      final order = await _orderService.createOrder(
         items: cartSnapshot,
         total: cart.total,
         status: 'ready',
@@ -561,8 +569,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
       if (!context.mounted) return;
 
+      await ThermalPrinterService.instance.printReceiptAuto(
+        ThermalReceiptData(
+          companyName: 'Orion POS',
+          phone: '+92-317-7921817',
+          email: 'info@orion.com',
+          website: 'www.orion.com',
+          servedBy: auth.role,
+          customerName: _customerName.trim().isEmpty
+              ? 'Walk-in Customer'
+              : _customerName.trim(),
+          orderType: _orderType,
+          items: order.items,
+          total: order.total,
+          cash: order.tenderedAmount,
+          change: order.change,
+          tax: 0.0,
+          paymentMethod: order.paymentMethod ?? _paymentMethod,
+          orderNo: 'ORDER-${order.orderNumber}',
+          date:
+              '${order.createdAt.day}/${order.createdAt.month}/${order.createdAt.year} '
+              '${order.createdAt.hour.toString().padLeft(2, '0')}:'
+              '${order.createdAt.minute.toString().padLeft(2, '0')}',
+        ),
+      );
+
       cart.clear();
-      Navigator.pushNamedAndRemoveUntil(context, '/pos', (route) => false);
+      navigator.pushNamedAndRemoveUntil('/pos', (route) => false);
     } catch (e) {
       if (!context.mounted) return;
 

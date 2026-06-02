@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Required to discover and connect to thermal printers.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Required to discover network thermal printers.</string>
 </dict>
 </plist>
