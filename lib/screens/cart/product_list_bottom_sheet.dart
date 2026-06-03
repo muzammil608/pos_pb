@@ -1,3 +1,6 @@
+// ignore_for_file: use_super_parameters
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -96,13 +99,12 @@ class _ProductImage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.zero,
-      child: Image.network(
-        _imageUrl,
+      child: CachedNetworkImage(
+        imageUrl: _imageUrl,
         width: width,
         height: height,
         fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
+        placeholder: (context, url) {
           return Container(
             width: width,
             height: height,
@@ -119,7 +121,7 @@ class _ProductImage extends StatelessWidget {
             ),
           );
         },
-        errorBuilder: (context, error, stackTrace) {
+        errorWidget: (context, url, error) {
           return Container(
             width: width,
             height: height,
@@ -147,11 +149,13 @@ class ProductListBottomSheet extends StatefulWidget {
 
 class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
   final FocusNode _focusNode = FocusNode(debugLabel: 'ProductListBottomSheet');
+  final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final GlobalKey<PosSearchBarState> _searchBarKey =
       GlobalKey<PosSearchBarState>();
   final GlobalKey<PosCategoryChipsState> _categoryChipsKey =
       GlobalKey<PosCategoryChipsState>();
+  final Map<int, GlobalKey> _productItemKeys = {};
   int _focusedIndex = 0;
   int _columns = 3;
   String _query = '';
@@ -169,6 +173,7 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
@@ -187,6 +192,31 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
     setState(() {
       _focusedIndex = (_focusedIndex + delta).clamp(0, _products.length - 1);
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollFocusedProductIntoView();
+    });
+  }
+
+  void _setFocusedIndex(int index) {
+    if (!mounted) return;
+    setState(() {
+      _focusedIndex = index;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollFocusedProductIntoView(index);
+    });
+  }
+
+  void _scrollFocusedProductIntoView([int? index]) {
+    final focusedIndex = index ?? _focusedIndex;
+    final context = _productItemKeys[focusedIndex]?.currentContext;
+    if (context == null) return;
+    Scrollable.ensureVisible(
+      context,
+      alignment: 0.18,
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   List<String> _getCategories(List<Product> products) {
@@ -364,15 +394,15 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                     onChanged: (value) {
                       setState(() {
                         _query = value.trim().toLowerCase();
-                        _focusedIndex = 0;
                       });
+                      _setFocusedIndex(0);
                     },
                     onClear: () {
                       setState(() {
                         _query = '';
-                        _focusedIndex = 0;
                       });
                       _focusNode.requestFocus();
+                      _setFocusedIndex(0);
                     },
                     hintText: 'Search products…  ( / or Ctrl+F )',
                     height: 44,
@@ -483,19 +513,24 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                                     onSelected: (category) {
                                       setState(() {
                                         _selectedCategory = category;
-                                        _focusedIndex = 0;
                                       });
+                                      _setFocusedIndex(0);
                                     },
                                   ),
                                 if (showChips) const SizedBox(height: 10),
                                 Expanded(
                                   child: ListView.builder(
+                                    controller: _scrollController,
                                     padding: const EdgeInsets.fromLTRB(
                                         16, 0, 16, 24),
                                     itemCount: _products.length,
                                     itemBuilder: (context, index) {
                                       final product = _products[index];
                                       return _BottomSheetProductTile(
+                                        key: _productItemKeys.putIfAbsent(
+                                          index,
+                                          GlobalKey.new,
+                                        ),
                                         product: product,
                                         isFocused: index == _focusedIndex,
                                         onTap: () =>
@@ -522,13 +557,14 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                                   onSelected: (category) {
                                     setState(() {
                                       _selectedCategory = category;
-                                      _focusedIndex = 0;
                                     });
+                                    _setFocusedIndex(0);
                                   },
                                 ),
                               if (showChips) const SizedBox(height: 10),
                               Expanded(
                                 child: GridView.builder(
+                                  controller: _scrollController,
                                   padding:
                                       const EdgeInsets.fromLTRB(16, 0, 16, 24),
                                   gridDelegate:
@@ -544,6 +580,10 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                                   itemBuilder: (context, index) {
                                     final product = _products[index];
                                     return _BottomSheetProductGridCard(
+                                      key: _productItemKeys.putIfAbsent(
+                                        index,
+                                        GlobalKey.new,
+                                      ),
                                       product: product,
                                       isFocused: index == _focusedIndex,
                                       onTap: () =>
@@ -580,11 +620,12 @@ class _BottomSheetProductTile extends StatefulWidget {
   final VoidCallback onFocus;
 
   const _BottomSheetProductTile({
+    Key? key,
     required this.product,
     required this.isFocused,
     required this.onTap,
     required this.onFocus,
-  });
+  }) : super(key: key);
 
   @override
   State<_BottomSheetProductTile> createState() =>
@@ -749,11 +790,12 @@ class _BottomSheetProductGridCard extends StatefulWidget {
   final VoidCallback onFocus;
 
   const _BottomSheetProductGridCard({
+    Key? key,
     required this.product,
     required this.isFocused,
     required this.onTap,
     required this.onFocus,
-  });
+  }) : super(key: key);
 
   @override
   State<_BottomSheetProductGridCard> createState() =>

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/unauthorized_screen.dart';
 import '../screens/pos/pos_screen.dart';
+import '../screens/products/products_screen.dart';
 import '../screens/reports/report_screen.dart';
 import '../screens/reports/admin_dashboard_screen.dart';
 import '../screens/cart/checkout_screen.dart';
@@ -14,6 +15,7 @@ class AppRoutes {
   static Map<String, WidgetBuilder> get routes => {
         '/login': (_) => const LoginScreen(),
         '/pos': (_) => const PosScreen(),
+        '/products': (_) => const ProductsScreen(),
         '/checkout': (_) => const CheckoutScreen(),
         '/reports': (_) => const ReportScreen(),
         '/admin': (_) => const AdminDashboardScreen(),

@@ -105,7 +105,6 @@ class ThermalPrinterService {
       final ticket = await _buildTicket(data);
       await _manager.printTicket(ticket);
     } catch (_) {
-      // Auto-print should never block order completion.
     } finally {
       try {
         if (_manager.isConnected) {

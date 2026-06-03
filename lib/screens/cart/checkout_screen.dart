@@ -253,6 +253,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double _tenderedAmount = 0.0;
   bool _isSubmitting = false;
   int _focusedCartIndex = 0;
+  // bool _arrowMoveInProgress = false;
+  // int _lastCartMoveMicros = 0;
+  // int _lastCartMoveDirection = 0;
 
   // Guards to prevent re-entrant dialog/sheet calls
   bool _actionsDialogOpen = false;
@@ -327,10 +330,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _moveFocusedCartItem(CartProvider cart, int direction) {
     if (cart.items.isEmpty) return;
-    final next = (_safeCartIndex(cart) + direction).clamp(
+
+    final current = _safeCartIndex(cart);
+    final next = (current + direction).clamp(
       0,
       cart.items.length - 1,
     );
+
+    // Debug: helps detect double-firing of arrow keys in checkout.
+    // Look for logs like: "checkout arrow" ... which may appear twice per key press.
+    // ignore: avoid_print
+    print('checkout arrow dir=$direction current=$current next=$next');
+
     setState(() => _focusedCartIndex = next);
     _focusCartShortcuts();
   }
@@ -872,7 +883,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   TextField(
                                     focusNode: _cashFocus,
                                     controller: _cashController,
-                                    autofocus: true,
                                     keyboardType:
                                         const TextInputType.numberWithOptions(
                                             decimal: true),

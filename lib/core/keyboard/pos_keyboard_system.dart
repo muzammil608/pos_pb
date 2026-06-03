@@ -157,13 +157,7 @@ class PosShortcuts {
     const SingleActivator(LogicalKeyboardKey.delete): const DeleteItemIntent(),
     const SingleActivator(LogicalKeyboardKey.numpadEnter):
         const ConfirmItemIntent(),
-    const SingleActivator(LogicalKeyboardKey.arrowUp): const ArrowUpIntent(),
-    const SingleActivator(LogicalKeyboardKey.arrowDown):
-        const ArrowDownIntent(),
-    const SingleActivator(LogicalKeyboardKey.arrowLeft):
-        const ArrowLeftIntent(),
-    const SingleActivator(LogicalKeyboardKey.arrowRight):
-        const ArrowRightIntent(),
+    const SingleActivator(LogicalKeyboardKey.keyE): const EditItemIntent(),
     const SingleActivator(LogicalKeyboardKey.slash, shift: true):
         const ShowShortcutsIntent(),
     const SingleActivator(LogicalKeyboardKey.f7):
@@ -337,6 +331,7 @@ class PosKeyboardScope extends StatefulWidget {
   final VoidCallback? onInventory;
   final VoidCallback? onClearCart;
   final VoidCallback? onDeleteFocusedItem;
+  final VoidCallback? onEditFocusedItem;
   final VoidCallback? onUndoCart;
   final VoidCallback? onConfirmFocusedItem;
   final VoidCallback? onArrowUp;
@@ -360,6 +355,7 @@ class PosKeyboardScope extends StatefulWidget {
     this.onInventory,
     this.onClearCart,
     this.onDeleteFocusedItem,
+    this.onEditFocusedItem,
     this.onUndoCart,
     this.onConfirmFocusedItem,
     this.onArrowUp,
@@ -376,9 +372,6 @@ class PosKeyboardScope extends StatefulWidget {
 }
 
 class _PosKeyboardScopeState extends State<PosKeyboardScope> {
-  LogicalKeyboardKey? _lastHardwareShortcutKey;
-  int _lastHardwareShortcutMicros = 0;
-
   @override
   void initState() {
     super.initState();
@@ -389,22 +382,6 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     super.dispose();
-  }
-
-  void _markHardwareShortcut(LogicalKeyboardKey key) {
-    _lastHardwareShortcutKey = key;
-    _lastHardwareShortcutMicros = DateTime.now().microsecondsSinceEpoch;
-  }
-
-  bool _consumeHardwareShortcut(LogicalKeyboardKey key) {
-    final now = DateTime.now().microsecondsSinceEpoch;
-    if (_lastHardwareShortcutKey != key ||
-        now - _lastHardwareShortcutMicros > 100000) {
-      return false;
-    }
-    _lastHardwareShortcutKey = null;
-    _lastHardwareShortcutMicros = 0;
-    return true;
   }
 
   bool _handleHardwareKey(KeyEvent event) {
@@ -433,6 +410,16 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
       return true;
     }
 
+    if (event.logicalKey == LogicalKeyboardKey.f7) {
+      widget.onSelectPaymentMethod?.call('cash');
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.f8) {
+      widget.onSelectPaymentMethod?.call('card');
+      return true;
+    }
+
     if (event.logicalKey == LogicalKeyboardKey.f5) {
       widget.onRefresh?.call();
       return true;
@@ -445,14 +432,22 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
     }
 
     if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      _markHardwareShortcut(event.logicalKey);
       widget.onArrowUp?.call();
       return true;
     }
 
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      _markHardwareShortcut(event.logicalKey);
       widget.onArrowDown?.call();
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      widget.onArrowLeft?.call();
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      widget.onArrowRight?.call();
       return true;
     }
 
@@ -541,6 +536,12 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
               return null;
             },
           ),
+          EditItemIntent: CallbackAction<EditItemIntent>(
+            onInvoke: (_) {
+              widget.onEditFocusedItem?.call();
+              return null;
+            },
+          ),
           UndoCartIntent: CallbackAction<UndoCartIntent>(
             onInvoke: (_) {
               widget.onUndoCart?.call();
@@ -550,36 +551,6 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
           ConfirmItemIntent: CallbackAction<ConfirmItemIntent>(
             onInvoke: (_) {
               widget.onConfirmFocusedItem?.call();
-              return null;
-            },
-          ),
-          ArrowUpIntent: CallbackAction<ArrowUpIntent>(
-            onInvoke: (_) {
-              if (_consumeHardwareShortcut(LogicalKeyboardKey.arrowUp)) {
-                return null;
-              }
-              widget.onArrowUp?.call();
-              return null;
-            },
-          ),
-          ArrowDownIntent: CallbackAction<ArrowDownIntent>(
-            onInvoke: (_) {
-              if (_consumeHardwareShortcut(LogicalKeyboardKey.arrowDown)) {
-                return null;
-              }
-              widget.onArrowDown?.call();
-              return null;
-            },
-          ),
-          ArrowLeftIntent: CallbackAction<ArrowLeftIntent>(
-            onInvoke: (_) {
-              widget.onArrowLeft?.call();
-              return null;
-            },
-          ),
-          ArrowRightIntent: CallbackAction<ArrowRightIntent>(
-            onInvoke: (_) {
-              widget.onArrowRight?.call();
               return null;
             },
           ),
@@ -680,21 +651,39 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
       return true;
     }
 
-    if (logicalKey == LogicalKeyboardKey.arrowUp) {
-      widget.onArrowUp?.call();
-      return true;
-    }
-    if (logicalKey == LogicalKeyboardKey.arrowDown) {
-      widget.onArrowDown?.call();
+    if (logicalKey == LogicalKeyboardKey.f7) {
+      widget.onSelectPaymentMethod?.call('cash');
       return true;
     }
 
-    if (isTextEditing) return false;
+    if (logicalKey == LogicalKeyboardKey.f8) {
+      widget.onSelectPaymentMethod?.call('card');
+      return true;
+    }
 
     if (logicalKey == LogicalKeyboardKey.keyE) {
       widget.onEditFocusedItem?.call();
       return true;
     }
+
+    if (logicalKey == LogicalKeyboardKey.arrowUp) {
+      if (FocusManager.instance.primaryFocus?.context?.widget
+          is! EditableText) {
+        widget.onArrowUp?.call();
+        return true;
+      }
+      return false;
+    }
+    if (logicalKey == LogicalKeyboardKey.arrowDown) {
+      if (FocusManager.instance.primaryFocus?.context?.widget
+          is! EditableText) {
+        widget.onArrowDown?.call();
+        return true;
+      }
+      return false;
+    }
+
+    if (isTextEditing) return false;
     if (logicalKey == LogicalKeyboardKey.delete) {
       widget.onDeleteFocusedItem?.call();
       return true;
@@ -733,10 +722,19 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
     widget.onCashChanged?.call(next);
   }
 
+  Map<ShortcutActivator, Intent> get _checkoutShortcuts {
+    return Map<ShortcutActivator, Intent>.fromEntries(
+      PosShortcuts.numpad.entries.where(
+        (entry) =>
+            entry.value is! ArrowUpIntent && entry.value is! ArrowDownIntent,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Shortcuts(
-      shortcuts: PosShortcuts.numpad,
+      shortcuts: _checkoutShortcuts,
       child: Actions(
         actions: {
           NumpadKeyIntent: CallbackAction<NumpadKeyIntent>(
@@ -763,22 +761,6 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
             onInvoke: (_) {
               if (!(widget.cashFocusNode?.hasFocus ?? false)) {
                 widget.onDeleteFocusedItem?.call();
-              }
-              return null;
-            },
-          ),
-          ArrowUpIntent: CallbackAction<ArrowUpIntent>(
-            onInvoke: (_) {
-              if (!(widget.cashFocusNode?.hasFocus ?? false)) {
-                widget.onArrowUp?.call();
-              }
-              return null;
-            },
-          ),
-          ArrowDownIntent: CallbackAction<ArrowDownIntent>(
-            onInvoke: (_) {
-              if (!(widget.cashFocusNode?.hasFocus ?? false)) {
-                widget.onArrowDown?.call();
               }
               return null;
             },

@@ -1,6 +1,9 @@
+// ignore_for_file: use_super_parameters
+
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +24,7 @@ import '../../services/pocketbase/product_service.dart';
 import '../../widgets/app_navigation.dart';
 import '../../widgets/receipt_dialog.dart';
 import '../../widgets/responsive_layout.dart';
+import '../cart/product_list_bottom_sheet.dart';
 
 bool get _isDesktop =>
     !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
@@ -570,12 +574,14 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   final FocusNode _cashFocusNode = FocusNode(debugLabel: 'PosCashTendered');
   final FocusNode _checkoutShortcutFocusNode =
       FocusNode(debugLabel: 'PosCheckoutShortcuts');
+  final ScrollController _productScrollController = ScrollController();
   final GlobalKey<PosSearchBarState> _searchBarKey =
       GlobalKey<PosSearchBarState>();
   final GlobalKey<PosCategoryChipsState> _categoryChipsKey =
       GlobalKey<PosCategoryChipsState>();
   final Map<String, GlobalKey> _cartItemKeys = {};
   final Map<String, GlobalKey> _cartItemMenuKeys = {};
+  final Map<int, GlobalKey> _productItemKeys = {};
 
   late AnimationController _pulseController;
 
@@ -592,6 +598,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   double _tenderedAmount = 0.0;
   bool _isSubmitting = false;
   bool _actionsDialogOpen = false;
+  bool _productSheetOpen = false;
   bool _checkoutKeyboardMode = false;
 
   bool _readyOrdersSheetOpen = false;
@@ -671,6 +678,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     _cashController.dispose();
     _cashFocusNode.dispose();
     _checkoutShortcutFocusNode.dispose();
+    _productScrollController.dispose();
     _pulseController.dispose();
     _posHeaderService?.dispose();
     PosHotkeyRegistry.unregisterAll();
@@ -689,10 +697,9 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     }
 
     if (_lastFilteredProducts.isEmpty) return;
-    setState(() {
-      _focusedProductIndex =
-          (_focusedProductIndex + 1).clamp(0, _lastFilteredProducts.length - 1);
-    });
+    _setFocusedProductIndex(
+      (_focusedProductIndex + 1).clamp(0, _lastFilteredProducts.length - 1),
+    );
   }
 
   void _onArrowUp() {
@@ -707,10 +714,9 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     }
 
     if (_lastFilteredProducts.isEmpty) return;
-    setState(() {
-      _focusedProductIndex =
-          (_focusedProductIndex - 1).clamp(0, _lastFilteredProducts.length - 1);
-    });
+    _setFocusedProductIndex(
+      (_focusedProductIndex - 1).clamp(0, _lastFilteredProducts.length - 1),
+    );
   }
 
   void _onArrowRight() {
@@ -743,6 +749,34 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     final cart = Provider.of<CartProvider>(context, listen: false);
     if (cart.items.isEmpty) return;
     _deleteFocusedCartItem(cart);
+  }
+
+  void _onEditFocusedItem() {
+    final cart = Provider.of<CartProvider>(context, listen: false);
+    if (cart.items.isEmpty) return;
+    _showCartItemActions(context, cart, cart.items[_safeCartIndex(cart)]);
+  }
+
+  void _setFocusedProductIndex(int index) {
+    if (!mounted) return;
+    setState(() {
+      _focusedProductIndex = index;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollFocusedProductIntoView(index);
+    });
+  }
+
+  void _scrollFocusedProductIntoView([int? index]) {
+    final focusedIndex = index ?? _focusedProductIndex;
+    final context = _productItemKeys[focusedIndex]?.currentContext;
+    if (context == null) return;
+    Scrollable.ensureVisible(
+      context,
+      alignment: 0.18,
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void _onUndoCart() {
@@ -828,91 +862,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
       _searchBarKey.currentState?.clear();
       _searchBarKey.currentState?.requestFocus();
     });
-  }
-
-  void _handleEscapeShortcut() {
-    if (_checkoutKeyboardMode) {
-      setState(() => _checkoutKeyboardMode = false);
-    }
-    _cashFocusNode.unfocus();
-    _checkoutShortcutFocusNode.unfocus();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _searchBarKey.currentState?.clear();
-      _searchBarKey.currentState?.requestFocus();
-    });
-  }
-
-  KeyEventResult _handleCheckoutKey(
-    CartProvider cart,
-    KeyEvent event,
-  ) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    final isTextEditing =
-        FocusManager.instance.primaryFocus?.context?.widget is EditableText;
-
-    switch (event.logicalKey) {
-      case LogicalKeyboardKey.arrowUp:
-        _moveFocusedCartItem(cart, -1);
-        return KeyEventResult.handled;
-      case LogicalKeyboardKey.arrowDown:
-        _moveFocusedCartItem(cart, 1);
-        return KeyEventResult.handled;
-      case LogicalKeyboardKey.keyE:
-        if (isTextEditing) return KeyEventResult.ignored;
-        if (cart.items.isNotEmpty) {
-          final item = cart.items[_safeCartIndex(cart)];
-          _showCartItemActions(context, cart, item);
-        }
-        return KeyEventResult.handled;
-      case LogicalKeyboardKey.enter:
-      case LogicalKeyboardKey.numpadEnter:
-        if (_cashFocusNode.hasFocus) return KeyEventResult.ignored;
-        _placeOrder(context, cart).then((success) {
-          if (!mounted || !success) return;
-          _focusPosForNewOrder();
-        });
-        return KeyEventResult.handled;
-      case LogicalKeyboardKey.f2:
-        _showReadyOrdersSheet(context);
-        return KeyEventResult.handled;
-      case LogicalKeyboardKey.f7:
-        _selectPaymentMethod('cash');
-        return KeyEventResult.handled;
-      case LogicalKeyboardKey.f8:
-        _selectPaymentMethod('card');
-        return KeyEventResult.handled;
-      default:
-        return KeyEventResult.ignored;
-    }
-  }
-
-  KeyEventResult _handleCashFieldKey(
-    CartProvider cart,
-    KeyEvent event,
-  ) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-
-    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      _moveFocusedCartItem(cart, -1);
-      return KeyEventResult.handled;
-    }
-
-    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      _moveFocusedCartItem(cart, 1);
-      return KeyEventResult.handled;
-    }
-
-    if (event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
-      _placeOrder(context, cart).then((success) {
-        if (!mounted || !success) return;
-        _focusPosForNewOrder();
-      });
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.ignored;
   }
 
   void _openProducts() {
@@ -1090,6 +1039,44 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _openProductBottomSheet(BuildContext context) async {
+    if (_productSheetOpen) return;
+    _productSheetOpen = true;
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          final size = MediaQuery.of(sheetContext).size;
+          final isWide = size.width >= 900;
+          final panelWidth = isWide ? size.width / 3 : size.width;
+          final panelHeight = size.height * 0.82;
+
+          return Align(
+            alignment: Alignment.bottomRight,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: isWide ? 360 : 0,
+                maxWidth: isWide
+                    ? panelWidth.clamp(360.0, 560.0).toDouble()
+                    : panelWidth,
+                maxHeight: panelHeight,
+              ),
+              child: const ProductListBottomSheet(),
+            ),
+          );
+        },
+      );
+    } finally {
+      _productSheetOpen = false;
+      if (mounted) {
+        _checkoutShortcutFocusNode.requestFocus();
+      }
+    }
+  }
+
   Future<void> _showCartItemActions(
     BuildContext context,
     CartProvider cart,
@@ -1101,6 +1088,12 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     final cartDocId = item['cartDocId'] as String? ?? '';
     final menuKey = _cartItemMenuKeys[cartDocId];
     final actions = [
+      const _CartActionOption(
+        value: 'add',
+        label: 'Add More',
+        icon: Icons.add_circle_outline,
+        color: NovaColors.violet,
+      ),
       const _CartActionOption(
         value: 'edit',
         label: 'Edit Qty',
@@ -1134,8 +1127,10 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
       _actionsDialogOpen = false;
     }
 
-    if (!mounted || value == null) return;
-    if (value == 'edit') {
+    if (!mounted || !context.mounted || value == null) return;
+    if (value == 'add') {
+      await _openProductBottomSheet(context);
+    } else if (value == 'edit') {
       await _showEditItemDialog(cart, item);
     } else if (value == 'delete') {
       await _deleteCartItem(cart, item);
@@ -1939,6 +1934,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
               onProducts: _openProducts,
               onClearCart: _onClearCart,
               onDeleteFocusedItem: _onDeleteFocusedItem,
+              onEditFocusedItem: _onEditFocusedItem,
               onUndoCart: _onUndoCart,
               onConfirmFocusedItem: _onConfirmFocusedItem,
               onArrowUp: _onArrowUp,
@@ -1946,7 +1942,8 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
               onArrowLeft: _onArrowLeft,
               onArrowRight: _onArrowRight,
               onRefresh: () => setState(() {}),
-              onEscape: _handleEscapeShortcut,
+              onEscape: null,
+              onSelectPaymentMethod: _selectPaymentMethod,
               onInventory: _openInventory,
               child: StreamBuilder<List<Product>>(
                 stream: _productService?.streamProducts ??
@@ -2060,6 +2057,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
 
                               if (isMobile) {
                                 return ListView.builder(
+                                  controller: _productScrollController,
                                   padding: listPadding,
                                   itemCount: filteredProducts.length,
                                   itemBuilder: (_, index) {
@@ -2067,6 +2065,10 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                                     final isFocused =
                                         _focusedProductIndex == index;
                                     return _ProductListTile(
+                                      key: _productItemKeys.putIfAbsent(
+                                        index,
+                                        GlobalKey.new,
+                                      ),
                                       product: product,
                                       isFocused: isFocused,
                                       onTap: () =>
@@ -2077,6 +2079,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                               }
 
                               return GridView.builder(
+                                controller: _productScrollController,
                                 padding: listPadding,
                                 gridDelegate:
                                     SliverGridDelegateWithFixedCrossAxisCount(
@@ -2093,6 +2096,10 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                                   final isFocused =
                                       _focusedProductIndex == index;
                                   return _ProductCard(
+                                    key: _productItemKeys.putIfAbsent(
+                                      index,
+                                      GlobalKey.new,
+                                    ),
                                     product: product,
                                     isFocused: isFocused,
                                     onTap: () =>
@@ -2111,16 +2118,20 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                               child: PosSearchBar(
                                 key: _searchBarKey,
                                 controller: _searchController,
-                                onChanged: (v) => setState(() {
-                                  _searchQuery = v;
-                                  _focusedProductIndex = 0;
-                                }),
+                                onChanged: (v) {
+                                  setState(() {
+                                    _searchQuery = v;
+                                  });
+                                  _setFocusedProductIndex(0);
+                                },
                                 onSubmitted: (v) =>
                                     _handleSearchSubmitted(v, allProducts),
-                                onClear: () => setState(() {
-                                  _searchQuery = '';
+                                onClear: () {
+                                  setState(() {
+                                    _searchQuery = '';
+                                  });
                                   _focusedProductIndex = -1;
-                                }),
+                                },
                               ),
                             ),
                             const SizedBox(height: 10),
@@ -2131,10 +2142,12 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                                   key: _categoryChipsKey,
                                   categories: categories,
                                   selected: _selectedCategory,
-                                  onSelected: (cat) => setState(() {
-                                    _selectedCategory = cat;
-                                    _focusedProductIndex = 0;
-                                  }),
+                                  onSelected: (cat) {
+                                    setState(() {
+                                      _selectedCategory = cat;
+                                    });
+                                    _setFocusedProductIndex(0);
+                                  },
                                 ),
                               ),
                             if (_posHeaderService != null) ...[
@@ -2223,9 +2236,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
 
                         return Focus(
                             focusNode: _checkoutShortcutFocusNode,
-                            canRequestFocus: true,
-                            onKeyEvent: (node, event) =>
-                                _handleCheckoutKey(cart, event),
                             child: Container(
                               decoration: BoxDecoration(
                                 color: NovaColors.bgPrimary,
@@ -2377,53 +2387,35 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                                           ),
                                           if (_paymentMethod == 'cash') ...[
                                             const SizedBox(height: 10),
-                                            Focus(
-                                              onKeyEvent: (node, event) =>
-                                                  _handleCashFieldKey(
-                                                cart,
-                                                event,
+                                            TextField(
+                                              focusNode: _cashFocusNode,
+                                              controller: _cashController,
+                                              textInputAction:
+                                                  TextInputAction.done,
+                                              keyboardType: const TextInputType
+                                                  .numberWithOptions(
+                                                decimal: true,
                                               ),
-                                              child: TextField(
-                                                focusNode: _cashFocusNode,
-                                                controller: _cashController,
-                                                textInputAction:
-                                                    TextInputAction.done,
-                                                keyboardType:
-                                                    const TextInputType
-                                                        .numberWithOptions(
-                                                  decimal: true,
-                                                ),
-                                                onSubmitted: (_) async {
-                                                  final success =
-                                                      await _placeOrder(
-                                                    context,
-                                                    cart,
-                                                  );
-                                                  if (success && mounted) {
-                                                    _focusPosForNewOrder();
-                                                  }
-                                                },
-                                                onChanged: (value) =>
-                                                    setState(() {
-                                                  _tenderedAmount =
-                                                      double.tryParse(value) ??
-                                                          0.0;
-                                                }),
-                                                style: const TextStyle(
-                                                  fontSize: 13,
-                                                  color: NovaColors.textPrimary,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                                decoration: _fieldDecoration(
-                                                  'Cash Tendered',
-                                                  icon: Icons.money_rounded,
-                                                ).copyWith(
-                                                  prefixText: 'Rs  ',
-                                                  prefixStyle: const TextStyle(
-                                                    color: NovaColors
-                                                        .textSecondary,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
+                                              onChanged: (value) =>
+                                                  setState(() {
+                                                _tenderedAmount =
+                                                    double.tryParse(value) ??
+                                                        0.0;
+                                              }),
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: NovaColors.textPrimary,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              decoration: _fieldDecoration(
+                                                'Cash Tendered',
+                                                icon: Icons.money_rounded,
+                                              ).copyWith(
+                                                prefixText: 'Rs  ',
+                                                prefixStyle: const TextStyle(
+                                                  color:
+                                                      NovaColors.textSecondary,
+                                                  fontWeight: FontWeight.w600,
                                                 ),
                                               ),
                                             ),
@@ -4017,13 +4009,12 @@ class _ProductImage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.zero,
-      child: Image.network(
-        _imageUrl,
+      child: CachedNetworkImage(
+        imageUrl: _imageUrl,
         width: width,
         height: height,
         fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
+        placeholder: (context, url) {
           return Container(
             width: width,
             height: height,
@@ -4040,7 +4031,7 @@ class _ProductImage extends StatelessWidget {
             ),
           );
         },
-        errorBuilder: (context, error, stackTrace) {
+        errorWidget: (context, url, error) {
           return Container(
             width: width,
             height: height,
@@ -4062,10 +4053,11 @@ class _ProductListTile extends StatefulWidget {
   final bool isFocused;
 
   const _ProductListTile({
+    Key? key,
     required this.product,
     required this.onTap,
     this.isFocused = false,
-  });
+  }) : super(key: key);
 
   @override
   State<_ProductListTile> createState() => _ProductListTileState();
@@ -4223,6 +4215,7 @@ class _ProductCard extends StatefulWidget {
   final bool isFocused;
 
   const _ProductCard({
+    super.key,
     required this.product,
     required this.onTap,
     this.isFocused = false,

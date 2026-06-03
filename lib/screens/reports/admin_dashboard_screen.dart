@@ -107,13 +107,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       Icon(Icons.analytics_rounded,
                           color: Colors.white70, size: 22),
                       SizedBox(width: 10),
-                      Text(
-                        'Admin Dashboard',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                          letterSpacing: 0.3,
+                      Expanded(
+                        child: Text(
+                          'Admin Dashboard',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            letterSpacing: 0.3,
+                          ),
                         ),
                       ),
                     ],
