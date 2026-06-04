@@ -108,32 +108,10 @@ class SelectPaymentMethodIntent extends Intent {
   const SelectPaymentMethodIntent(this.method);
 }
 
-class KitchenNavigateIntent extends Intent {
-  final bool up;
-  const KitchenNavigateIntent({required this.up});
-}
-
-class KitchenEditItemIntent extends Intent {
-  const KitchenEditItemIntent();
-}
-
-class KitchenDeleteItemIntent extends Intent {
-  const KitchenDeleteItemIntent();
-}
-
-class KitchenConfirmItemIntent extends Intent {
-  const KitchenConfirmItemIntent();
-}
-
-class KitchenReadyOrderIntent extends Intent {
-  const KitchenReadyOrderIntent();
-}
-
 class PosShortcuts {
   static Map<ShortcutActivator, Intent> posScreen = {
     const SingleActivator(LogicalKeyboardKey.keyF, control: true):
         const FocusSearchIntent(),
-    const SingleActivator(LogicalKeyboardKey.slash): const FocusSearchIntent(),
     const SingleActivator(LogicalKeyboardKey.escape): const ClearSearchIntent(),
     const SingleActivator(LogicalKeyboardKey.arrowRight, control: true):
         const NextCategoryIntent(),
@@ -147,19 +125,10 @@ class PosShortcuts {
     const SingleActivator(LogicalKeyboardKey.f6): const InventoryIntent(),
     const SingleActivator(LogicalKeyboardKey.enter, control: true):
         const CheckoutIntent(),
-    const SingleActivator(LogicalKeyboardKey.keyI, control: true):
-        const InventoryIntent(),
     const SingleActivator(LogicalKeyboardKey.delete, control: true):
         const ClearCartIntent(),
     const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
         const UndoCartIntent(),
-    const SingleActivator(LogicalKeyboardKey.enter): const ConfirmItemIntent(),
-    const SingleActivator(LogicalKeyboardKey.delete): const DeleteItemIntent(),
-    const SingleActivator(LogicalKeyboardKey.numpadEnter):
-        const ConfirmItemIntent(),
-    const SingleActivator(LogicalKeyboardKey.keyE): const EditItemIntent(),
-    const SingleActivator(LogicalKeyboardKey.slash, shift: true):
-        const ShowShortcutsIntent(),
     const SingleActivator(LogicalKeyboardKey.f7):
         SelectPaymentMethodIntent('cash'),
     const SingleActivator(LogicalKeyboardKey.f8):
@@ -195,26 +164,11 @@ class PosShortcuts {
     const SingleActivator(LogicalKeyboardKey.enter): ConfirmItemIntent(),
     const SingleActivator(LogicalKeyboardKey.numpadEnter): ConfirmItemIntent(),
     const SingleActivator(LogicalKeyboardKey.keyE): EditItemIntent(),
-    const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true):
-        CheckoutBackIntent(),
-    const SingleActivator(LogicalKeyboardKey.f10): CheckoutBackIntent(),
+    const SingleActivator(LogicalKeyboardKey.f9): CheckoutBackIntent(),
     const SingleActivator(LogicalKeyboardKey.f7):
         SelectPaymentMethodIntent('cash'),
     const SingleActivator(LogicalKeyboardKey.f8):
         SelectPaymentMethodIntent('card'),
-  };
-
-  static Map<ShortcutActivator, Intent> kitchen = {
-    const SingleActivator(LogicalKeyboardKey.arrowUp):
-        KitchenNavigateIntent(up: true),
-    const SingleActivator(LogicalKeyboardKey.arrowDown):
-        KitchenNavigateIntent(up: false),
-    const SingleActivator(LogicalKeyboardKey.delete):
-        const KitchenDeleteItemIntent(),
-    const SingleActivator(LogicalKeyboardKey.enter):
-        const KitchenReadyOrderIntent(),
-    const SingleActivator(LogicalKeyboardKey.numpadEnter):
-        const KitchenReadyOrderIntent(),
   };
 }
 
@@ -389,16 +343,48 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
     if (ModalRoute.of(context)?.isCurrent != true) return false;
 
     final searchBar = widget.searchBarKey?.currentState;
+    final searchHasFocus = searchBar?.hasFocus ?? false;
+
+    if (event.logicalKey == LogicalKeyboardKey.f1) {
+      widget.onNewOrder?.call();
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.f2) {
+      widget.onReadyOrders?.call();
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.f3) {
+      widget.onClearCart?.call();
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.f4) {
+      widget.onProducts?.call();
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.f6) {
+      widget.onInventory?.call();
+      return true;
+    }
+
     if (event.logicalKey == LogicalKeyboardKey.keyF &&
         HardwareKeyboard.instance.isControlPressed) {
       searchBar?.requestFocus();
       return true;
     }
 
-    if (event.logicalKey == LogicalKeyboardKey.slash &&
-        searchBar?.hasFocus != true) {
-      searchBar?.requestFocus();
-      return true;
+    if (event.character == '/' ||
+        (event.logicalKey == LogicalKeyboardKey.slash &&
+            !HardwareKeyboard.instance.isShiftPressed)) {
+      if (!searchHasFocus) {
+        if (_isDesktop) {
+          PosShortcutHelp.show(context);
+        }
+        return true;
+      }
     }
 
     if (event.logicalKey == LogicalKeyboardKey.escape) {
@@ -431,6 +417,31 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
       return true;
     }
 
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      if (!searchHasFocus) {
+        widget.onConfirmFocusedItem?.call();
+        return true;
+      }
+      return false;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.delete) {
+      if (!searchHasFocus) {
+        widget.onDeleteFocusedItem?.call();
+        return true;
+      }
+      return false;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.keyE) {
+      if (!searchHasFocus) {
+        widget.onEditFocusedItem?.call();
+        return true;
+      }
+      return false;
+    }
+
     if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
       widget.onArrowUp?.call();
       return true;
@@ -441,14 +452,28 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
       return true;
     }
 
+    final hasCtrl = HardwareKeyboard.instance.isControlPressed;
+
     if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-      widget.onArrowLeft?.call();
-      return true;
+      if (hasCtrl) {
+        widget.categoryChipsKey?.currentState?.prevCategory();
+        return true;
+      } else if (!searchHasFocus ||
+          (searchBar?.widget.controller.text.isEmpty ?? true)) {
+        widget.onArrowLeft?.call();
+        return true;
+      }
     }
 
     if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-      widget.onArrowRight?.call();
-      return true;
+      if (hasCtrl) {
+        widget.categoryChipsKey?.currentState?.nextCategory();
+        return true;
+      } else if (!searchHasFocus ||
+          (searchBar?.widget.controller.text.isEmpty ?? true)) {
+        widget.onArrowRight?.call();
+        return true;
+      }
     }
 
     return false;
@@ -532,31 +557,49 @@ class _PosKeyboardScopeState extends State<PosKeyboardScope> {
           ),
           DeleteItemIntent: CallbackAction<DeleteItemIntent>(
             onInvoke: (_) {
-              widget.onDeleteFocusedItem?.call();
+              final searchHasFocus =
+                  widget.searchBarKey?.currentState?.hasFocus ?? false;
+              if (!searchHasFocus) {
+                widget.onDeleteFocusedItem?.call();
+              }
               return null;
             },
           ),
           EditItemIntent: CallbackAction<EditItemIntent>(
             onInvoke: (_) {
-              widget.onEditFocusedItem?.call();
+              final searchHasFocus =
+                  widget.searchBarKey?.currentState?.hasFocus ?? false;
+              if (!searchHasFocus) {
+                widget.onEditFocusedItem?.call();
+              }
               return null;
             },
           ),
           UndoCartIntent: CallbackAction<UndoCartIntent>(
             onInvoke: (_) {
-              widget.onUndoCart?.call();
+              final searchHasFocus =
+                  widget.searchBarKey?.currentState?.hasFocus ?? false;
+              if (!searchHasFocus) {
+                widget.onUndoCart?.call();
+              }
               return null;
             },
           ),
           ConfirmItemIntent: CallbackAction<ConfirmItemIntent>(
             onInvoke: (_) {
-              widget.onConfirmFocusedItem?.call();
+              final searchHasFocus =
+                  widget.searchBarKey?.currentState?.hasFocus ?? false;
+              if (!searchHasFocus) {
+                widget.onConfirmFocusedItem?.call();
+              }
               return null;
             },
           ),
           ShowShortcutsIntent: CallbackAction<ShowShortcutsIntent>(
             onInvoke: (_) {
-              if (_isDesktop) {
+              final searchHasFocus =
+                  widget.searchBarKey?.currentState?.hasFocus ?? false;
+              if (!searchHasFocus && _isDesktop) {
                 PosShortcutHelp.show(context);
               }
               return null;
@@ -642,9 +685,7 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
     final logicalKey = event.logicalKey;
     final isTextEditing =
         FocusManager.instance.primaryFocus?.context?.widget is EditableText;
-    final isBackToPos = logicalKey == LogicalKeyboardKey.f10 ||
-        (logicalKey == LogicalKeyboardKey.arrowLeft &&
-            HardwareKeyboard.instance.isAltPressed);
+    final isBackToPos = logicalKey == LogicalKeyboardKey.f9;
 
     if (isBackToPos) {
       _goBackOnce();
@@ -784,114 +825,6 @@ class _CheckoutKeyboardScopeState extends State<CheckoutKeyboardScope> {
           child: widget.child,
         ),
       ),
-    );
-  }
-}
-
-class KitchenKeyboardScope extends StatefulWidget {
-  final Widget child;
-  final ValueChanged<bool>? onNavigate;
-  final VoidCallback? onEdit;
-  final VoidCallback? onDelete;
-  final VoidCallback? onConfirm;
-  final VoidCallback? onReadyOrder;
-  final VoidCallback? onBack;
-
-  const KitchenKeyboardScope({
-    super.key,
-    required this.child,
-    this.onNavigate,
-    this.onEdit,
-    this.onDelete,
-    this.onConfirm,
-    this.onReadyOrder,
-    this.onBack,
-  });
-
-  @override
-  State<KitchenKeyboardScope> createState() => _KitchenKeyboardScopeState();
-}
-
-class _KitchenKeyboardScopeState extends State<KitchenKeyboardScope> {
-  final FocusNode _focusNode = FocusNode(debugLabel: 'KitchenKeyboardScope');
-  bool _backInProgress = false;
-
-  @override
-  void initState() {
-    super.initState();
-    HardwareKeyboard.instance.addHandler(_handleHardwareKey);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
-    });
-  }
-
-  @override
-  void dispose() {
-    HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  bool _isBackToPosKey(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.f10 ||
-        (key == LogicalKeyboardKey.arrowLeft &&
-            HardwareKeyboard.instance.isAltPressed);
-  }
-
-  bool _handleHardwareKey(KeyEvent event) {
-    if (!mounted || event is! KeyDownEvent) return false;
-    if (!_isBackToPosKey(event.logicalKey)) return false;
-    if (widget.onBack == null) return false;
-
-    _goBackOnce();
-    return true;
-  }
-
-  void _goBackOnce() {
-    if (_backInProgress) return;
-    _backInProgress = true;
-    widget.onBack?.call();
-  }
-
-  KeyEventResult _handleKey(FocusNode _, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-
-    final key = event.logicalKey;
-
-    if (_isBackToPosKey(key)) {
-      if (widget.onBack == null) return KeyEventResult.ignored;
-      _goBackOnce();
-      return KeyEventResult.handled;
-    }
-
-    if (key == LogicalKeyboardKey.arrowUp) {
-      widget.onNavigate?.call(true);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      widget.onNavigate?.call(false);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.enter ||
-        key == LogicalKeyboardKey.numpadEnter) {
-      (widget.onReadyOrder ?? widget.onConfirm)?.call();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.delete) {
-      widget.onDelete?.call();
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.ignored;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Focus(
-      focusNode: _focusNode,
-      autofocus: true,
-      onKeyEvent: _handleKey,
-      child: widget.child,
     );
   }
 }
@@ -1484,8 +1417,7 @@ class PosShortcutHelp extends StatelessWidget {
       (
         'Navigation',
         [
-          ('Ctrl+F  or  /', 'Focus product search'),
-          ('Ctrl+I', 'Open inventory'),
+          ('Ctrl+F', 'Focus product search'),
           ('Ctrl+→ / Ctrl+←', 'Next / prev category'),
           ('↑ ↓ ← →', 'Navigate product list'),
           ('Tab / Shift+Tab', 'Move between fields'),
@@ -1507,6 +1439,7 @@ class PosShortcutHelp extends StatelessWidget {
         [
           ('Enter', 'Confirm / add focused item'),
           ('Escape', 'Cancel dialog / clear search'),
+          ('E', 'Edit focused item qty'),
           ('Delete', 'Remove last cart item'),
           ('Ctrl+Z', 'Undo last cart action'),
           ('Ctrl+Enter', 'Go to checkout'),
@@ -1519,7 +1452,7 @@ class PosShortcutHelp extends StatelessWidget {
           ('0–9 / Numpad', 'Enter cash amount'),
           ('Backspace', 'Delete last digit'),
           ('Enter', 'Confirm payment'),
-          ('F10 / Alt+←', 'Back to POS'),
+          ('F9', 'Back to POS'),
           ('F7', 'Select Cash payment'),
           ('F8', 'Select Card payment'),
         ]
@@ -1605,7 +1538,7 @@ class PosShortcutHelp extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Center(
-                  child: Text('Press  ?  anytime to show this',
+                  child: Text('Press  /  anytime to show this',
                       style: TextStyle(
                           fontSize: 11,
                           color: Color(0xFF9999AE),

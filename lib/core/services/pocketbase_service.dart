@@ -10,19 +10,14 @@ class PocketBaseService {
   static const String _configuredUrl = String.fromEnvironment('POCKETBASE_URL');
 
   static String get _baseUrl {
-    // Use custom env URL if provided
     if (_configuredUrl.isNotEmpty) {
       return _configuredUrl;
     }
 
-    // Mobile debug default: use adb reverse / simulator loopback.
-    // For physical devices over Wi-Fi, pass:
-    // --dart-define=POCKETBASE_URL=http://<your-lan-ip>:8090
     if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       return 'http://127.0.0.1:8090';
     }
 
-    // Desktop / other platforms
     return 'http://127.0.0.1:8090';
   }
 

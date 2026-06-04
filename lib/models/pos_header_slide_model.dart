@@ -139,7 +139,7 @@ class PosHeaderSlide {
       'startColor': colorToHex(startColor),
       'middleColor': colorToHex(middleColor),
       'endColor': colorToHex(endColor),
-      'sortOrder': sortOrder.toInt(), // ensure it's always a plain int
+      'sortOrder': sortOrder.toInt(),
       'isActive': isActive,
     };
   }

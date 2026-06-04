@@ -36,7 +36,6 @@ class AuthProvider extends ChangeNotifier {
 
   bool get isAdmin => role == 'admin';
   bool get isCashier => role == 'cashier';
-  bool get isKitchen => role == 'kitchen';
 
   PocketBase get pb {
     final value = _pb;

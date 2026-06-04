@@ -81,9 +81,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
         return Scaffold(
           backgroundColor: NovaColors.bgTertiary,
-          drawer: isDesktop
-              ? null
-              : AppNavigationDrawer(auth: auth, currentRoute: '/admin'),
+          drawer: null,
+          bottomNavigationBar:
+              !isDesktop ? const AppMobileBottomNavBar(currentIndex: 1) : null,
           appBar: PreferredSize(
             preferredSize: const Size.fromHeight(64),
             child: Container(
@@ -123,6 +123,53 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ],
                   ),
                   actions: [
+                    if (!isDesktop)
+                      IconButton(
+                        tooltip: 'Logout',
+                        icon: const Icon(Icons.logout_rounded,
+                            color: Colors.white70),
+                        onPressed: () async {
+                          final isMobile =
+                              MediaQuery.sizeOf(context).width < 600;
+                          bool confirm = true;
+                          if (!isMobile) {
+                            confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (dialogCtx) => AlertDialog(
+                                    title: const Text('Logout'),
+                                    content: const Text(
+                                        'Are you sure you want to logout?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dialogCtx, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dialogCtx, true),
+                                        style: TextButton.styleFrom(
+                                            foregroundColor: Colors.red),
+                                        child: const Text('Logout'),
+                                      ),
+                                    ],
+                                  ),
+                                ) ??
+                                false;
+                          }
+                          if (confirm && context.mounted) {
+                            await Provider.of<AuthProvider>(context,
+                                    listen: false)
+                                .logout();
+                            if (context.mounted) {
+                              Navigator.of(context).pushNamedAndRemoveUntil(
+                                '/login',
+                                (route) => false,
+                              );
+                            }
+                          }
+                        },
+                      ),
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: AppDrawerAvatarButton(
@@ -535,12 +582,23 @@ class _QuickActionsRow extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _QuickActionCard(
-            icon: Icons.receipt_long_rounded,
+            icon: Icons.inventory_rounded,
             label: 'Inventory',
             subtitle: 'Reports & Stock',
             color: NovaColors.teal,
             bgColor: NovaColors.tealLight,
             onTap: () => Navigator.pushNamed(context, '/inventory'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _QuickActionCard(
+            icon: Icons.people_rounded,
+            label: 'Employees',
+            subtitle: 'Manage Staff',
+            color: NovaColors.rose,
+            bgColor: NovaColors.roseLight,
+            onTap: () => Navigator.pushNamed(context, '/employees'),
           ),
         ),
       ],

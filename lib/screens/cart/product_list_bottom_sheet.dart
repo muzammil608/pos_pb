@@ -1,5 +1,3 @@
-// ignore_for_file: use_super_parameters
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,9 +11,6 @@ import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/pocketbase/product_service.dart';
 
-// ---------------------------------------------------------------------------
-// Category → Unsplash image map (mirrors pos_screen.dart _CategoryImages)
-// ---------------------------------------------------------------------------
 class _CategoryImages {
   static const Map<String, String> _images = {
     'dairy':
@@ -75,9 +70,6 @@ class _CategoryImages {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Shared product image widget (mirrors pos_screen.dart _ProductImage)
-// ---------------------------------------------------------------------------
 class _ProductImage extends StatelessWidget {
   final Product product;
   final double? width;
@@ -137,9 +129,6 @@ class _ProductImage extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Main bottom sheet
-// ---------------------------------------------------------------------------
 class ProductListBottomSheet extends StatefulWidget {
   const ProductListBottomSheet({super.key});
 
@@ -162,9 +151,15 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
   String _selectedCategory = 'All';
   List<Product> _products = const [];
 
+  late final ProductService _productService;
+  late final Stream<List<Product>> _productsStream;
+
   @override
   void initState() {
     super.initState();
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    _productService = ProductService(auth.ownerId);
+    _productsStream = _productService.streamProducts;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
@@ -178,10 +173,9 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
     super.dispose();
   }
 
-  // Mirrors ResponsiveLayout.productColumns used in pos_screen.dart
   int _columnCount(double width) {
     if (width < 380) return 1;
-    if (width < 600) return 1; // list mode handles <600
+    if (width < 600) return 1;
     if (width < 900) return 3;
     if (width < 1200) return 4;
     return 5;
@@ -239,9 +233,6 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    final productService = ProductService(auth.ownerId);
-
     return Shortcuts(
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.slash): _SheetFocusSearchIntent(),
@@ -323,7 +314,6 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Drag handle
                 Padding(
                   padding: const EdgeInsets.only(top: 10, bottom: 4),
                   child: Container(
@@ -335,7 +325,6 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                     ),
                   ),
                 ),
-                // Header
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   padding:
@@ -385,7 +374,6 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Search bar
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: PosSearchBar(
@@ -409,10 +397,9 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                // Product grid / list
                 Flexible(
                   child: StreamBuilder<List<Product>>(
-                    stream: productService.streamProducts,
+                    stream: _productsStream,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Padding(
@@ -500,7 +487,7 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                       return LayoutBuilder(
                         builder: (context, constraints) {
                           final showChips = categories.length > 1;
-                          // ── Mobile: list tiles with image ──────────────
+
                           if (constraints.maxWidth < 600) {
                             _columns = 1;
                             return Column(
@@ -545,7 +532,6 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
                             );
                           }
 
-                          // ── Desktop / tablet: grid cards with image ────
                           _columns = _columnCount(constraints.maxWidth);
                           return Column(
                             children: [
@@ -610,9 +596,6 @@ class _ProductListBottomSheetState extends State<ProductListBottomSheet> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// List tile  (mirrors _ProductListTile from pos_screen.dart)
-// ---------------------------------------------------------------------------
 class _BottomSheetProductTile extends StatefulWidget {
   final Product product;
   final bool isFocused;
@@ -620,12 +603,12 @@ class _BottomSheetProductTile extends StatefulWidget {
   final VoidCallback onFocus;
 
   const _BottomSheetProductTile({
-    Key? key,
+    super.key,
     required this.product,
     required this.isFocused,
     required this.onTap,
     required this.onFocus,
-  }) : super(key: key);
+  });
 
   @override
   State<_BottomSheetProductTile> createState() =>
@@ -688,7 +671,6 @@ class _BottomSheetProductTileState extends State<_BottomSheetProductTile>
             ),
             child: Row(
               children: [
-                // Product image — 72×72, left-rounded (identical to _ProductListTile)
                 ClipRRect(
                   borderRadius:
                       const BorderRadius.horizontal(left: Radius.circular(12)),
@@ -699,7 +681,6 @@ class _BottomSheetProductTileState extends State<_BottomSheetProductTile>
                   ),
                 ),
                 const SizedBox(width: 10),
-                // Name + category pill
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -734,7 +715,6 @@ class _BottomSheetProductTileState extends State<_BottomSheetProductTile>
                     ],
                   ),
                 ),
-                // Price pill + add circle (identical to _ProductListTile)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Column(
@@ -780,9 +760,6 @@ class _BottomSheetProductTileState extends State<_BottomSheetProductTile>
   }
 }
 
-// ---------------------------------------------------------------------------
-// Grid card  (mirrors _ProductCard from pos_screen.dart)
-// ---------------------------------------------------------------------------
 class _BottomSheetProductGridCard extends StatefulWidget {
   final Product product;
   final bool isFocused;
@@ -790,12 +767,12 @@ class _BottomSheetProductGridCard extends StatefulWidget {
   final VoidCallback onFocus;
 
   const _BottomSheetProductGridCard({
-    Key? key,
+    super.key,
     required this.product,
     required this.isFocused,
     required this.onTap,
     required this.onFocus,
-  }) : super(key: key);
+  });
 
   @override
   State<_BottomSheetProductGridCard> createState() =>
@@ -864,7 +841,6 @@ class _BottomSheetProductGridCardState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Image — top 5 flex (same ratio as _ProductCard)
                 Expanded(
                   flex: 5,
                   child: _ProductImage(
@@ -873,7 +849,6 @@ class _BottomSheetProductGridCardState
                         const BorderRadius.vertical(top: Radius.circular(12)),
                   ),
                 ),
-                // Info — bottom 4 flex
                 Expanded(
                   flex: 4,
                   child: Padding(
@@ -941,9 +916,6 @@ class _BottomSheetProductGridCardState
   }
 }
 
-// ---------------------------------------------------------------------------
-// Intent classes (unchanged)
-// ---------------------------------------------------------------------------
 class _SheetMoveIntent extends Intent {
   final int delta;
   const _SheetMoveIntent(this.delta);

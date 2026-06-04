@@ -90,9 +90,7 @@ class ThermalPrinterService {
         if (_manager.isConnected) {
           await _manager.disconnect();
         }
-      } catch (_) {
-        // Disconnect failures should not block the UI.
-      }
+      } catch (_) {}
     }
   }
 
@@ -116,14 +114,13 @@ class ThermalPrinterService {
 
   Future<PrinterDevice?> _pickPrinter(BuildContext context) async {
     final printers = await _manager.scanPrinters(
-      timeout: const Duration(seconds: 5),
+      timeout: const Duration(seconds: 2),
       types: _supportedScanTypes(),
     );
 
     if (!context.mounted) return null;
 
     if (printers.isEmpty) {
-      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_noPrinterMessage())),
       );
@@ -134,7 +131,6 @@ class ThermalPrinterService {
         printers.where(_isSupportedPrinterDevice).toList(growable: false);
 
     if (supportedPrinters.isEmpty) {
-      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_unsupportedPrinterMessage(printers))),
       );
@@ -145,7 +141,6 @@ class ThermalPrinterService {
       return supportedPrinters.first;
     }
 
-    // ignore: use_build_context_synchronously
     return showDialog<PrinterDevice>(
       context: context,
       builder: (dialogContext) {
@@ -176,7 +171,7 @@ class ThermalPrinterService {
 
   Future<PrinterDevice?> _pickPrinterAuto() async {
     final printers = await _manager.scanPrinters(
-      timeout: const Duration(seconds: 5),
+      timeout: const Duration(seconds: 2),
       types: _supportedScanTypes(),
     );
 

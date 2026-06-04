@@ -1,5 +1,3 @@
-// ignore_for_file: use_build_context_synchronously
-
 import 'dart:async';
 import 'dart:convert';
 
@@ -58,11 +56,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
         final userName = auth.user?.displayName ?? userEmail.split('@').first;
         final photoUrl = auth.user?.photoURL;
 
+        final isDesktop = AppNavigationShell.isDesktop(context);
+
         return Scaffold(
           backgroundColor: NovaColors.bgTertiary,
-          drawer: AppNavigationShell.isDesktop(context)
-              ? null
-              : AppNavigationDrawer(auth: auth, currentRoute: '/inventory'),
+          drawer: null,
+          bottomNavigationBar:
+              !isDesktop ? const AppMobileBottomNavBar(currentIndex: 3) : null,
           appBar: AppNavigationAppBar(
             title: 'Inventory Dashboard',
             icon: Icons.inventory_rounded,
@@ -119,6 +119,13 @@ class _StockAlertBadgeState extends State<_StockAlertBadge> {
   void _showOverlay() {
     if (_latestAlerts.isEmpty) return;
     _hideTimer?.cancel();
+
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+    if (isMobile) {
+      _showMobileBottomSheet();
+      return;
+    }
+
     if (_overlayEntry != null) {
       _overlayEntry!.markNeedsBuild();
       return;
@@ -135,6 +142,11 @@ class _StockAlertBadgeState extends State<_StockAlertBadge> {
         return Positioned.fill(
           child: Stack(
             children: [
+              GestureDetector(
+                onTap: _removeOverlay,
+                behavior: HitTestBehavior.translucent,
+                child: const SizedBox.expand(),
+              ),
               CompositedTransformFollower(
                 link: _layerLink,
                 showWhenUnlinked: false,
@@ -179,6 +191,148 @@ class _StockAlertBadgeState extends State<_StockAlertBadge> {
     );
 
     Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _showMobileBottomSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final outCount = _latestAlerts.where((p) => p.stockQty <= 0).length;
+        final lowCount = _latestAlerts.length - outCount;
+        final urgentColor = outCount > 0 ? NovaColors.danger : NovaColors.amber;
+
+        return GestureDetector(
+          onTap: () => Navigator.pop(sheetContext),
+          behavior: HitTestBehavior.translucent,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: GestureDetector(
+              onTap: () {},
+              behavior: HitTestBehavior.opaque,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: NovaColors.bgPrimary,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  child: SafeArea(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.symmetric(vertical: 10),
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: NovaColors.borderSecondary,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+                          child: Row(
+                            children: [
+                              Icon(Icons.notifications_active_rounded,
+                                  color: urgentColor, size: 20),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Text(
+                                  'Stock Notifications',
+                                  style: TextStyle(
+                                    color: NovaColors.textPrimary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: urgentColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '$outCount out | $lowCount low',
+                                  style: TextStyle(
+                                    color: urgentColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Divider(
+                            height: 1, color: NovaColors.borderTertiary),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight:
+                                MediaQuery.of(sheetContext).size.height * 0.5,
+                          ),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            itemCount: _latestAlerts.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 2),
+                            itemBuilder: (context, index) {
+                              final product = _latestAlerts[index];
+                              return _StockAlertProductTile(product: product);
+                            },
+                          ),
+                        ),
+                        const Divider(
+                            height: 1, color: NovaColors.borderTertiary),
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 46,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(sheetContext);
+                                Navigator.of(context).push(
+                                  NoAnimationPageRoute(
+                                    builder: (_) => const ProductsScreen(
+                                        inventoryMode: true),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: NovaColors.violet,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              icon: const Icon(Icons.inventory_2_rounded,
+                                  size: 18),
+                              label: const Text(
+                                'Manage Products',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _scheduleHideOverlay() {
@@ -2579,6 +2733,7 @@ class _InventoryTablePanel extends StatefulWidget {
 class _InventoryTablePanelState extends State<_InventoryTablePanel> {
   String _selectedCategory = 'All Categories';
   String _searchQuery = '';
+  int _visibleCount = 10;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode =
       FocusNode(debugLabel: 'InventorySearchField');
@@ -2632,7 +2787,10 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
 
   void _clearSearch() {
     _searchController.clear();
-    setState(() => _searchQuery = '');
+    setState(() {
+      _searchQuery = '';
+      _visibleCount = 10;
+    });
   }
 
   List<Product> get _filtered {
@@ -2684,7 +2842,6 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Panel header
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
               child: Row(
@@ -2713,13 +2870,14 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                         (cat) => DropdownMenuItem(value: cat, child: Text(cat)),
                       ),
                     ],
-                    onChanged: (v) => setState(() => _selectedCategory = v!),
+                    onChanged: (v) => setState(() {
+                      _selectedCategory = v!;
+                      _visibleCount = 10;
+                    }),
                   ),
                 ],
               ),
             ),
-
-            // Search bar
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
               child: SizedBox(
@@ -2729,7 +2887,10 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                   focusNode: _searchFocusNode,
                   style: const TextStyle(
                       color: NovaColors.textPrimary, fontSize: 13),
-                  onChanged: (v) => setState(() => _searchQuery = v.trim()),
+                  onChanged: (v) => setState(() {
+                    _searchQuery = v.trim();
+                    _visibleCount = 10;
+                  }),
                   decoration: InputDecoration(
                     hintText:
                         'Search by name, barcode or category…  ( / or Ctrl+F )',
@@ -2768,10 +2929,7 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                 ),
               ),
             ),
-
             const Divider(height: 1, color: NovaColors.borderTertiary),
-
-            // Content
             if (visible.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(16),
@@ -2786,11 +2944,47 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                 height: contentHeight,
                 child: SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
-                  child: _ProductCardList(
-                    products: visible,
-                    onRestock: (p) => _showRestockDialog(context, p),
-                    onAdjust: (p) => _showAdjustDialog(context, p),
-                    onOrder: (p) => _openSupplierOrder(context, p, visible),
+                  child: Column(
+                    children: [
+                      _ProductCardList(
+                        products: visible.take(_visibleCount).toList(),
+                        onRestock: (p) => _showRestockDialog(context, p),
+                        onAdjust: (p) => _showAdjustDialog(context, p),
+                        onOrder: (p) => _openSupplierOrder(context, p, visible),
+                      ),
+                      if (visible.length > _visibleCount)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _visibleCount += 10;
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: NovaColors.violetLight,
+                                foregroundColor: NovaColors.violet,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  side: const BorderSide(
+                                      color: NovaColors.violet, width: 0.5),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 12),
+                              ),
+                              icon: const Icon(Icons.expand_more_rounded,
+                                  size: 18),
+                              label: Text(
+                                'Load More (${visible.length - _visibleCount} remaining)',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700, fontSize: 13),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               )
@@ -2998,8 +3192,6 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                   ),
                 ),
               ),
-
-            // Footer
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
               child: Text(
@@ -3092,7 +3284,7 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
           quantity: int.parse(qtyCtrl.text.trim()),
           note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
         );
-        if (!mounted) return;
+        if (!context.mounted) return;
         AppNotice.show(
           context,
           'Restocked ${p.name} successfully.',
@@ -3104,7 +3296,7 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
           debugPrint('[Inventory] refresh after restock skipped: $e');
         }
       } catch (e) {
-        if (mounted) {
+        if (context.mounted) {
           AppNotice.show(
             context,
             'Restock failed: $e',
@@ -3179,9 +3371,9 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
           delta: int.parse(deltaCtrl.text.trim()),
           note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
         );
-        if (mounted) widget.onMutated();
+        if (context.mounted) widget.onMutated();
       } catch (e) {
-        if (mounted) {
+        if (context.mounted) {
           AppNotice.show(
             context,
             'Adjustment failed: $e',
@@ -3483,7 +3675,6 @@ class _CurrentStockChip extends StatelessWidget {
     );
   }
 }
-// Mobile product card list
 
 class _ProductCardList extends StatelessWidget {
   const _ProductCardList({
@@ -3862,9 +4053,7 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
       if (loaded.length != parsed.length) {
         await _saveSuppliers();
       }
-    } catch (_) {
-      // Ignore malformed cached data and keep the supplier list empty.
-    }
+    } catch (_) {}
   }
 
   Future<void> _saveSuppliers() async {
@@ -5001,10 +5190,6 @@ InputDecoration _orderInputDecoration() => InputDecoration(
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
     );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared small widgets
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _StockCell extends StatelessWidget {
   const _StockCell({required this.product, this.compact = false});
   final Product product;
@@ -5022,15 +5207,15 @@ class _StockCell extends StatelessWidget {
     Color trackColor;
     Color qtyColor;
     if (isOut) {
-      barColor = const Color(0xFFE53935); // red
+      barColor = const Color(0xFFE53935);
       trackColor = const Color(0xFFFFEDE8);
       qtyColor = const Color(0xFFE53935);
     } else if (product.stockQty <= product.lowStockThreshold) {
-      barColor = const Color(0xFFFB8C00); // orange
+      barColor = const Color(0xFFFB8C00);
       trackColor = const Color(0xFFFFF3E0);
       qtyColor = const Color(0xFFEF6C00);
     } else {
-      barColor = const Color(0xFF2E7D32); // green
+      barColor = const Color(0xFF2E7D32);
       trackColor = NovaColors.bgSecondary;
       qtyColor = NovaColors.textPrimary;
     }

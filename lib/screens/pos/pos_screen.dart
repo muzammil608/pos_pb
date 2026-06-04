@@ -1,5 +1,3 @@
-// ignore_for_file: use_super_parameters
-
 import 'dart:async';
 import 'dart:io';
 
@@ -11,7 +9,9 @@ import 'package:provider/provider.dart';
 
 import '../../core/keyboard/pos_keyboard_system.dart';
 import '../../core/theme/nova_theme.dart';
+import '../../core/theme/cafe_colors.dart';
 import '../../core/utils/clickable_cursor.dart';
+import '../../core/utils/app_notice.dart';
 import '../../models/pos_header_slide_model.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
@@ -171,10 +171,10 @@ class _EditQuantityDialogState extends State<_EditQuantityDialog> {
   void _save() {
     final qty = int.tryParse(_qtyController.text.trim());
     if (qty == null || qty <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter a valid quantity greater than 0.'),
-        ),
+      AppNotice.show(
+        context,
+        'Enter a valid quantity greater than 0.',
+        type: AppNoticeType.error,
       );
       return;
     }
@@ -568,6 +568,24 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   PosHeaderService? _posHeaderService;
   InventoryService? _inventoryService;
 
+  Stream<List<Product>>? _productsStream;
+  Stream<OrderRecordSnapshot>? _ordersStream;
+
+  List<Product>? _lastProducts;
+  OrderRecordSnapshot? _lastOrders;
+  String? _cachedOwnerId;
+
+  String? _getStockStatus(String productId, List<Product> products) {
+    try {
+      final p = products.firstWhere((p) => p.id == productId);
+      if (p.stockQty <= 0) return 'OUT OF STOCK';
+      if (p.stockQty <= p.lowStockThreshold) {
+        return 'LOW STOCK (${p.stockQty})';
+      }
+    } catch (_) {}
+    return null;
+  }
+
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _customerNameController = TextEditingController();
   final TextEditingController _cashController = TextEditingController();
@@ -580,6 +598,8 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   final GlobalKey<PosCategoryChipsState> _categoryChipsKey =
       GlobalKey<PosCategoryChipsState>();
   final Map<String, GlobalKey> _cartItemKeys = {};
+  final GlobalKey<AppNoticeHostState> _noticeKey =
+      GlobalKey<AppNoticeHostState>();
   final Map<String, GlobalKey> _cartItemMenuKeys = {};
   final Map<int, GlobalKey> _productItemKeys = {};
 
@@ -592,6 +612,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   final String _orderType = 'dine_in';
 
   int _focusedProductIndex = -1;
+  int _currentCrossAxisCount = 2;
   List<Product> _lastFilteredProducts = [];
   int _focusedCartIndex = 0;
 
@@ -630,6 +651,13 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     )..repeat(reverse: true);
 
     _registerHotkeys();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (AppMobileBottomNavBar.autoShowReadyOrders) {
+        AppMobileBottomNavBar.autoShowReadyOrders = false;
+        _showReadyOrdersSheet(context);
+      }
+    });
   }
 
   Future<void> _registerHotkeys() async {
@@ -663,11 +691,16 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    if (auth.ownerId.isNotEmpty) {
+
+    if (auth.ownerId.isNotEmpty && auth.ownerId != _cachedOwnerId) {
+      _cachedOwnerId = auth.ownerId;
       _productService = ProductService(auth.ownerId);
       _orderService = OrderService(auth.ownerId);
       _posHeaderService = PosHeaderService(auth.ownerId);
       _inventoryService = InventoryService(auth.ownerId);
+
+      _productsStream = _productService?.streamProducts.asBroadcastStream();
+      _ordersStream = _orderService?.getOrders().asBroadcastStream();
     }
   }
 
@@ -697,9 +730,11 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     }
 
     if (_lastFilteredProducts.isEmpty) return;
-    _setFocusedProductIndex(
-      (_focusedProductIndex + 1).clamp(0, _lastFilteredProducts.length - 1),
-    );
+    final step = _currentCrossAxisCount;
+    final nextIndex = _focusedProductIndex + step;
+    if (nextIndex < _lastFilteredProducts.length) {
+      _setFocusedProductIndex(nextIndex);
+    }
   }
 
   void _onArrowUp() {
@@ -714,22 +749,33 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     }
 
     if (_lastFilteredProducts.isEmpty) return;
+    final step = _currentCrossAxisCount;
+    final nextIndex = _focusedProductIndex - step;
+    if (nextIndex >= 0) {
+      _setFocusedProductIndex(nextIndex);
+    }
+  }
+
+  void _onArrowRight() {
+    if (_isCheckoutKeyboardActive) return;
+    if (_lastFilteredProducts.isEmpty) return;
+    _setFocusedProductIndex(
+      (_focusedProductIndex + 1).clamp(0, _lastFilteredProducts.length - 1),
+    );
+  }
+
+  void _onArrowLeft() {
+    if (_isCheckoutKeyboardActive) return;
+    if (_lastFilteredProducts.isEmpty) return;
     _setFocusedProductIndex(
       (_focusedProductIndex - 1).clamp(0, _lastFilteredProducts.length - 1),
     );
   }
 
-  void _onArrowRight() {
-    _categoryChipsKey.currentState?.nextCategory();
-  }
-
-  void _onArrowLeft() {
-    _categoryChipsKey.currentState?.prevCategory();
-  }
-
   void _onConfirmFocusedItem() {
+    final cart = Provider.of<CartProvider>(context, listen: false);
+
     if (_isCheckoutKeyboardActive) {
-      final cart = Provider.of<CartProvider>(context, listen: false);
       _placeOrder(context, cart).then((success) {
         if (!mounted || !success) return;
         _focusPosForNewOrder();
@@ -761,6 +807,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     if (!mounted) return;
     setState(() {
       _focusedProductIndex = index;
+      _checkoutKeyboardMode = false;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollFocusedProductIntoView(index);
@@ -785,11 +832,9 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
       final description = stack.lastDescription ?? 'last action';
       stack.undo();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Undone: $description'),
-            duration: const Duration(seconds: 2),
-          ),
+        _noticeKey.currentState?.show(
+          'Undone: $description',
+          type: AppNoticeType.info,
         );
       }
     }
@@ -824,7 +869,6 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
       _clearCurrentOrderWithUndo();
     }
     _searchBarKey.currentState?.clear();
-    _searchBarKey.currentState?.requestFocus();
     _resetCheckoutForm();
   }
 
@@ -852,16 +896,12 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   }
 
   void _focusPosForNewOrder() {
-    if (_checkoutKeyboardMode) {
-      setState(() => _checkoutKeyboardMode = false);
-    }
+    setState(() {
+      _checkoutKeyboardMode = false;
+      _focusedCartIndex = 0;
+    });
     _cashFocusNode.unfocus();
     _checkoutShortcutFocusNode.unfocus();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _searchBarKey.currentState?.clear();
-      _searchBarKey.currentState?.requestFocus();
-    });
   }
 
   void _openProducts() {
@@ -871,11 +911,9 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
   void _openInventory() {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Inventory is available for admins.'),
-          duration: Duration(seconds: 2),
-        ),
+      _noticeKey.currentState?.show(
+        'Inventory is available for admins.',
+        type: AppNoticeType.warning,
       );
       return;
     }
@@ -902,6 +940,10 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
         }
       });
     }
+
+    if (mounted) {
+      _searchBarKey.currentState?.clear();
+    }
   }
 
   int _safeCartIndex(CartProvider cart) {
@@ -909,10 +951,13 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     return _focusedCartIndex.clamp(0, cart.items.length - 1);
   }
 
-  bool get _isCheckoutKeyboardActive =>
-      _checkoutKeyboardMode ||
-      _checkoutShortcutFocusNode.hasFocus ||
-      _cashFocusNode.hasFocus;
+  bool get _isCheckoutKeyboardActive {
+    final searchHasFocus = _searchBarKey.currentState?.hasFocus ?? false;
+    if (searchHasFocus) return false;
+    return _checkoutKeyboardMode ||
+        _checkoutShortcutFocusNode.hasFocus ||
+        _cashFocusNode.hasFocus;
+  }
 
   void _moveFocusedCartItem(CartProvider cart, int direction) {
     if (cart.items.isEmpty) {
@@ -1180,11 +1225,15 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     if (cart.items.isEmpty) return false;
     if (_paymentMethod == 'cash' &&
         _cashIsInsufficient(_tenderedAmount, cart.total)) {
+      _noticeKey.currentState?.show(
+        'Insufficient cash amount.',
+        type: AppNoticeType.warning,
+      );
       return false;
     }
     if (_isSubmitting) return false;
+    ScaffoldMessenger.of(context);
 
-    final messenger = ScaffoldMessenger.of(context);
     final changeAmount =
         _paymentMethod == 'cash' ? _tenderedAmount - cart.total : 0.0;
     final auth = Provider.of<AuthProvider>(context, listen: false);
@@ -1210,12 +1259,7 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
 
       final stockIssueMessage = await _validateStockBeforePlace(cartSnapshot);
       if (stockIssueMessage != null) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(stockIssueMessage),
-            duration: const Duration(seconds: 4),
-          ),
-        );
+        _noticeKey.currentState?.showOutOfStock(stockIssueMessage);
         return false;
       }
 
@@ -1231,35 +1275,42 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
       );
       if (!mounted) return false;
 
-      await ThermalPrinterService.instance.printReceiptAuto(
-        ThermalReceiptData(
-          companyName: 'Orion POS',
-          phone: '+92-317-7921817',
-          email: 'info@orion.com',
-          website: 'www.orion.com',
-          servedBy: auth.role,
-          customerName: _customerName.trim().isEmpty
-              ? 'Walk-in Customer'
-              : _customerName.trim(),
-          orderType: _orderType,
-          items: order.items,
-          total: order.total,
-          cash: order.tenderedAmount,
-          change: order.change,
-          tax: 0.0,
-          paymentMethod: order.paymentMethod ?? _paymentMethod,
-          orderNo: 'ORDER-${order.orderNumber}',
-          date:
-              '${order.createdAt.day}/${order.createdAt.month}/${order.createdAt.year} '
-              '${order.createdAt.hour.toString().padLeft(2, '0')}:'
-              '${order.createdAt.minute.toString().padLeft(2, '0')}',
-        ),
-      );
+      try {
+        await ThermalPrinterService.instance.printReceiptAuto(
+          ThermalReceiptData(
+            companyName: 'Orion POS',
+            phone: '+92-317-7921817',
+            email: 'info@orion.com',
+            website: 'www.orion.com',
+            servedBy: auth.role,
+            customerName: _customerName.trim().isEmpty
+                ? 'Walk-in Customer'
+                : _customerName.trim(),
+            orderType: _orderType,
+            items: order.items,
+            total: order.total,
+            cash: order.tenderedAmount,
+            change: order.change,
+            tax: 0.0,
+            paymentMethod: order.paymentMethod ?? _paymentMethod,
+            orderNo: 'ORDER-${order.orderNumber}',
+            date:
+                '${order.createdAt.day}/${order.createdAt.month}/${order.createdAt.year} '
+                '${order.createdAt.hour.toString().padLeft(2, '0')}:'
+                '${order.createdAt.minute.toString().padLeft(2, '0')}',
+          ),
+        );
+      } catch (e) {
+        debugPrint('Printing skipped or failed on this platform: $e');
+      }
 
       await cart.clear();
       _resetCheckoutForm();
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Order placed successfully.')),
+      _noticeKey.currentState?.showOrderSuccess(
+        orderNo: order.orderNumber.toString(),
+        total: order.total,
+        paymentMethod: _paymentMethod,
+        change: changeAmount,
       );
       _focusPosForNewOrder();
       return true;
@@ -1272,12 +1323,12 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
           ? 'No internet connection. Please check your connection and try again.'
           : 'Error: $e';
 
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(errorMsg),
-          duration: const Duration(seconds: 4),
-        ),
-      );
+      if (context.mounted) {
+        _noticeKey.currentState?.show(
+          errorMsg,
+          type: AppNoticeType.error,
+        );
+      }
       return false;
     } finally {
       if (mounted) {
@@ -1322,25 +1373,35 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     });
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Added ${product.name} - Rs ${product.price.toStringAsFixed(0)}',
-        ),
-        duration: const Duration(seconds: 1),
-      ),
+    _noticeKey.currentState?.show(
+      'Added ${product.name} - Rs ${product.price.toStringAsFixed(0)}',
+      type: AppNoticeType.success,
+      duration: const Duration(seconds: 2),
     );
-    _searchBarKey.currentState?.clear();
-    _searchBarKey.currentState?.requestFocus();
+    if (mounted) {
+      _searchBarKey.currentState?.clear();
+    }
   }
 
   Future<void> _handleSearchSubmitted(
     String value,
     List<Product> products,
   ) async {
+    if (value.trim().isEmpty) return;
     final product = _findProductByBarcode(products, value);
-    if (product == null) return;
-    await _addScannedProduct(product);
+    if (product != null) {
+      await _addScannedProduct(product);
+      return;
+    }
+
+    if (_lastFilteredProducts.isNotEmpty) {
+      final index = _focusedProductIndex >= 0 &&
+              _focusedProductIndex < _lastFilteredProducts.length
+          ? _focusedProductIndex
+          : 0;
+      final selectedProduct = _lastFilteredProducts[index];
+      await _addProductWithQtyDialog(selectedProduct);
+    }
   }
 
   Future<int?> _showQtyDialog(
@@ -1569,217 +1630,248 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (sheetContext) {
-          return Align(
-            alignment: Alignment.bottomCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 920),
-              child: Container(
-                height: MediaQuery.of(sheetContext).size.height * 0.85,
-                decoration: const BoxDecoration(
-                  color: NovaColors.bgSecondary,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.only(top: 10, bottom: 2),
-                        width: 36,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: NovaColors.borderSecondary,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      Container(
-                        margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
-                        decoration: BoxDecoration(
-                          color: NovaColors.bgPrimary,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: NovaColors.borderTertiary, width: 0.5),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: NovaColors.tealLight,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                  Icons.check_circle_outline_rounded,
-                                  color: NovaColors.teal,
-                                  size: 20),
+          return GestureDetector(
+            onTap: () => Navigator.pop(sheetContext),
+            behavior: HitTestBehavior.translucent,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: GestureDetector(
+                onTap: () {},
+                behavior: HitTestBehavior.opaque,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 920),
+                  child: Container(
+                    height: MediaQuery.of(sheetContext).size.height * 0.85,
+                    decoration: const BoxDecoration(
+                      color: NovaColors.bgSecondary,
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    child: SafeArea(
+                      child: Column(
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.only(top: 10, bottom: 2),
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: NovaColors.borderSecondary,
+                              borderRadius: BorderRadius.circular(2),
                             ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Ready to Collect',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: NovaColors.textPrimary,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Tap Print & Complete to close order',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: NovaColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          ),
+                          Container(
+                            margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: NovaColors.bgPrimary,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color: NovaColors.borderTertiary, width: 0.5),
                             ),
-                            StreamBuilder<OrderRecordSnapshot>(
-                              stream: _orderService?.getOrders(),
-                              builder: (context, snapshot) {
-                                if (_orderService == null) {
-                                  return const SizedBox.shrink();
-                                }
-                                if (snapshot.hasError ||
-                                    snapshot.connectionState ==
-                                        ConnectionState.waiting) {
-                                  return const SizedBox.shrink();
-                                }
-                                final count = _readyOrderCount(snapshot);
-                                if (count == 0) return const SizedBox.shrink();
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                     color: NovaColors.tealLight,
-                                    borderRadius: BorderRadius.circular(20),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: Text(
-                                    '$count',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
+                                  child: const Icon(
+                                      Icons.check_circle_outline_rounded,
                                       color: NovaColors.teal,
+                                      size: 20),
+                                ),
+                                const SizedBox(width: 12),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Ready to Collect',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                          color: NovaColors.textPrimary,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Tap Print & Complete to close order',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: NovaColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                StreamBuilder<OrderRecordSnapshot>(
+                                  stream: _ordersStream,
+                                  initialData: _lastOrders,
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData) {
+                                      _lastOrders = snapshot.data;
+                                    }
+                                    if (_orderService == null) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    if (snapshot.hasError ||
+                                        snapshot.connectionState ==
+                                            ConnectionState.waiting) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    final count = _readyOrderCount(snapshot);
+                                    if (count == 0) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: NovaColors.tealLight,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        '$count',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: NovaColors.teal,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: StreamBuilder<OrderRecordSnapshot>(
+                              stream: _ordersStream,
+                              initialData: _lastOrders,
+                              builder: (context, snapshot) {
+                                if (snapshot.hasData) {
+                                  _lastOrders = snapshot.data;
+                                }
+                                if (_orderService == null) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(
+                                        color: NovaColors.violet),
+                                  );
+                                }
+                                if (snapshot.hasError) {
+                                  return Center(
+                                    child: Text(
+                                      'Error: ${snapshot.error}',
+                                      style: const TextStyle(
+                                          color: NovaColors.textSecondary),
+                                    ),
+                                  );
+                                }
+                                if (snapshot.connectionState ==
+                                        ConnectionState.waiting &&
+                                    !snapshot.hasData) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(
+                                        color: NovaColors.violet),
+                                  );
+                                }
+                                if (!snapshot.hasData ||
+                                    snapshot.data!.docs.isEmpty) {
+                                  return _emptyOrdersView();
+                                }
+
+                                final readyDocs =
+                                    snapshot.data!.docs.where((doc) {
+                                  return doc.data()['status'] == 'ready';
+                                }).toList();
+
+                                readyDocs.sort((a, b) {
+                                  final aDate =
+                                      a.data()['createdAt'] as DateTime?;
+                                  final bDate =
+                                      b.data()['createdAt'] as DateTime?;
+                                  final aMs =
+                                      aDate?.millisecondsSinceEpoch ?? 0;
+                                  final bMs =
+                                      bDate?.millisecondsSinceEpoch ?? 0;
+                                  return bMs.compareTo(aMs);
+                                });
+
+                                if (readyDocs.isEmpty) {
+                                  return _emptyOrdersView();
+                                }
+
+                                return Shortcuts(
+                                  shortcuts: const {
+                                    SingleActivator(LogicalKeyboardKey.enter):
+                                        ConfirmItemIntent(),
+                                    SingleActivator(
+                                            LogicalKeyboardKey.numpadEnter):
+                                        ConfirmItemIntent(),
+                                  },
+                                  child: Actions(
+                                    actions: {
+                                      ConfirmItemIntent:
+                                          CallbackAction<ConfirmItemIntent>(
+                                        onInvoke: (_) {
+                                          _completeReadyOrder(
+                                            sheetContext: sheetContext,
+                                            rootContext: rootContext,
+                                            doc: readyDocs.first,
+                                          );
+                                          return null;
+                                        },
+                                      ),
+                                    },
+                                    child: Focus(
+                                      autofocus: true,
+                                      child: ListView.builder(
+                                        padding: const EdgeInsets.fromLTRB(
+                                            16, 0, 16, 24),
+                                        itemCount: readyDocs.length,
+                                        itemBuilder: (context, index) {
+                                          final doc = readyDocs[index];
+                                          final data = doc.data();
+
+                                          final orderLabel =
+                                              '#${data['orderNumber'] ?? doc.id.substring(0, 6)}';
+                                          final items =
+                                              List<Map<String, dynamic>>.from(
+                                            (data['items'] as List? ?? []).map(
+                                              (item) =>
+                                                  Map<String, dynamic>.from(
+                                                      item as Map),
+                                            ),
+                                          );
+
+                                          return _ReadyOrderCard(
+                                            orderLabel: orderLabel,
+                                            items: items,
+                                            total: (data['total'] as num?)
+                                                    ?.toDouble() ??
+                                                0,
+                                            index: index,
+                                            onComplete: () =>
+                                                _completeReadyOrder(
+                                              sheetContext: sheetContext,
+                                              rootContext: rootContext,
+                                              doc: doc,
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 );
                               },
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: StreamBuilder<OrderRecordSnapshot>(
-                          stream: _orderService?.getOrders(),
-                          builder: (context, snapshot) {
-                            if (_orderService == null) {
-                              return const Center(
-                                child: CircularProgressIndicator(
-                                    color: NovaColors.violet),
-                              );
-                            }
-                            if (snapshot.hasError) {
-                              return Center(
-                                child: Text(
-                                  'Error: ${snapshot.error}',
-                                  style: const TextStyle(
-                                      color: NovaColors.textSecondary),
-                                ),
-                              );
-                            }
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const Center(
-                                child: CircularProgressIndicator(
-                                    color: NovaColors.violet),
-                              );
-                            }
-                            if (!snapshot.hasData ||
-                                snapshot.data!.docs.isEmpty) {
-                              return _emptyOrdersView();
-                            }
-
-                            final readyDocs = snapshot.data!.docs.where((doc) {
-                              return doc.data()['status'] == 'ready';
-                            }).toList();
-
-                            readyDocs.sort((a, b) {
-                              final aDate = a.data()['createdAt'] as DateTime?;
-                              final bDate = b.data()['createdAt'] as DateTime?;
-                              final aMs = aDate?.millisecondsSinceEpoch ?? 0;
-                              final bMs = bDate?.millisecondsSinceEpoch ?? 0;
-                              return bMs.compareTo(aMs);
-                            });
-
-                            if (readyDocs.isEmpty) return _emptyOrdersView();
-
-                            return Shortcuts(
-                              shortcuts: const {
-                                SingleActivator(LogicalKeyboardKey.enter):
-                                    ConfirmItemIntent(),
-                                SingleActivator(LogicalKeyboardKey.numpadEnter):
-                                    ConfirmItemIntent(),
-                              },
-                              child: Actions(
-                                actions: {
-                                  ConfirmItemIntent:
-                                      CallbackAction<ConfirmItemIntent>(
-                                    onInvoke: (_) {
-                                      _completeReadyOrder(
-                                        sheetContext: sheetContext,
-                                        rootContext: rootContext,
-                                        doc: readyDocs.first,
-                                      );
-                                      return null;
-                                    },
-                                  ),
-                                },
-                                child: Focus(
-                                  autofocus: true,
-                                  child: ListView.builder(
-                                    padding: const EdgeInsets.fromLTRB(
-                                        16, 0, 16, 24),
-                                    itemCount: readyDocs.length,
-                                    itemBuilder: (context, index) {
-                                      final doc = readyDocs[index];
-                                      final data = doc.data();
-
-                                      final orderLabel =
-                                          '#${data['orderNumber'] ?? doc.id.substring(0, 6)}';
-                                      final items =
-                                          List<Map<String, dynamic>>.from(
-                                        (data['items'] as List? ?? []).map(
-                                          (item) => Map<String, dynamic>.from(
-                                              item as Map),
-                                        ),
-                                      );
-
-                                      return _ReadyOrderCard(
-                                        orderLabel: orderLabel,
-                                        items: items,
-                                        total: (data['total'] as num?)
-                                                ?.toDouble() ??
-                                            0,
-                                        index: index,
-                                        onComplete: () => _completeReadyOrder(
-                                          sheetContext: sheetContext,
-                                          rootContext: rootContext,
-                                          doc: doc,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -1788,41 +1880,47 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
         },
       );
     } finally {
-      if (mounted) setState(() => _readyOrdersSheetOpen = false);
+      if (mounted) {
+        setState(() => _readyOrdersSheetOpen = false);
+      }
     }
   }
 
   Widget _emptyOrdersView() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: NovaColors.bgSecondary,
-              shape: BoxShape.circle,
-              border: Border.all(color: NovaColors.borderTertiary),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: NovaColors.bgSecondary,
+                shape: BoxShape.circle,
+                border: Border.all(color: NovaColors.borderTertiary),
+              ),
+              child: const Icon(Icons.coffee_outlined,
+                  size: 40, color: NovaColors.textTertiary),
             ),
-            child: const Icon(Icons.coffee_outlined,
-                size: 40, color: NovaColors.textTertiary),
-          ),
-          const SizedBox(height: 14),
-          const Text('No ready orders yet',
-              style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: NovaColors.textPrimary)),
-          const SizedBox(height: 4),
-          const Text('New orders will appear here',
-              style: TextStyle(fontSize: 13, color: NovaColors.textTertiary)),
-        ],
+            const SizedBox(height: 14),
+            const Text('No ready orders yet',
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: NovaColors.textPrimary)),
+            const SizedBox(height: 4),
+            const Text('New orders will appear here',
+                style: TextStyle(fontSize: 13, color: NovaColors.textTertiary)),
+          ],
+        ),
       ),
     );
   }
 
   int _crossAxisCount(double width) {
-    if (width < 380) return 1;
+    if (width < 380) {
+      return 1;
+    }
     return ResponsiveLayout.productColumns(width);
   }
 
@@ -1830,6 +1928,97 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
     final cats = products.map((p) => p.category).toSet().toList();
     cats.sort();
     return ['All', ...cats];
+  }
+
+  Widget buildMobileCartBar(CartProvider cart) {
+    if (cart.items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final itemCount = cart.items.length;
+    final total = cart.total;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: CafeColors.headerGradient,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: NovaColors.violet.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _onCheckout,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.shopping_bag_outlined,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$itemCount Item${itemCount == 1 ? "" : "s"}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            'Rs ${total.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const Row(
+                    children: [
+                      Text(
+                        'Go to Cart',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -1852,219 +2041,520 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
         final userName = user.displayName ?? userEmail.split('@').first;
         final photoUrl = user.photoURL;
 
+        final isMobileUI = !AppNavigationShell.isDesktop(context);
+
         return Scaffold(
           backgroundColor: NovaColors.bgTertiary,
-          resizeToAvoidBottomInset: false,
-          drawer: AppNavigationShell.isDesktop(context)
+          resizeToAvoidBottomInset: isMobileUI ? true : false,
+          drawer: isMobileUI
               ? null
-              : AppNavigationDrawer(auth: auth, currentRoute: '/pos'),
-          appBar: AppNavigationAppBar(
-            title: 'Order Station',
-            icon: Icons.storefront_rounded,
-            photoUrl: photoUrl,
-            userName: userName,
-            actions: [
-              if (_isDesktop)
-                IconButton(
-                  tooltip: 'Keyboard Shortcuts (?)',
-                  onPressed: () => PosShortcutHelp.show(context),
-                  icon: const Icon(Icons.keyboard_rounded,
-                      color: Colors.white70, size: 20),
-                ),
-              StreamBuilder<OrderRecordSnapshot>(
-                stream: _orderService?.getOrders(),
-                builder: (context, snapshot) {
-                  final readyCount = _readyOrderCount(snapshot);
-                  return IconButton(
-                    tooltip: 'Ready Orders  (F2)',
-                    onPressed: () => _showReadyOrdersSheet(context),
-                    icon: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Icon(
-                          readyCount > 0
-                              ? Icons.notifications_active_rounded
-                              : Icons.notifications_outlined,
-                          color: readyCount > 0
-                              ? NovaColors.violet
-                              : NovaColors.textSecondary,
-                          size: 22,
+              : (AppNavigationShell.isDesktop(context)
+                  ? null
+                  : AppNavigationDrawer(auth: auth, currentRoute: '/pos')),
+          appBar: isMobileUI
+              ? PreferredSize(
+                  preferredSize: const Size.fromHeight(88),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: CafeColors.headerGradient,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0x22111111),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
                         ),
-                        if (readyCount > 0)
-                          Positioned(
-                            top: -3,
-                            right: -3,
-                            child: Container(
-                              width: 14,
-                              height: 14,
-                              decoration: BoxDecoration(
-                                color: NovaColors.teal,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                    color: NovaColors.bgPrimary, width: 1.5),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '$readyCount',
-                                  style: const TextStyle(
-                                    fontSize: 7,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
                       ],
                     ),
-                  );
-                },
-              ),
-            ],
-          ),
-          body: AppNavigationShell(
-            auth: auth,
-            currentRoute: '/pos',
-            child: PosKeyboardScope(
-              searchBarKey: _searchBarKey,
-              categoryChipsKey: _categoryChipsKey,
-              onNewOrder: _startNewOrder,
-              onCheckout: _onCheckout,
-              onReadyOrders: () => _showReadyOrdersSheet(context),
-              onProducts: _openProducts,
-              onClearCart: _onClearCart,
-              onDeleteFocusedItem: _onDeleteFocusedItem,
-              onEditFocusedItem: _onEditFocusedItem,
-              onUndoCart: _onUndoCart,
-              onConfirmFocusedItem: _onConfirmFocusedItem,
-              onArrowUp: _onArrowUp,
-              onArrowDown: _onArrowDown,
-              onArrowLeft: _onArrowLeft,
-              onArrowRight: _onArrowRight,
-              onRefresh: () => setState(() {}),
-              onEscape: null,
-              onSelectPaymentMethod: _selectPaymentMethod,
-              onInventory: _openInventory,
-              child: StreamBuilder<List<Product>>(
-                stream: _productService?.streamProducts ??
-                    Stream<List<Product>>.value([]),
-                builder: (context, snapshot) {
-                  final allProducts = snapshot.data ?? [];
-                  final categories = _getCategories(allProducts);
-
-                  final normalizedQuery = _normalizeSearch(_searchQuery);
-
-                  final filteredProducts = allProducts.where((product) {
-                    final name = product.name.toLowerCase();
-                    final category = product.category.toLowerCase();
-                    final barcode = product.barcode.toLowerCase();
-                    final matchSearch = normalizedQuery.isEmpty ||
-                        name.contains(normalizedQuery) ||
-                        category.contains(normalizedQuery) ||
-                        barcode.contains(normalizedQuery);
-                    final matchCategory = _selectedCategory == 'All' ||
-                        product.category == _selectedCategory;
-                    return matchSearch && matchCategory;
-                  }).toList();
-
-                  if (normalizedQuery.isNotEmpty) {
-                    filteredProducts.sort((a, b) {
-                      final scoreCompare = _matchScore(a, normalizedQuery)
-                          .compareTo(_matchScore(b, normalizedQuery));
-                      if (scoreCompare != 0) return scoreCompare;
-                      return a.name.toLowerCase().compareTo(
-                            b.name.toLowerCase(),
-                          );
-                    });
-                  }
-
-                  _lastFilteredProducts = filteredProducts;
-                  if (_lastFilteredProducts.isEmpty) {
-                    _focusedProductIndex = -1;
-                  } else if (_focusedProductIndex < 0 ||
-                      _focusedProductIndex >= _lastFilteredProducts.length) {
-                    _focusedProductIndex = 0;
-                  }
-
-                  return LayoutBuilder(
-                    builder: (context, viewportConstraints) {
-                      final isDesktop = viewportConstraints.maxWidth >=
-                          ResponsiveLayout.desktopBreakpoint;
-
-                      Widget buildProductArea({
-                        required EdgeInsets searchPadding,
-                        required EdgeInsets chipPadding,
-                        required EdgeInsets listPadding,
-                        required bool includeFooter,
-                      }) {
-                        Widget buildProductList() {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(
-                                  color: NovaColors.violet),
-                            );
-                          }
-                          if (snapshot.hasError) {
-                            return const Center(
-                              child: Text(
-                                'Error loading products',
-                                style: TextStyle(
-                                  color: NovaColors.textSecondary,
+                    child: SafeArea(
+                      bottom: false,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                              ),
-                            );
-                          }
-                          if (filteredProducts.isEmpty) {
-                            return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                                const Row(
+                                  children: [
+                                    Icon(Icons.wifi,
+                                        color: Colors.white70, size: 12),
+                                    SizedBox(width: 4),
+                                    Icon(Icons.signal_cellular_4_bar,
+                                        color: Colors.white70, size: 12),
+                                    SizedBox(width: 4),
+                                    Icon(Icons.battery_std,
+                                        color: Colors.white70, size: 12),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Container(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              child: Row(
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(20),
-                                    decoration: BoxDecoration(
-                                      color: NovaColors.bgSecondary,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: NovaColors.borderTertiary,
+                                  const Icon(Icons.storefront_rounded,
+                                      color: Colors.white70, size: 22),
+                                  const SizedBox(width: 10),
+                                  const Expanded(
+                                    child: Text(
+                                      'Order Station',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 18,
+                                        letterSpacing: 0.3,
                                       ),
                                     ),
-                                    child: const Icon(
-                                      Icons.coffee_maker_outlined,
-                                      size: 40,
-                                      color: NovaColors.textTertiary,
-                                    ),
                                   ),
-                                  const SizedBox(height: 14),
-                                  Text(
-                                    _searchQuery.isNotEmpty
-                                        ? 'No items match "$_searchQuery"'
-                                        : 'No items in this category',
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w500,
-                                      color: NovaColors.textPrimary,
+                                  ExcludeFocus(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        StreamBuilder<OrderRecordSnapshot>(
+                                          stream: _ordersStream,
+                                          initialData: _lastOrders,
+                                          builder: (context, snapshot) {
+                                            if (snapshot.hasData) {
+                                              _lastOrders = snapshot.data;
+                                            }
+                                            final readyCount =
+                                                _readyOrderCount(snapshot);
+                                            return IconButton(
+                                              tooltip: 'Ready Orders',
+                                              onPressed: () =>
+                                                  _showReadyOrdersSheet(
+                                                      context),
+                                              icon: Stack(
+                                                clipBehavior: Clip.none,
+                                                children: [
+                                                  Icon(
+                                                    readyCount > 0
+                                                        ? Icons
+                                                            .notifications_active_rounded
+                                                        : Icons
+                                                            .notifications_outlined,
+                                                    color: readyCount > 0
+                                                        ? Colors.white
+                                                        : Colors.white70,
+                                                    size: 22,
+                                                  ),
+                                                  if (readyCount > 0)
+                                                    Positioned(
+                                                      top: -3,
+                                                      right: -3,
+                                                      child: Container(
+                                                        width: 14,
+                                                        height: 14,
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color:
+                                                              NovaColors.teal,
+                                                          shape:
+                                                              BoxShape.circle,
+                                                          border: Border.all(
+                                                              color: CafeColors
+                                                                  .flame,
+                                                              width: 1.5),
+                                                        ),
+                                                        child: Center(
+                                                          child: Text(
+                                                            '$readyCount',
+                                                            style:
+                                                                const TextStyle(
+                                                              fontSize: 7,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w800,
+                                                              color:
+                                                                  Colors.white,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        IconButton(
+                                          tooltip: 'Logout',
+                                          icon: const Icon(Icons.logout_rounded,
+                                              color: Colors.white70),
+                                          onPressed: () async {
+                                            final isMobile =
+                                                MediaQuery.sizeOf(context)
+                                                        .width <
+                                                    600;
+                                            bool confirm = true;
+                                            if (!isMobile) {
+                                              confirm = await showDialog<bool>(
+                                                    context: context,
+                                                    builder: (dialogCtx) =>
+                                                        AlertDialog(
+                                                      title:
+                                                          const Text('Logout'),
+                                                      content: const Text(
+                                                          'Are you sure you want to logout?'),
+                                                      actions: [
+                                                        TextButton(
+                                                          onPressed: () =>
+                                                              Navigator.pop(
+                                                                  dialogCtx,
+                                                                  false),
+                                                          child: const Text(
+                                                              'Cancel'),
+                                                        ),
+                                                        TextButton(
+                                                          onPressed: () =>
+                                                              Navigator.pop(
+                                                                  dialogCtx,
+                                                                  true),
+                                                          style: TextButton
+                                                              .styleFrom(
+                                                            foregroundColor:
+                                                                Colors.red,
+                                                          ),
+                                                          child: const Text(
+                                                              'Logout'),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ) ??
+                                                  false;
+                                            }
+                                            if (confirm && context.mounted) {
+                                              await Provider.of<AuthProvider>(
+                                                      context,
+                                                      listen: false)
+                                                  .logout();
+                                              if (context.mounted) {
+                                                Navigator.of(context)
+                                                    .pushNamedAndRemoveUntil(
+                                                  '/login',
+                                                  (route) => false,
+                                                );
+                                              }
+                                            }
+                                          },
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                              right: 12, left: 4),
+                                          child: AppUserAvatar(
+                                            photoUrl: photoUrl,
+                                            userName: userName,
+                                            radius: 16,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              : AppNavigationAppBar(
+                  title: 'Order Station',
+                  icon: Icons.storefront_rounded,
+                  photoUrl: photoUrl,
+                  userName: userName,
+                  actions: [
+                    if (_isDesktop)
+                      IconButton(
+                        tooltip: 'Keyboard Shortcuts (?)',
+                        onPressed: () => PosShortcutHelp.show(context),
+                        icon: const Icon(Icons.keyboard_rounded,
+                            color: Colors.white70, size: 20),
+                      ),
+                    StreamBuilder<OrderRecordSnapshot>(
+                      stream: _ordersStream,
+                      initialData: _lastOrders,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          _lastOrders = snapshot.data;
+                        }
+                        final readyCount = _readyOrderCount(snapshot);
+                        return IconButton(
+                          tooltip: 'Ready Orders  (F2)',
+                          onPressed: () => _showReadyOrdersSheet(context),
+                          icon: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Icon(
+                                readyCount > 0
+                                    ? Icons.notifications_active_rounded
+                                    : Icons.notifications_outlined,
+                                color: readyCount > 0
+                                    ? NovaColors.violet
+                                    : NovaColors.textSecondary,
+                                size: 22,
+                              ),
+                              if (readyCount > 0)
+                                Positioned(
+                                  top: -3,
+                                  right: -3,
+                                  child: Container(
+                                    width: 14,
+                                    height: 14,
+                                    decoration: BoxDecoration(
+                                      color: NovaColors.teal,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: NovaColors.bgPrimary,
+                                          width: 1.5),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '$readyCount',
+                                        style: const TextStyle(
+                                          fontSize: 7,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+          bottomNavigationBar: isMobileUI
+              ? AppMobileBottomNavBar(
+                  currentIndex: 0,
+                  onPosTap: () {
+                    if (_checkoutKeyboardMode) {
+                      setState(() {
+                        _checkoutKeyboardMode = false;
+                      });
+                    }
+                  },
+                )
+              : null,
+          body: AppNavigationShell(
+            auth: auth,
+            currentRoute: '/pos',
+            child: AppNoticeHost(
+              key: _noticeKey,
+              child: PosKeyboardScope(
+                searchBarKey: _searchBarKey,
+                categoryChipsKey: _categoryChipsKey,
+                onNewOrder: _startNewOrder,
+                onCheckout: _onCheckout,
+                onReadyOrders: () => _showReadyOrdersSheet(context),
+                onProducts: _openProducts,
+                onClearCart: _onClearCart,
+                onDeleteFocusedItem: _onDeleteFocusedItem,
+                onEditFocusedItem: _onEditFocusedItem,
+                onUndoCart: _onUndoCart,
+                onConfirmFocusedItem: _onConfirmFocusedItem,
+                onArrowUp: _onArrowUp,
+                onArrowDown: _onArrowDown,
+                onArrowLeft: _onArrowLeft,
+                onArrowRight: _onArrowRight,
+                onRefresh: () => setState(() {}),
+                onEscape: () {
+                  if (_checkoutKeyboardMode) {
+                    _focusPosForNewOrder();
+                  } else {
+                    _searchBarKey.currentState?.clear();
+                  }
+                },
+                onSelectPaymentMethod: _selectPaymentMethod,
+                onInventory: _openInventory,
+                child: StreamBuilder<List<Product>>(
+                  stream: _productsStream ??
+                      Stream<List<Product>>.value(_lastProducts ?? []),
+                  initialData: _lastProducts,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      _lastProducts = snapshot.data;
+                    }
+
+                    final allProducts = snapshot.data ?? [];
+                    final categories = _getCategories(allProducts);
+
+                    final normalizedQuery = _normalizeSearch(_searchQuery);
+
+                    final filteredProducts = allProducts.where((product) {
+                      final name = product.name.toLowerCase();
+                      final category = product.category.toLowerCase();
+                      final barcode = product.barcode.toLowerCase();
+                      final matchSearch = normalizedQuery.isEmpty ||
+                          name.contains(normalizedQuery) ||
+                          category.contains(normalizedQuery) ||
+                          barcode.contains(normalizedQuery);
+                      final matchCategory = _selectedCategory == 'All' ||
+                          product.category == _selectedCategory;
+                      return matchSearch && matchCategory;
+                    }).toList();
+
+                    if (normalizedQuery.isNotEmpty) {
+                      filteredProducts.sort((a, b) {
+                        final scoreCompare = _matchScore(a, normalizedQuery)
+                            .compareTo(_matchScore(b, normalizedQuery));
+                        if (scoreCompare != 0) {
+                          return scoreCompare;
+                        }
+                        return a.name.toLowerCase().compareTo(
+                              b.name.toLowerCase(),
                             );
-                          }
+                      });
+                    }
 
-                          return LayoutBuilder(
-                            builder: (context, constraints) {
-                              final isMobile = constraints.maxWidth < 600;
+                    _lastFilteredProducts = filteredProducts;
+                    if (_lastFilteredProducts.isEmpty) {
+                      _focusedProductIndex = -1;
+                    } else if (_focusedProductIndex < 0 ||
+                        _focusedProductIndex >= _lastFilteredProducts.length) {
+                      _focusedProductIndex = 0;
+                    }
 
-                              if (isMobile) {
-                                return ListView.builder(
+                    return LayoutBuilder(
+                      builder: (context, viewportConstraints) {
+                        final screenWidth = viewportConstraints.maxWidth;
+
+                        final isWide = screenWidth >= 800;
+
+                        final isDesktop = screenWidth >= 1100;
+
+                        final cartFlex = screenWidth >= 1100 ? 1 : 3;
+                        final productFlex = screenWidth >= 1100 ? 3 : 4;
+
+                        Widget buildProductArea({
+                          required EdgeInsets searchPadding,
+                          required EdgeInsets chipPadding,
+                          required EdgeInsets listPadding,
+                          required bool includeFooter,
+                        }) {
+                          Widget buildProductList() {
+                            if (snapshot.connectionState ==
+                                    ConnectionState.waiting &&
+                                !snapshot.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(
+                                    color: NovaColors.violet),
+                              );
+                            }
+                            if (snapshot.hasError) {
+                              return const Center(
+                                child: Text(
+                                  'Error loading products',
+                                  style: TextStyle(
+                                    color: NovaColors.textSecondary,
+                                  ),
+                                ),
+                              );
+                            }
+                            if (filteredProducts.isEmpty) {
+                              return Center(
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(20),
+                                        decoration: BoxDecoration(
+                                          color: NovaColors.bgSecondary,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: NovaColors.borderTertiary,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.coffee_maker_outlined,
+                                          size: 40,
+                                          color: NovaColors.textTertiary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      Text(
+                                        _searchQuery.isNotEmpty
+                                            ? 'No items match "$_searchQuery"'
+                                            : 'No items in this category',
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                          color: NovaColors.textPrimary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+
+                            return LayoutBuilder(
+                              builder: (context, constraints) {
+                                final isMobile = constraints.maxWidth < 600;
+                                _currentCrossAxisCount = isMobile
+                                    ? 1
+                                    : _crossAxisCount(constraints.maxWidth);
+
+                                if (isMobile) {
+                                  return ListView.builder(
+                                    controller: _productScrollController,
+                                    padding: listPadding,
+                                    itemCount: filteredProducts.length,
+                                    itemBuilder: (_, index) {
+                                      final product = filteredProducts[index];
+                                      final isFocused =
+                                          _focusedProductIndex == index;
+                                      return _ProductListTile(
+                                        key: _productItemKeys.putIfAbsent(
+                                          index,
+                                          GlobalKey.new,
+                                        ),
+                                        product: product,
+                                        isFocused: isFocused,
+                                        onTap: () =>
+                                            _addProductWithQtyDialog(product),
+                                      );
+                                    },
+                                  );
+                                }
+
+                                return GridView.builder(
                                   controller: _productScrollController,
                                   padding: listPadding,
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount:
+                                        _crossAxisCount(constraints.maxWidth),
+                                    childAspectRatio: constraints.maxWidth < 380
+                                        ? 1.35
+                                        : 0.78,
+                                    mainAxisSpacing: 10,
+                                    crossAxisSpacing: 10,
+                                  ),
                                   itemCount: filteredProducts.length,
                                   itemBuilder: (_, index) {
                                     final product = filteredProducts[index];
                                     final isFocused =
                                         _focusedProductIndex == index;
-                                    return _ProductListTile(
+                                    return _ProductCard(
                                       key: _productItemKeys.putIfAbsent(
                                         index,
                                         GlobalKey.new,
@@ -2076,924 +2566,1001 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
                                     );
                                   },
                                 );
-                              }
+                              },
+                            );
+                          }
 
-                              return GridView.builder(
-                                controller: _productScrollController,
-                                padding: listPadding,
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount:
-                                      _crossAxisCount(constraints.maxWidth),
-                                  childAspectRatio:
-                                      constraints.maxWidth < 380 ? 1.35 : 0.78,
-                                  mainAxisSpacing: 10,
-                                  crossAxisSpacing: 10,
-                                ),
-                                itemCount: filteredProducts.length,
-                                itemBuilder: (_, index) {
-                                  final product = filteredProducts[index];
-                                  final isFocused =
-                                      _focusedProductIndex == index;
-                                  return _ProductCard(
-                                    key: _productItemKeys.putIfAbsent(
-                                      index,
-                                      GlobalKey.new,
-                                    ),
-                                    product: product,
-                                    isFocused: isFocused,
-                                    onTap: () =>
-                                        _addProductWithQtyDialog(product),
-                                  );
-                                },
-                              );
-                            },
-                          );
-                        }
-
-                        return Column(
-                          children: [
-                            Padding(
-                              padding: searchPadding,
-                              child: PosSearchBar(
-                                key: _searchBarKey,
-                                controller: _searchController,
-                                onChanged: (v) {
-                                  setState(() {
-                                    _searchQuery = v;
-                                  });
-                                  _setFocusedProductIndex(0);
-                                },
-                                onSubmitted: (v) =>
-                                    _handleSearchSubmitted(v, allProducts),
-                                onClear: () {
-                                  setState(() {
-                                    _searchQuery = '';
-                                  });
-                                  _focusedProductIndex = -1;
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            if (allProducts.isNotEmpty)
+                          return Column(
+                            children: [
                               Padding(
-                                padding: chipPadding,
-                                child: PosCategoryChips(
-                                  key: _categoryChipsKey,
-                                  categories: categories,
-                                  selected: _selectedCategory,
-                                  onSelected: (cat) {
+                                padding: searchPadding,
+                                child: PosSearchBar(
+                                  key: _searchBarKey,
+                                  controller: _searchController,
+                                  onChanged: (v) {
                                     setState(() {
-                                      _selectedCategory = cat;
+                                      _searchQuery = v;
                                     });
                                     _setFocusedProductIndex(0);
                                   },
+                                  onSubmitted: (v) =>
+                                      _handleSearchSubmitted(v, allProducts),
+                                  onClear: () {
+                                    setState(() {
+                                      _searchQuery = '';
+                                    });
+                                    _focusedProductIndex = -1;
+                                  },
                                 ),
                               ),
-                            if (_posHeaderService != null) ...[
                               const SizedBox(height: 10),
-                              PosHeaderSlideshow(
-                                service: _posHeaderService!,
-                                canEdit: auth.isAdmin,
-                              ),
-                            ],
-                            const SizedBox(height: 10),
-                            Expanded(child: buildProductList()),
-                            if (includeFooter)
-                              SafeArea(
-                                top: false,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: NovaColors.bgPrimary,
-                                    borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(18),
-                                    ),
-                                    border: const Border(
-                                      top: BorderSide(
-                                        color: NovaColors.borderTertiary,
-                                        width: 0.5,
-                                      ),
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.08),
-                                        blurRadius: 18,
-                                        offset: const Offset(0, -4),
-                                      ),
-                                    ],
-                                  ),
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: _BottomBarButton(
-                                          onPressed: cart.items.isEmpty
-                                              ? null
-                                              : _onCheckout,
-                                          icon: Icons.shopping_bag_outlined,
-                                          label: 'Checkout',
-                                          badge: cart.items.isNotEmpty
-                                              ? '${cart.items.length}'
-                                              : null,
-                                          isPrimary: true,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child:
-                                            StreamBuilder<OrderRecordSnapshot>(
-                                          stream: _orderService?.getOrders(),
-                                          builder: (context, snapshot) {
-                                            final readyCount =
-                                                _readyOrderCount(snapshot);
-                                            return _BottomBarButton(
-                                              onPressed: () =>
-                                                  _showReadyOrdersSheet(
-                                                      context),
-                                              icon: Icons.receipt_long_outlined,
-                                              label: 'Ready Orders',
-                                              badge: readyCount > 0
-                                                  ? '$readyCount'
-                                                  : null,
-                                              isPrimary: false,
-                                              badgeColor: NovaColors.teal,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ],
+                              if (allProducts.isNotEmpty)
+                                Padding(
+                                  padding: chipPadding,
+                                  child: PosCategoryChips(
+                                    key: _categoryChipsKey,
+                                    categories: categories,
+                                    selected: _selectedCategory,
+                                    onSelected: (cat) {
+                                      setState(() {
+                                        _selectedCategory = cat;
+                                      });
+                                      _setFocusedProductIndex(0);
+                                    },
                                   ),
                                 ),
-                              ),
-                          ],
-                        );
-                      }
-
-                      Widget buildCheckoutPanel() {
-                        final itemCount = cart.items.length;
-                        final readyOrdersStream = _orderService?.getOrders();
-
-                        return Focus(
-                            focusNode: _checkoutShortcutFocusNode,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: NovaColors.bgPrimary,
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: NovaColors.borderTertiary,
-                                  width: 0.75,
+                              if (_posHeaderService != null) ...[
+                                const SizedBox(height: 10),
+                                PosHeaderSlideshow(
+                                  service: _posHeaderService!,
+                                  canEdit: auth.isAdmin ||
+                                      auth.user?.role == 'admin',
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.06),
-                                    blurRadius: 18,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 14),
-                                    decoration: const BoxDecoration(
-                                      color: NovaColors.bgSecondary,
-                                      borderRadius: BorderRadius.vertical(
+                              ],
+                              const SizedBox(height: 10),
+                              Expanded(child: buildProductList()),
+                              if (includeFooter)
+                                SafeArea(
+                                  top: false,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: NovaColors.bgPrimary,
+                                      borderRadius: const BorderRadius.vertical(
                                         top: Radius.circular(18),
                                       ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: NovaColors.violetLight,
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                          ),
-                                          child: const Icon(
-                                            Icons
-                                                .shopping_cart_checkout_rounded,
-                                            color: NovaColors.violet,
-                                            size: 18,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        const Expanded(
-                                          child: Text(
-                                            'Checkout',
-                                            style: TextStyle(
-                                              color: NovaColors.textPrimary,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 15,
-                                            ),
-                                          ),
-                                        ),
-                                        if (itemCount > 0)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: NovaColors.violetLight,
-                                              borderRadius:
-                                                  BorderRadius.circular(999),
-                                            ),
-                                            child: Text(
-                                              '$itemCount item${itemCount == 1 ? '' : 's'}',
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w700,
-                                                color: NovaColors.violet,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                        16, 14, 16, 0),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: NovaColors.bgSecondary,
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
+                                      border: const Border(
+                                        top: BorderSide(
                                           color: NovaColors.borderTertiary,
                                           width: 0.5,
                                         ),
                                       ),
-                                      padding: const EdgeInsets.all(12),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.08),
+                                          blurRadius: 18,
+                                          offset: const Offset(0, -4),
+                                        ),
+                                      ],
+                                    ),
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 12, 16, 12),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: _BottomBarButton(
+                                            onPressed: cart.items.isEmpty
+                                                ? null
+                                                : _onCheckout,
+                                            icon: Icons.shopping_bag_outlined,
+                                            label: 'Checkout',
+                                            badge: cart.items.isNotEmpty
+                                                ? '${cart.items.length}'
+                                                : null,
+                                            isPrimary: true,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: StreamBuilder<
+                                              OrderRecordSnapshot>(
+                                            stream: _ordersStream,
+                                            initialData: _lastOrders,
+                                            builder: (context, snapshot) {
+                                              if (snapshot.hasData) {
+                                                _lastOrders = snapshot.data;
+                                              }
+                                              final readyCount =
+                                                  _readyOrderCount(snapshot);
+                                              return _BottomBarButton(
+                                                onPressed: () =>
+                                                    _showReadyOrdersSheet(
+                                                        context),
+                                                icon:
+                                                    Icons.receipt_long_outlined,
+                                                label: 'Ready Orders',
+                                                badge: readyCount > 0
+                                                    ? '$readyCount'
+                                                    : null,
+                                                isPrimary: false,
+                                                badgeColor: NovaColors.teal,
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        }
+
+                        Widget buildCheckoutPanel(
+                            {bool showBackButton = true}) {
+                          final itemCount = cart.items.length;
+
+                          return Focus(
+                              focusNode: _checkoutShortcutFocusNode,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: NovaColors.bgPrimary,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: NovaColors.borderTertiary,
+                                    width: 0.75,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.06),
+                                      blurRadius: 18,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 14),
+                                      decoration: const BoxDecoration(
+                                        color: NovaColors.bgSecondary,
+                                        borderRadius: BorderRadius.vertical(
+                                          top: Radius.circular(18),
+                                        ),
+                                      ),
+                                      child: Row(
                                         children: [
-                                          const Text(
-                                            'Order Details',
-                                            style: TextStyle(
-                                              color: NovaColors.textPrimary,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 12),
-                                          TextField(
-                                            controller: _customerNameController,
-                                            onChanged: (value) => setState(
-                                              () => _customerName = value,
-                                            ),
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              color: NovaColors.textPrimary,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            decoration: _fieldDecoration(
-                                              'Customer Name',
-                                              icon:
-                                                  Icons.person_outline_rounded,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 10),
-                                          DropdownButtonFormField<String>(
-                                            isExpanded: true,
-                                            value: _paymentMethod,
-                                            decoration: _fieldDecoration(
-                                              'Payment Method',
-                                              icon: Icons.payment_outlined,
-                                            ),
-                                            dropdownColor: NovaColors.bgPrimary,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              color: NovaColors.textPrimary,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            items: const [
-                                              DropdownMenuItem(
-                                                value: 'cash',
-                                                child: Text('Cash'),
+                                          if (showBackButton)
+                                            InkWell(
+                                              onTap: _focusPosForNewOrder,
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: NovaColors.violetLight,
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                child: const Icon(
+                                                  Icons
+                                                      .arrow_back_ios_new_rounded,
+                                                  color: NovaColors.violet,
+                                                  size: 16,
+                                                ),
                                               ),
-                                              DropdownMenuItem(
-                                                value: 'card',
-                                                child: Text('Card'),
-                                              ),
-                                            ],
-                                            onChanged: (value) =>
-                                                _selectPaymentMethod(
-                                              value ?? 'cash',
+                                            ),
+                                          if (showBackButton)
+                                            const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: NovaColors.violetLight,
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            child: const Icon(
+                                              Icons
+                                                  .shopping_cart_checkout_rounded,
+                                              color: NovaColors.violet,
+                                              size: 18,
                                             ),
                                           ),
-                                          if (_paymentMethod == 'cash') ...[
-                                            const SizedBox(height: 10),
+                                          const SizedBox(width: 10),
+                                          const Expanded(
+                                            child: Text(
+                                              'Checkout',
+                                              style: TextStyle(
+                                                color: NovaColors.textPrimary,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                          ),
+                                          if (itemCount > 0)
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                                vertical: 4,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: NovaColors.violetLight,
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                              ),
+                                              child: Text(
+                                                '$itemCount item${itemCount == 1 ? '' : 's'}',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: NovaColors.violet,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                          16, 14, 16, 0),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: NovaColors.bgSecondary,
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                          border: Border.all(
+                                            color: NovaColors.borderTertiary,
+                                            width: 0.5,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.all(12),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Order Details',
+                                              style: TextStyle(
+                                                color: NovaColors.textPrimary,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 12),
                                             TextField(
-                                              focusNode: _cashFocusNode,
-                                              controller: _cashController,
-                                              textInputAction:
-                                                  TextInputAction.done,
-                                              keyboardType: const TextInputType
-                                                  .numberWithOptions(
-                                                decimal: true,
+                                              controller:
+                                                  _customerNameController,
+                                              onChanged: (value) => setState(
+                                                () => _customerName = value,
                                               ),
-                                              onChanged: (value) =>
-                                                  setState(() {
-                                                _tenderedAmount =
-                                                    double.tryParse(value) ??
-                                                        0.0;
-                                              }),
                                               style: const TextStyle(
                                                 fontSize: 13,
                                                 color: NovaColors.textPrimary,
                                                 fontWeight: FontWeight.w500,
                                               ),
                                               decoration: _fieldDecoration(
-                                                'Cash Tendered',
-                                                icon: Icons.money_rounded,
-                                              ).copyWith(
-                                                prefixText: 'Rs  ',
-                                                prefixStyle: const TextStyle(
-                                                  color:
-                                                      NovaColors.textSecondary,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
+                                                'Customer Name',
+                                                icon: Icons
+                                                    .person_outline_rounded,
                                               ),
                                             ),
-                                            if (_tenderedAmount > 0 &&
-                                                _cashIsInsufficient(
-                                                  _tenderedAmount,
-                                                  cart.total,
-                                                ))
-                                              Padding(
-                                                padding: const EdgeInsets.only(
-                                                  left: 4,
-                                                  top: 6,
+                                            const SizedBox(height: 10),
+                                            DropdownButtonFormField<String>(
+                                              isExpanded: true,
+                                              value: _paymentMethod,
+                                              decoration: _fieldDecoration(
+                                                'Payment Method',
+                                                icon: Icons.payment_outlined,
+                                              ),
+                                              dropdownColor:
+                                                  NovaColors.bgPrimary,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: NovaColors.textPrimary,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              items: const [
+                                                DropdownMenuItem(
+                                                  value: 'cash',
+                                                  child: Text('Cash'),
                                                 ),
-                                                child: Row(
-                                                  children: [
-                                                    const Icon(
-                                                      Icons
-                                                          .warning_amber_rounded,
-                                                      color: NovaColors.danger,
-                                                      size: 13,
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      'Amount is less than total',
-                                                      style: TextStyle(
+                                                DropdownMenuItem(
+                                                  value: 'card',
+                                                  child: Text('Card'),
+                                                ),
+                                              ],
+                                              onChanged: (value) =>
+                                                  _selectPaymentMethod(
+                                                value ?? 'cash',
+                                              ),
+                                            ),
+                                            if (_paymentMethod == 'cash') ...[
+                                              const SizedBox(height: 10),
+                                              TextField(
+                                                focusNode: _cashFocusNode,
+                                                controller: _cashController,
+                                                textInputAction:
+                                                    TextInputAction.done,
+                                                keyboardType:
+                                                    const TextInputType
+                                                        .numberWithOptions(
+                                                  decimal: true,
+                                                ),
+                                                onChanged: (value) =>
+                                                    setState(() {
+                                                  _tenderedAmount =
+                                                      double.tryParse(value) ??
+                                                          0.0;
+                                                }),
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  color: NovaColors.textPrimary,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                decoration: _fieldDecoration(
+                                                  'Cash Tendered',
+                                                  icon: Icons.money_rounded,
+                                                ).copyWith(
+                                                  prefixText: 'Rs  ',
+                                                  prefixStyle: const TextStyle(
+                                                    color: NovaColors
+                                                        .textSecondary,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (_tenderedAmount > 0 &&
+                                                  _cashIsInsufficient(
+                                                    _tenderedAmount,
+                                                    cart.total,
+                                                  ))
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                    left: 4,
+                                                    top: 6,
+                                                  ),
+                                                  child: Row(
+                                                    children: [
+                                                      const Icon(
+                                                        Icons
+                                                            .warning_amber_rounded,
                                                         color:
                                                             NovaColors.danger,
-                                                        fontSize: 11,
-                                                        fontWeight:
-                                                            FontWeight.w500,
+                                                        size: 13,
                                                       ),
-                                                    ),
-                                                  ],
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        'Amount is less than total',
+                                                        style: TextStyle(
+                                                          color:
+                                                              NovaColors.danger,
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
-                                              ),
-                                            const SizedBox(height: 10),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                horizontal: 14,
-                                                vertical: 10,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: !_cashIsInsufficient(
-                                                  _tenderedAmount,
-                                                  cart.total,
-                                                )
-                                                    ? NovaColors.tealLight
-                                                    : NovaColors.dangerLight,
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                                border: Border.all(
+                                              const SizedBox(height: 10),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 14,
+                                                  vertical: 10,
+                                                ),
+                                                decoration: BoxDecoration(
                                                   color: !_cashIsInsufficient(
                                                     _tenderedAmount,
                                                     cart.total,
                                                   )
-                                                      ? NovaColors.teal
-                                                          .withValues(
-                                                          alpha: 0.3,
-                                                        )
-                                                      : NovaColors.danger
-                                                          .withValues(
-                                                              alpha: 0.2),
-                                                  width: 0.5,
+                                                      ? NovaColors.tealLight
+                                                      : NovaColors.dangerLight,
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                  border: Border.all(
+                                                    color: !_cashIsInsufficient(
+                                                      _tenderedAmount,
+                                                      cart.total,
+                                                    )
+                                                        ? NovaColors.teal
+                                                            .withValues(
+                                                            alpha: 0.3,
+                                                          )
+                                                        : NovaColors.danger
+                                                            .withValues(
+                                                                alpha: 0.2),
+                                                    width: 0.5,
+                                                  ),
                                                 ),
-                                              ),
-                                              child: Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment
-                                                        .spaceBetween,
-                                                children: [
-                                                  Row(
-                                                    children: [
-                                                      Icon(
-                                                        Icons
-                                                            .change_circle_outlined,
-                                                        size: 15,
+                                                child: Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons
+                                                              .change_circle_outlined,
+                                                          size: 15,
+                                                          color: !_cashIsInsufficient(
+                                                                  _tenderedAmount,
+                                                                  cart.total)
+                                                              ? NovaColors.teal
+                                                              : NovaColors
+                                                                  .danger,
+                                                        ),
+                                                        const SizedBox(
+                                                            width: 6),
+                                                        const Text(
+                                                          'Change Due',
+                                                          style: TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                            fontSize: 13,
+                                                            color: NovaColors
+                                                                .textSecondary,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    Text(
+                                                      'Rs ${(_tenderedAmount - cart.total).toStringAsFixed(0)}',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        fontSize: 14,
                                                         color: !_cashIsInsufficient(
                                                                 _tenderedAmount,
                                                                 cart.total)
                                                             ? NovaColors.teal
                                                             : NovaColors.danger,
                                                       ),
-                                                      const SizedBox(width: 6),
-                                                      const Text(
-                                                        'Change Due',
-                                                        style: TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                          fontSize: 13,
-                                                          color: NovaColors
-                                                              .textSecondary,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  Text(
-                                                    'Rs ${(_tenderedAmount - cart.total).toStringAsFixed(0)}',
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      fontSize: 14,
-                                                      color: !_cashIsInsufficient(
-                                                              _tenderedAmount,
-                                                              cart.total)
-                                                          ? NovaColors.teal
-                                                          : NovaColors.danger,
                                                     ),
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
-                                            ),
+                                            ],
                                           ],
-                                        ],
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Expanded(
-                                    child: cart.items.isEmpty
-                                        ? Center(
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Container(
-                                                  padding:
-                                                      const EdgeInsets.all(18),
-                                                  decoration: BoxDecoration(
-                                                    color:
-                                                        NovaColors.bgSecondary,
-                                                    shape: BoxShape.circle,
-                                                    border: Border.all(
-                                                      color: NovaColors
-                                                          .borderTertiary,
-                                                    ),
-                                                  ),
-                                                  child: const Icon(
-                                                    Icons.shopping_bag_outlined,
-                                                    size: 34,
-                                                    color:
-                                                        NovaColors.textTertiary,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                const Text(
-                                                  'No items in cart',
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w600,
-                                                    color:
-                                                        NovaColors.textPrimary,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                const Padding(
-                                                  padding: EdgeInsets.symmetric(
-                                                    horizontal: 24,
-                                                  ),
-                                                  child: Text(
-                                                    'Add products from the left side to start checkout.',
-                                                    textAlign: TextAlign.center,
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: NovaColors
-                                                          .textTertiary,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          )
-                                        : ListView.separated(
-                                            padding: const EdgeInsets.fromLTRB(
-                                              16,
-                                              8,
-                                              16,
-                                              12,
-                                            ),
-                                            itemCount: cart.items.length,
-                                            separatorBuilder: (_, __) =>
-                                                const Divider(
-                                              height: 16,
-                                              color: NovaColors.borderTertiary,
-                                            ),
-                                            itemBuilder: (context, index) {
-                                              final item = cart.items[index];
-                                              final cartDocId =
-                                                  item['cartDocId']
-                                                          as String? ??
-                                                      '';
-                                              final price =
-                                                  ((item['unitPrice'] ??
-                                                                  item['price'])
-                                                              as num?)
-                                                          ?.toDouble() ??
-                                                      0.0;
-                                              final qty = (item['qty'] as num?)
-                                                      ?.toInt() ??
-                                                  1;
-                                              final lineTotal =
-                                                  ((item['lineTotal']) as num?)
-                                                          ?.toDouble() ??
-                                                      price * qty;
-                                              final name =
-                                                  item['name']?.toString() ??
-                                                      'Item';
-                                              final isFocused =
-                                                  index == _safeCartIndex(cart);
-                                              final itemKey =
-                                                  _cartItemKeys.putIfAbsent(
-                                                cartDocId,
-                                                GlobalKey.new,
-                                              );
-                                              final menuButtonKey =
-                                                  _cartItemMenuKeys.putIfAbsent(
-                                                cartDocId,
-                                                GlobalKey.new,
-                                              );
-
-                                              return InkWell(
-                                                key: itemKey,
-                                                borderRadius:
-                                                    BorderRadius.circular(14),
-                                                onTap: () =>
-                                                    _selectCartItem(index),
-                                                child: AnimatedContainer(
-                                                  duration: const Duration(
-                                                    milliseconds: 140,
-                                                  ),
-                                                  padding:
-                                                      const EdgeInsets.all(12),
-                                                  decoration: BoxDecoration(
-                                                    color: isFocused
-                                                        ? NovaColors.violetLight
-                                                        : NovaColors
+                                    const SizedBox(height: 10),
+                                    Expanded(
+                                      child: cart.items.isEmpty
+                                          ? Center(
+                                              child: SingleChildScrollView(
+                                                child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                              18),
+                                                      decoration: BoxDecoration(
+                                                        color: NovaColors
                                                             .bgSecondary,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            14),
-                                                    border: Border.all(
-                                                      color: isFocused
-                                                          ? NovaColors.violet
-                                                          : NovaColors
+                                                        shape: BoxShape.circle,
+                                                        border: Border.all(
+                                                          color: NovaColors
                                                               .borderTertiary,
-                                                      width:
-                                                          isFocused ? 1 : 0.5,
-                                                    ),
-                                                  ),
-                                                  child: Row(
-                                                    children: [
-                                                      Container(
-                                                        width: 42,
-                                                        height: 42,
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color:
-                                                              itemBgColor(name),
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(
-                                                            10,
-                                                          ),
                                                         ),
-                                                        child: Center(
-                                                          child: Text(
-                                                            itemEmoji(name),
-                                                            style:
-                                                                const TextStyle(
-                                                              fontSize: 18,
+                                                      ),
+                                                      child: const Icon(
+                                                        Icons
+                                                            .shopping_bag_outlined,
+                                                        size: 34,
+                                                        color: NovaColors
+                                                            .textTertiary,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    const Text(
+                                                      'No items in cart',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: NovaColors
+                                                            .textPrimary,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    const Padding(
+                                                      padding:
+                                                          EdgeInsets.symmetric(
+                                                        horizontal: 24,
+                                                      ),
+                                                      child: Text(
+                                                        'Add products from the left side to start checkout.',
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: NovaColors
+                                                              .textTertiary,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            )
+                                          : ListView.separated(
+                                              padding:
+                                                  const EdgeInsets.fromLTRB(
+                                                16,
+                                                8,
+                                                16,
+                                                12,
+                                              ),
+                                              itemCount: cart.items.length,
+                                              separatorBuilder: (_, __) =>
+                                                  const Divider(
+                                                height: 16,
+                                                color:
+                                                    NovaColors.borderTertiary,
+                                              ),
+                                              itemBuilder: (context, index) {
+                                                final item = cart.items[index];
+                                                final cartDocId =
+                                                    item['cartDocId']
+                                                            as String? ??
+                                                        '';
+                                                final price =
+                                                    ((item['unitPrice'] ??
+                                                                    item[
+                                                                        'price'])
+                                                                as num?)
+                                                            ?.toDouble() ??
+                                                        0.0;
+                                                final qty =
+                                                    (item['qty'] as num?)
+                                                            ?.toInt() ??
+                                                        1;
+                                                final lineTotal =
+                                                    ((item['lineTotal'])
+                                                                as num?)
+                                                            ?.toDouble() ??
+                                                        price * qty;
+                                                final name =
+                                                    item['name']?.toString() ??
+                                                        'Item';
+                                                final productId =
+                                                    item['productId']
+                                                            ?.toString() ??
+                                                        '';
+                                                final stockStatus =
+                                                    _getStockStatus(
+                                                        productId, allProducts);
+                                                final isFocused = index ==
+                                                    _safeCartIndex(cart);
+                                                final itemKey =
+                                                    _cartItemKeys.putIfAbsent(
+                                                  cartDocId,
+                                                  GlobalKey.new,
+                                                );
+                                                final menuButtonKey =
+                                                    _cartItemMenuKeys
+                                                        .putIfAbsent(
+                                                  cartDocId,
+                                                  GlobalKey.new,
+                                                );
+
+                                                return InkWell(
+                                                  key: itemKey,
+                                                  borderRadius:
+                                                      BorderRadius.circular(14),
+                                                  onTap: () =>
+                                                      _selectCartItem(index),
+                                                  child: AnimatedContainer(
+                                                    duration: const Duration(
+                                                      milliseconds: 140,
+                                                    ),
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                            12),
+                                                    decoration: BoxDecoration(
+                                                      color: isFocused
+                                                          ? NovaColors
+                                                              .violetLight
+                                                          : NovaColors
+                                                              .bgSecondary,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              14),
+                                                      border: Border.all(
+                                                        color: isFocused
+                                                            ? NovaColors.violet
+                                                            : NovaColors
+                                                                .borderTertiary,
+                                                        width:
+                                                            isFocused ? 1 : 0.5,
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      children: [
+                                                        Container(
+                                                          width: 42,
+                                                          height: 42,
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color: itemBgColor(
+                                                                name),
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                              10,
+                                                            ),
+                                                          ),
+                                                          child: Center(
+                                                            child: Text(
+                                                              itemEmoji(name),
+                                                              style:
+                                                                  const TextStyle(
+                                                                fontSize: 18,
+                                                              ),
                                                             ),
                                                           ),
                                                         ),
-                                                      ),
-                                                      const SizedBox(width: 10),
-                                                      Expanded(
-                                                        child: Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          children: [
-                                                            Text(
-                                                              name,
-                                                              maxLines: 1,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
+                                                        const SizedBox(
+                                                            width: 10),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            children: [
+                                                              Text(
+                                                                name,
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style:
+                                                                    const TextStyle(
+                                                                  fontSize: 13,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                  color: NovaColors
+                                                                      .textPrimary,
+                                                                ),
+                                                              ),
+                                                              if (stockStatus !=
+                                                                  null) ...[
+                                                                const SizedBox(
+                                                                    height: 2),
+                                                                Text(
+                                                                    stockStatus,
+                                                                    style: TextStyle(
+                                                                        fontSize:
+                                                                            10,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .bold,
+                                                                        color: stockStatus.startsWith('OUT')
+                                                                            ? NovaColors.danger
+                                                                            : NovaColors.amber)),
+                                                              ],
+                                                              const SizedBox(
+                                                                  height: 4),
+                                                              Row(
+                                                                children: [
+                                                                  Container(
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .symmetric(
+                                                                      horizontal:
+                                                                          6,
+                                                                      vertical:
+                                                                          2,
+                                                                    ),
+                                                                    decoration:
+                                                                        BoxDecoration(
+                                                                      color: isFocused
+                                                                          ? NovaColors
+                                                                              .bgPrimary
+                                                                          : NovaColors
+                                                                              .violetLight,
+                                                                      borderRadius:
+                                                                          BorderRadius
+                                                                              .circular(
+                                                                        5,
+                                                                      ),
+                                                                    ),
+                                                                    child: Text(
+                                                                      '×$qty',
+                                                                      style:
+                                                                          const TextStyle(
+                                                                        fontSize:
+                                                                            10,
+                                                                        color: NovaColors
+                                                                            .violet,
+                                                                        fontWeight:
+                                                                            FontWeight.w600,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(
+                                                                      width: 6),
+                                                                  Expanded(
+                                                                    child: Text(
+                                                                      'Rs ${price.toStringAsFixed(0)} each',
+                                                                      maxLines:
+                                                                          1,
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis,
+                                                                      style:
+                                                                          const TextStyle(
+                                                                        fontSize:
+                                                                            11,
+                                                                        color: NovaColors
+                                                                            .textTertiary,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                            width: 8),
+                                                        ConstrainedBox(
+                                                          constraints:
+                                                              const BoxConstraints(
+                                                            maxWidth: 72,
+                                                          ),
+                                                          child: FittedBox(
+                                                            fit: BoxFit
+                                                                .scaleDown,
+                                                            alignment: Alignment
+                                                                .centerRight,
+                                                            child: Text(
+                                                              'Rs ${lineTotal.toStringAsFixed(0)}',
                                                               style:
                                                                   const TextStyle(
                                                                 fontSize: 13,
                                                                 fontWeight:
                                                                     FontWeight
-                                                                        .w600,
+                                                                        .w700,
                                                                 color: NovaColors
                                                                     .textPrimary,
                                                               ),
                                                             ),
-                                                            const SizedBox(
-                                                                height: 4),
-                                                            Row(
-                                                              children: [
-                                                                Container(
-                                                                  padding:
-                                                                      const EdgeInsets
-                                                                          .symmetric(
-                                                                    horizontal:
-                                                                        6,
-                                                                    vertical: 2,
-                                                                  ),
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: isFocused
-                                                                        ? NovaColors
-                                                                            .bgPrimary
-                                                                        : NovaColors
-                                                                            .violetLight,
-                                                                    borderRadius:
-                                                                        BorderRadius
-                                                                            .circular(
-                                                                      5,
-                                                                    ),
-                                                                  ),
-                                                                  child: Text(
-                                                                    '×$qty',
-                                                                    style:
-                                                                        const TextStyle(
-                                                                      fontSize:
-                                                                          10,
-                                                                      color: NovaColors
-                                                                          .violet,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w600,
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                                const SizedBox(
-                                                                    width: 6),
-                                                                Expanded(
-                                                                  child: Text(
-                                                                    'Rs ${price.toStringAsFixed(0)} each',
-                                                                    maxLines: 1,
-                                                                    overflow:
-                                                                        TextOverflow
-                                                                            .ellipsis,
-                                                                    style:
-                                                                        const TextStyle(
-                                                                      fontSize:
-                                                                          11,
-                                                                      color: NovaColors
-                                                                          .textTertiary,
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 8),
-                                                      ConstrainedBox(
-                                                        constraints:
-                                                            const BoxConstraints(
-                                                          maxWidth: 72,
-                                                        ),
-                                                        child: FittedBox(
-                                                          fit: BoxFit.scaleDown,
-                                                          alignment: Alignment
-                                                              .centerRight,
-                                                          child: Text(
-                                                            'Rs ${lineTotal.toStringAsFixed(0)}',
-                                                            style:
-                                                                const TextStyle(
-                                                              fontSize: 13,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w700,
-                                                              color: NovaColors
-                                                                  .textPrimary,
-                                                            ),
                                                           ),
                                                         ),
-                                                      ),
-                                                      IconButton(
-                                                        key: menuButtonKey,
-                                                        icon: const Icon(
-                                                          Icons
-                                                              .more_vert_rounded,
-                                                          color: NovaColors
-                                                              .textTertiary,
-                                                          size: 16,
+                                                        IconButton(
+                                                          key: menuButtonKey,
+                                                          icon: const Icon(
+                                                            Icons
+                                                                .more_vert_rounded,
+                                                            color: NovaColors
+                                                                .textTertiary,
+                                                            size: 16,
+                                                          ),
+                                                          padding:
+                                                              EdgeInsets.zero,
+                                                          constraints:
+                                                              const BoxConstraints(
+                                                            minWidth: 32,
+                                                            minHeight: 32,
+                                                          ),
+                                                          splashRadius: 18,
+                                                          onPressed: () async {
+                                                            _selectCartItem(
+                                                                index);
+                                                            await _showCartItemActions(
+                                                              context,
+                                                              cart,
+                                                              item,
+                                                            );
+                                                          },
                                                         ),
-                                                        padding:
-                                                            EdgeInsets.zero,
-                                                        constraints:
-                                                            const BoxConstraints(
-                                                          minWidth: 32,
-                                                          minHeight: 32,
-                                                        ),
-                                                        splashRadius: 18,
-                                                        onPressed: () async {
-                                                          _selectCartItem(
-                                                              index);
-                                                          await _showCartItemActions(
+                                                      ],
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                    ),
+                                    Container(
+                                      decoration: const BoxDecoration(
+                                        color: NovaColors.bgSecondary,
+                                        borderRadius: BorderRadius.vertical(
+                                          bottom: Radius.circular(18),
+                                        ),
+                                      ),
+                                      padding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        14,
+                                        16,
+                                        16,
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              const Text(
+                                                'Total',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color:
+                                                      NovaColors.textTertiary,
+                                                ),
+                                              ),
+                                              Text(
+                                                'Rs ${cart.total.toStringAsFixed(0)}',
+                                                style: const TextStyle(
+                                                  fontSize: 24,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: NovaColors.textPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: _BottomBarButton(
+                                                  onPressed: cart
+                                                              .items.isEmpty ||
+                                                          (_paymentMethod ==
+                                                                  'cash' &&
+                                                              _cashIsInsufficient(
+                                                                  _tenderedAmount,
+                                                                  cart.total)) ||
+                                                          _isSubmitting
+                                                      ? null
+                                                      : () => _placeOrder(
                                                             context,
                                                             cart,
-                                                            item,
-                                                          );
-                                                        },
-                                                      ),
-                                                    ],
+                                                          ),
+                                                  icon: _isSubmitting
+                                                      ? Icons
+                                                          .hourglass_top_rounded
+                                                      : Icons.send_rounded,
+                                                  label: _isSubmitting
+                                                      ? 'Placing...'
+                                                      : 'Place Order',
+                                                  badge: itemCount > 0
+                                                      ? '$itemCount'
+                                                      : null,
+                                                  isPrimary: true,
+                                                ),
+                                              ),
+                                              if (isDesktop) ...[
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: StreamBuilder<
+                                                      OrderRecordSnapshot>(
+                                                    stream: _ordersStream,
+                                                    initialData: _lastOrders,
+                                                    builder:
+                                                        (context, snapshot) {
+                                                      if (snapshot.hasData) {
+                                                        _lastOrders =
+                                                            snapshot.data;
+                                                      }
+                                                      final readyCount =
+                                                          _readyOrderCount(
+                                                              snapshot);
+                                                      return _BottomBarButton(
+                                                        onPressed: () =>
+                                                            _showReadyOrdersSheet(
+                                                                context),
+                                                        icon: Icons
+                                                            .receipt_long_outlined,
+                                                        label: 'Ready Orders',
+                                                        badge: readyCount > 0
+                                                            ? '$readyCount'
+                                                            : null,
+                                                        isPrimary: false,
+                                                        badgeColor:
+                                                            NovaColors.teal,
+                                                      );
+                                                    },
                                                   ),
                                                 ),
-                                              );
-                                            },
+                                              ],
+                                            ],
                                           ),
-                                  ),
-                                  Container(
-                                    decoration: const BoxDecoration(
-                                      color: NovaColors.bgSecondary,
-                                      borderRadius: BorderRadius.vertical(
-                                        bottom: Radius.circular(18),
+                                        ],
                                       ),
                                     ),
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
+                                  ],
+                                ),
+                              ));
+                        }
+
+                        if (isWide) {
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: productFlex,
+                                  child: buildProductArea(
+                                    searchPadding: const EdgeInsets.fromLTRB(
+                                      0,
                                       14,
-                                      16,
-                                      16,
+                                      12,
+                                      0,
                                     ),
-                                    child: Column(
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text(
-                                              'Total',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: NovaColors.textTertiary,
-                                              ),
-                                            ),
-                                            Text(
-                                              'Rs ${cart.total.toStringAsFixed(0)}',
-                                              style: const TextStyle(
-                                                fontSize: 24,
-                                                fontWeight: FontWeight.w700,
-                                                color: NovaColors.textPrimary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: _BottomBarButton(
-                                                onPressed: cart.items.isEmpty ||
-                                                        (_paymentMethod ==
-                                                                'cash' &&
-                                                            _cashIsInsufficient(
-                                                                _tenderedAmount,
-                                                                cart.total)) ||
-                                                        _isSubmitting
-                                                    ? null
-                                                    : () => _placeOrder(
-                                                          context,
-                                                          cart,
-                                                        ),
-                                                icon: _isSubmitting
-                                                    ? Icons
-                                                        .hourglass_top_rounded
-                                                    : Icons.send_rounded,
-                                                label: _isSubmitting
-                                                    ? 'Placing...'
-                                                    : 'Place Order',
-                                                badge: itemCount > 0
-                                                    ? '$itemCount'
-                                                    : null,
-                                                isPrimary: true,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: StreamBuilder<
-                                                  OrderRecordSnapshot>(
-                                                stream: readyOrdersStream,
-                                                builder: (context, snapshot) {
-                                                  final readyCount =
-                                                      _readyOrderCount(
-                                                          snapshot);
-                                                  return _BottomBarButton(
-                                                    onPressed: () =>
-                                                        _showReadyOrdersSheet(
-                                                            context),
-                                                    icon: Icons
-                                                        .receipt_long_outlined,
-                                                    label: 'Ready Orders',
-                                                    badge: readyCount > 0
-                                                        ? '$readyCount'
-                                                        : null,
-                                                    isPrimary: false,
-                                                    badgeColor: NovaColors.teal,
-                                                  );
-                                                },
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                    chipPadding:
+                                        const EdgeInsets.only(right: 12),
+                                    listPadding: const EdgeInsets.fromLTRB(
+                                      0,
+                                      4,
+                                      12,
+                                      0,
                                     ),
+                                    includeFooter: false,
                                   ),
-                                ],
-                              ),
-                            ));
-                      }
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: cartFlex,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 14),
+                                    child: buildCheckoutPanel(
+                                        showBackButton: false),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
 
-                      if (isDesktop) {
-                        return Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                flex: 3,
-                                child: buildProductArea(
-                                  searchPadding: const EdgeInsets.fromLTRB(
-                                    0,
-                                    14,
-                                    12,
-                                    0,
-                                  ),
-                                  chipPadding: const EdgeInsets.only(right: 12),
-                                  listPadding: const EdgeInsets.fromLTRB(
-                                    0,
-                                    4,
-                                    12,
-                                    0,
-                                  ),
-                                  includeFooter: false,
+                        return ResponsiveCenter(
+                          padding: EdgeInsets.zero,
+                          child: _checkoutKeyboardMode
+                              ? Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child:
+                                      buildCheckoutPanel(showBackButton: true),
+                                )
+                              : Column(
+                                  children: [
+                                    Expanded(
+                                      child: buildProductArea(
+                                        searchPadding:
+                                            const EdgeInsets.fromLTRB(
+                                          16,
+                                          14,
+                                          16,
+                                          0,
+                                        ),
+                                        chipPadding: EdgeInsets.zero,
+                                        listPadding: const EdgeInsets.fromLTRB(
+                                          16,
+                                          4,
+                                          16,
+                                          12,
+                                        ),
+                                        includeFooter: false,
+                                      ),
+                                    ),
+                                    buildMobileCartBar(cart),
+                                  ],
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                flex: 1,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 14),
-                                  child: buildCheckoutPanel(),
-                                ),
-                              ),
-                            ],
-                          ),
                         );
-                      }
-
-                      return ResponsiveCenter(
-                        padding: EdgeInsets.zero,
-                        child: buildProductArea(
-                          searchPadding: const EdgeInsets.fromLTRB(
-                            16,
-                            14,
-                            16,
-                            0,
-                          ),
-                          chipPadding: EdgeInsets.zero,
-                          listPadding: const EdgeInsets.fromLTRB(
-                            16,
-                            4,
-                            16,
-                            12,
-                          ),
-                          includeFooter: true,
-                        ),
-                      );
-                    },
-                  );
-                },
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -3086,8 +3653,10 @@ class _PosHeaderSlideshowState extends State<PosHeaderSlideshow> {
 
         return LayoutBuilder(
           builder: (context, constraints) {
-            final isCompact = constraints.maxWidth < 600;
-            final height = isCompact ? 132.0 : 170.0;
+            final width = constraints.maxWidth;
+            final isCompact = width < 600;
+
+            final height = isCompact ? 132.0 : (width < 1100 ? 150.0 : 170.0);
 
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -3139,22 +3708,25 @@ class _PosHeaderSlideshowState extends State<PosHeaderSlideshow> {
                           ),
                         ),
                       ),
-                      TweenAnimationBuilder<double>(
-                        key: ValueKey(activeIndex),
-                        tween: Tween(begin: 0, end: 1),
-                        duration: _interval,
-                        builder: (context, value, child) {
-                          return Align(
-                            alignment: Alignment.bottomLeft,
-                            child: FractionallySizedBox(
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: TweenAnimationBuilder<double>(
+                          key: ValueKey(activeIndex),
+                          tween: Tween(begin: 0, end: 1),
+                          duration: _interval,
+                          builder: (context, value, child) {
+                            return FractionallySizedBox(
+                              alignment: Alignment.centerLeft,
                               widthFactor: value,
                               child: child,
-                            ),
-                          );
-                        },
-                        child: Container(
-                          height: 3,
-                          color: const Color(0xFFFF8C00).withOpacity(0.85),
+                            );
+                          },
+                          child: Container(
+                            height: 3,
+                            color: const Color(0xFFFF8C00).withOpacity(0.85),
+                          ),
                         ),
                       ),
                       if (widget.canEdit)
@@ -4053,11 +4625,11 @@ class _ProductListTile extends StatefulWidget {
   final bool isFocused;
 
   const _ProductListTile({
-    Key? key,
+    super.key,
     required this.product,
     required this.onTap,
     this.isFocused = false,
-  }) : super(key: key);
+  });
 
   @override
   State<_ProductListTile> createState() => _ProductListTileState();

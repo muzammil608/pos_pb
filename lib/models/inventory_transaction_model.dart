@@ -4,7 +4,7 @@ class InventoryTransaction {
   final String id;
   final String productId;
   final String productName;
-  final String type; // 'sale' | 'restock' | 'adjustment' | 'damage'
+  final String type;
   final int quantity;
   final int previousStock;
   final int newStock;

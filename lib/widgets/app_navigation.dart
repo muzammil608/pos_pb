@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../core/theme/cafe_colors.dart';
 import '../core/utils/clickable_cursor.dart';
 import '../providers/auth_provider.dart';
+import '../services/pocketbase/order_service.dart';
 
 class AppUserAvatar extends StatelessWidget {
   const AppUserAvatar({
@@ -509,12 +510,64 @@ class AppNavigationAppBar extends StatelessWidget
               ],
             ),
             actions: [
-              ...actions,
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: AppDrawerAvatarButton(
-                  photoUrl: photoUrl,
-                  userName: userName,
+              ExcludeFocus(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ...actions,
+                    if (!AppNavigationShell.isDesktop(context))
+                      IconButton(
+                        tooltip: 'Logout',
+                        icon: const Icon(Icons.logout_rounded,
+                            color: Colors.white70),
+                        onPressed: () async {
+                          final isMobile =
+                              MediaQuery.sizeOf(context).width < 600;
+                          bool confirm = true;
+                          if (!isMobile) {
+                            confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (dialogCtx) => AlertDialog(
+                                    title: const Text('Logout'),
+                                    content: const Text(
+                                        'Are you sure you want to logout?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dialogCtx, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dialogCtx, true),
+                                        style: TextButton.styleFrom(
+                                            foregroundColor: Colors.red),
+                                        child: const Text('Logout'),
+                                      ),
+                                    ],
+                                  ),
+                                ) ??
+                                false;
+                          }
+                          if (confirm && context.mounted) {
+                            await Provider.of<AuthProvider>(context,
+                                    listen: false)
+                                .logout();
+                            if (context.mounted) {
+                              Navigator.of(context).pushNamedAndRemoveUntil(
+                                  '/login', (route) => false);
+                            }
+                          }
+                        },
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: AppDrawerAvatarButton(
+                        photoUrl: photoUrl,
+                        userName: userName,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -591,10 +644,12 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
           onExit: (_) => setState(() => _hovered = false),
           child: SizedBox(
             width: _hovered ? 300 : 76,
-            child: AppNavigationDrawer(
-              auth: widget.auth,
-              currentRoute: widget.currentRoute,
-              compact: !_hovered,
+            child: ExcludeFocus(
+              child: AppNavigationDrawer(
+                auth: widget.auth,
+                currentRoute: widget.currentRoute,
+                compact: !_hovered,
+              ),
             ),
           ),
         ),
@@ -858,6 +913,120 @@ class _InitialAvatar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class AppMobileBottomNavBar extends StatelessWidget {
+  static bool autoShowReadyOrders = false;
+
+  final int currentIndex;
+  final VoidCallback? onPosTap;
+
+  const AppMobileBottomNavBar({
+    super.key,
+    required this.currentIndex,
+    this.onPosTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final orderService = OrderService(auth.ownerId);
+
+    return StreamBuilder<OrderRecordSnapshot>(
+      stream: orderService.getOrders(),
+      builder: (context, snapshot) {
+        int readyCount = 0;
+        if (snapshot.hasData) {
+          readyCount = snapshot.data!.docs
+              .where((doc) => doc.data()['status'] == 'ready')
+              .length;
+        }
+
+        return BottomNavigationBar(
+          currentIndex: currentIndex,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          selectedItemColor: const Color(0xFF534AB7),
+          unselectedItemColor: const Color(0xFF9999AE),
+          selectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+          unselectedLabelStyle: const TextStyle(fontSize: 11),
+          items: [
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.storefront_rounded),
+              label: 'POS',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.analytics_rounded),
+              label: 'Reports',
+            ),
+            BottomNavigationBarItem(
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.receipt_long_outlined),
+                  if (readyCount > 0)
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 14,
+                          minHeight: 14,
+                        ),
+                        child: Text(
+                          '$readyCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              label: 'Orders',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.inventory_rounded),
+              label: 'Inventory',
+            ),
+          ],
+          onTap: (index) {
+            if (index == currentIndex) {
+              if (index == 0 && onPosTap != null) {
+                onPosTap!();
+              }
+              return;
+            }
+
+            switch (index) {
+              case 0:
+                Navigator.pushReplacementNamed(context, '/pos');
+                break;
+              case 1:
+                Navigator.pushReplacementNamed(context, '/reports');
+                break;
+              case 2:
+                autoShowReadyOrders = true;
+                Navigator.pushReplacementNamed(context, '/pos');
+                break;
+              case 3:
+                Navigator.pushReplacementNamed(context, '/inventory');
+                break;
+            }
+          },
+        );
+      },
     );
   }
 }

@@ -32,7 +32,6 @@ class _Breakpoint {
 
 class _ResponsiveLayout {
   _ResponsiveLayout(double screenWidth, double screenHeight) {
-    // Guard against infinity on first layout pass on physical devices
     screenWidth = screenWidth.isInfinite ? 400.0 : screenWidth;
     screenHeight = screenHeight.isInfinite ? 800.0 : screenHeight;
 
@@ -417,7 +416,7 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             Expanded(
               child: Align(
-                alignment: Alignment.centerLeft,
+                alignment: Alignment.center,
                 child: _buildWideBrandPanel(layout),
               ),
             ),
@@ -468,7 +467,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildWideBrandPanel(_ResponsiveLayout layout) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         _BrandMark(
           outerSize: layout.logoSize,
@@ -477,6 +476,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 24),
         Text(
           'ORION',
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.white,
             fontSize: layout.titleFontSize + 8,
@@ -497,6 +497,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 28),
         Text(
           'Built for busy restaurant teams\n— so you can focus on the food,\nnot the paperwork.',
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.white.withOpacity(0.82),
             fontSize: 16,
@@ -745,7 +746,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: Colors.white.withOpacity(0.35), thickness: 1)),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 10),
-              child: Icon(Icons.local_pizza_rounded,
+              child: Icon(Icons.point_of_sale_rounded,
                   color: Colors.white70, size: 18),
             ),
             SizedBox(
@@ -830,7 +831,7 @@ class _BrandMark extends StatelessWidget {
           ),
           Transform.rotate(
             angle: -0.18,
-            child: Icon(Icons.local_pizza_rounded,
+            child: Icon(Icons.point_of_sale_rounded,
                 color: Colors.white, size: iconSize),
           ),
         ],
@@ -843,20 +844,20 @@ class _FoodPatternPainter extends CustomPainter {
   const _FoodPatternPainter();
 
   static const List<_PatternIcon> _icons = [
-    _PatternIcon(Icons.local_pizza, Offset(0.08, 0.08), 60, -0.45),
-    _PatternIcon(Icons.eco_outlined, Offset(0.68, 0.06), 48, 0.30),
-    _PatternIcon(Icons.local_pizza, Offset(0.86, 0.12), 62, 0.42),
-    _PatternIcon(Icons.circle_outlined, Offset(0.26, 0.17), 44, -0.25),
-    _PatternIcon(Icons.local_dining, Offset(0.08, 0.28), 42, 0.15),
-    _PatternIcon(Icons.eco_outlined, Offset(0.86, 0.30), 44, -0.12),
-    _PatternIcon(Icons.local_pizza, Offset(0.14, 0.43), 60, -0.52),
-    _PatternIcon(Icons.circle_outlined, Offset(0.72, 0.39), 42, 0.20),
-    _PatternIcon(Icons.local_pizza, Offset(0.82, 0.61), 64, 0.42),
-    _PatternIcon(Icons.eco_outlined, Offset(0.58, 0.65), 54, -0.24),
-    _PatternIcon(Icons.circle_outlined, Offset(0.20, 0.71), 38, 0.18),
-    _PatternIcon(Icons.local_pizza, Offset(0.08, 0.90), 58, -0.50),
-    _PatternIcon(Icons.circle_outlined, Offset(0.75, 0.88), 40, 0.12),
-    _PatternIcon(Icons.eco_outlined, Offset(0.88, 0.78), 44, 0.30),
+    _PatternIcon(Icons.point_of_sale_outlined, Offset(0.08, 0.08), 60, -0.45),
+    _PatternIcon(Icons.shopping_cart_outlined, Offset(0.68, 0.06), 48, 0.30),
+    _PatternIcon(Icons.storefront_outlined, Offset(0.86, 0.12), 62, 0.42),
+    _PatternIcon(Icons.receipt_long_outlined, Offset(0.26, 0.17), 44, -0.25),
+    _PatternIcon(Icons.payments_outlined, Offset(0.08, 0.28), 42, 0.15),
+    _PatternIcon(Icons.credit_card_outlined, Offset(0.86, 0.30), 44, -0.12),
+    _PatternIcon(Icons.point_of_sale_outlined, Offset(0.14, 0.43), 60, -0.52),
+    _PatternIcon(Icons.shopping_bag_outlined, Offset(0.72, 0.39), 42, 0.20),
+    _PatternIcon(Icons.storefront_outlined, Offset(0.82, 0.61), 64, 0.42),
+    _PatternIcon(Icons.receipt_long_outlined, Offset(0.58, 0.65), 54, -0.24),
+    _PatternIcon(Icons.payments_outlined, Offset(0.20, 0.71), 38, 0.18),
+    _PatternIcon(Icons.point_of_sale_outlined, Offset(0.08, 0.90), 58, -0.50),
+    _PatternIcon(Icons.shopping_cart_outlined, Offset(0.75, 0.88), 40, 0.12),
+    _PatternIcon(Icons.credit_card_outlined, Offset(0.88, 0.78), 44, 0.30),
   ];
 
   @override
