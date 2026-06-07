@@ -2051,296 +2051,72 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
               : (AppNavigationShell.isDesktop(context)
                   ? null
                   : AppNavigationDrawer(auth: auth, currentRoute: '/pos')),
-          appBar: isMobileUI
-              ? PreferredSize(
-                  preferredSize: const Size.fromHeight(88),
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: CafeColors.headerGradient,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x22111111),
-                          blurRadius: 8,
-                          offset: Offset(0, 2),
+          appBar: AppNavigationAppBar(
+            title: 'Order Station',
+            icon: Icons.storefront_rounded,
+            photoUrl: photoUrl,
+            userName: userName,
+            actions: [
+              if (_isDesktop)
+                IconButton(
+                  tooltip: 'Keyboard Shortcuts (?)',
+                  onPressed: () => PosShortcutHelp.show(context),
+                  icon: const Icon(Icons.keyboard_rounded,
+                      color: Colors.white70, size: 20),
+                ),
+              StreamBuilder<OrderRecordSnapshot>(
+                stream: _ordersStream,
+                initialData: _lastOrders,
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    _lastOrders = snapshot.data;
+                  }
+                  final readyCount = _readyOrderCount(snapshot);
+                  return IconButton(
+                    tooltip: _isDesktop ? 'Ready Orders  (F2)' : 'Ready Orders',
+                    onPressed: () => _showReadyOrdersSheet(context),
+                    icon: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(
+                          readyCount > 0
+                              ? Icons.notifications_active_rounded
+                              : Icons.notifications_outlined,
+                          color: readyCount > 0 ? Colors.white : Colors.white70,
+                          size: 22,
                         ),
+                        if (readyCount > 0)
+                          Positioned(
+                            top: -3,
+                            right: -3,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: NovaColors.teal,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: CafeColors.flame, width: 1.5),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '$readyCount',
+                                  style: const TextStyle(
+                                    fontSize: 7,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
-                    child: SafeArea(
-                      bottom: false,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const Row(
-                                  children: [
-                                    Icon(Icons.wifi,
-                                        color: Colors.white70, size: 12),
-                                    SizedBox(width: 4),
-                                    Icon(Icons.signal_cellular_4_bar,
-                                        color: Colors.white70, size: 12),
-                                    SizedBox(width: 4),
-                                    Icon(Icons.battery_std,
-                                        color: Colors.white70, size: 12),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            child: Container(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.storefront_rounded,
-                                      color: Colors.white70, size: 22),
-                                  const SizedBox(width: 10),
-                                  const Expanded(
-                                    child: Text(
-                                      'Order Station',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 18,
-                                        letterSpacing: 0.3,
-                                      ),
-                                    ),
-                                  ),
-                                  ExcludeFocus(
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        StreamBuilder<OrderRecordSnapshot>(
-                                          stream: _ordersStream,
-                                          initialData: _lastOrders,
-                                          builder: (context, snapshot) {
-                                            if (snapshot.hasData) {
-                                              _lastOrders = snapshot.data;
-                                            }
-                                            final readyCount =
-                                                _readyOrderCount(snapshot);
-                                            return IconButton(
-                                              tooltip: 'Ready Orders',
-                                              onPressed: () =>
-                                                  _showReadyOrdersSheet(
-                                                      context),
-                                              icon: Stack(
-                                                clipBehavior: Clip.none,
-                                                children: [
-                                                  Icon(
-                                                    readyCount > 0
-                                                        ? Icons
-                                                            .notifications_active_rounded
-                                                        : Icons
-                                                            .notifications_outlined,
-                                                    color: readyCount > 0
-                                                        ? Colors.white
-                                                        : Colors.white70,
-                                                    size: 22,
-                                                  ),
-                                                  if (readyCount > 0)
-                                                    Positioned(
-                                                      top: -3,
-                                                      right: -3,
-                                                      child: Container(
-                                                        width: 14,
-                                                        height: 14,
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color:
-                                                              NovaColors.teal,
-                                                          shape:
-                                                              BoxShape.circle,
-                                                          border: Border.all(
-                                                              color: CafeColors
-                                                                  .flame,
-                                                              width: 1.5),
-                                                        ),
-                                                        child: Center(
-                                                          child: Text(
-                                                            '$readyCount',
-                                                            style:
-                                                                const TextStyle(
-                                                              fontSize: 7,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w800,
-                                                              color:
-                                                                  Colors.white,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                        IconButton(
-                                          tooltip: 'Logout',
-                                          icon: const Icon(Icons.logout_rounded,
-                                              color: Colors.white70),
-                                          onPressed: () async {
-                                            final isMobile =
-                                                MediaQuery.sizeOf(context)
-                                                        .width <
-                                                    600;
-                                            bool confirm = true;
-                                            if (!isMobile) {
-                                              confirm = await showDialog<bool>(
-                                                    context: context,
-                                                    builder: (dialogCtx) =>
-                                                        AlertDialog(
-                                                      title:
-                                                          const Text('Logout'),
-                                                      content: const Text(
-                                                          'Are you sure you want to logout?'),
-                                                      actions: [
-                                                        TextButton(
-                                                          onPressed: () =>
-                                                              Navigator.pop(
-                                                                  dialogCtx,
-                                                                  false),
-                                                          child: const Text(
-                                                              'Cancel'),
-                                                        ),
-                                                        TextButton(
-                                                          onPressed: () =>
-                                                              Navigator.pop(
-                                                                  dialogCtx,
-                                                                  true),
-                                                          style: TextButton
-                                                              .styleFrom(
-                                                            foregroundColor:
-                                                                Colors.red,
-                                                          ),
-                                                          child: const Text(
-                                                              'Logout'),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ) ??
-                                                  false;
-                                            }
-                                            if (confirm && context.mounted) {
-                                              await Provider.of<AuthProvider>(
-                                                      context,
-                                                      listen: false)
-                                                  .logout();
-                                              if (context.mounted) {
-                                                Navigator.of(context)
-                                                    .pushNamedAndRemoveUntil(
-                                                  '/login',
-                                                  (route) => false,
-                                                );
-                                              }
-                                            }
-                                          },
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                              right: 12, left: 4),
-                                          child: AppUserAvatar(
-                                            photoUrl: photoUrl,
-                                            userName: userName,
-                                            radius: 16,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-              : AppNavigationAppBar(
-                  title: 'Order Station',
-                  icon: Icons.storefront_rounded,
-                  photoUrl: photoUrl,
-                  userName: userName,
-                  actions: [
-                    if (_isDesktop)
-                      IconButton(
-                        tooltip: 'Keyboard Shortcuts (?)',
-                        onPressed: () => PosShortcutHelp.show(context),
-                        icon: const Icon(Icons.keyboard_rounded,
-                            color: Colors.white70, size: 20),
-                      ),
-                    StreamBuilder<OrderRecordSnapshot>(
-                      stream: _ordersStream,
-                      initialData: _lastOrders,
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData) {
-                          _lastOrders = snapshot.data;
-                        }
-                        final readyCount = _readyOrderCount(snapshot);
-                        return IconButton(
-                          tooltip: 'Ready Orders  (F2)',
-                          onPressed: () => _showReadyOrdersSheet(context),
-                          icon: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Icon(
-                                readyCount > 0
-                                    ? Icons.notifications_active_rounded
-                                    : Icons.notifications_outlined,
-                                color: readyCount > 0
-                                    ? NovaColors.violet
-                                    : NovaColors.textSecondary,
-                                size: 22,
-                              ),
-                              if (readyCount > 0)
-                                Positioned(
-                                  top: -3,
-                                  right: -3,
-                                  child: Container(
-                                    width: 14,
-                                    height: 14,
-                                    decoration: BoxDecoration(
-                                      color: NovaColors.teal,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                          color: NovaColors.bgPrimary,
-                                          width: 1.5),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        '$readyCount',
-                                        style: const TextStyle(
-                                          fontSize: 7,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
+                  );
+                },
+              ),
+            ],
+          ),
           bottomNavigationBar: isMobileUI
               ? AppMobileBottomNavBar(
                   currentIndex: 0,

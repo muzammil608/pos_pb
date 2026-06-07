@@ -123,53 +123,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ],
                   ),
                   actions: [
-                    if (!isDesktop)
-                      IconButton(
-                        tooltip: 'Logout',
-                        icon: const Icon(Icons.logout_rounded,
-                            color: Colors.white70),
-                        onPressed: () async {
-                          final isMobile =
-                              MediaQuery.sizeOf(context).width < 600;
-                          bool confirm = true;
-                          if (!isMobile) {
-                            confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (dialogCtx) => AlertDialog(
-                                    title: const Text('Logout'),
-                                    content: const Text(
-                                        'Are you sure you want to logout?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(dialogCtx, false),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(dialogCtx, true),
-                                        style: TextButton.styleFrom(
-                                            foregroundColor: Colors.red),
-                                        child: const Text('Logout'),
-                                      ),
-                                    ],
-                                  ),
-                                ) ??
-                                false;
-                          }
-                          if (confirm && context.mounted) {
-                            await Provider.of<AuthProvider>(context,
-                                    listen: false)
-                                .logout();
-                            if (context.mounted) {
-                              Navigator.of(context).pushNamedAndRemoveUntil(
-                                '/login',
-                                (route) => false,
-                              );
-                            }
-                          }
-                        },
-                      ),
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: AppDrawerAvatarButton(
@@ -567,40 +520,54 @@ class _QuickActionsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+
+    final posCard = _QuickActionCard(
+      icon: Icons.storefront_rounded,
+      label: 'POS',
+      subtitle: 'Order Station',
+      color: NovaColors.violet,
+      bgColor: NovaColors.violetLight,
+      onTap: () => Navigator.pushNamed(context, '/pos'),
+    );
+
+    final inventoryCard = _QuickActionCard(
+      icon: Icons.inventory_rounded,
+      label: 'Inventory',
+      subtitle: 'Reports & Stock',
+      color: NovaColors.teal,
+      bgColor: NovaColors.tealLight,
+      onTap: () => Navigator.pushNamed(context, '/inventory'),
+    );
+
+    final employeesCard = _QuickActionCard(
+      icon: Icons.people_rounded,
+      label: 'Employees',
+      subtitle: 'Manage Staff',
+      color: NovaColors.rose,
+      bgColor: NovaColors.roseLight,
+      onTap: () => Navigator.pushNamed(context, '/employees'),
+    );
+
+    if (isMobile) {
+      return Column(
+        children: [
+          posCard,
+          const SizedBox(height: 10),
+          inventoryCard,
+          const SizedBox(height: 10),
+          employeesCard,
+        ],
+      );
+    }
+
     return Row(
       children: [
-        Expanded(
-          child: _QuickActionCard(
-            icon: Icons.storefront_rounded,
-            label: 'POS',
-            subtitle: 'Order Station',
-            color: NovaColors.violet,
-            bgColor: NovaColors.violetLight,
-            onTap: () => Navigator.pushNamed(context, '/pos'),
-          ),
-        ),
+        Expanded(child: posCard),
         const SizedBox(width: 12),
-        Expanded(
-          child: _QuickActionCard(
-            icon: Icons.inventory_rounded,
-            label: 'Inventory',
-            subtitle: 'Reports & Stock',
-            color: NovaColors.teal,
-            bgColor: NovaColors.tealLight,
-            onTap: () => Navigator.pushNamed(context, '/inventory'),
-          ),
-        ),
+        Expanded(child: inventoryCard),
         const SizedBox(width: 12),
-        Expanded(
-          child: _QuickActionCard(
-            icon: Icons.people_rounded,
-            label: 'Employees',
-            subtitle: 'Manage Staff',
-            color: NovaColors.rose,
-            bgColor: NovaColors.roseLight,
-            onTap: () => Navigator.pushNamed(context, '/employees'),
-          ),
-        ),
+        Expanded(child: employeesCard),
       ],
     );
   }

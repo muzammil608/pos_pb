@@ -64,6 +64,170 @@ class AppUserAvatar extends StatelessWidget {
   }
 }
 
+void showUserCredentialsCard(BuildContext context) async {
+  final auth = Provider.of<AuthProvider>(context, listen: false);
+  final user = auth.user;
+  final userEmail = user?.email ?? 'No Email';
+  final userName = user?.displayName ??
+      (userEmail.contains('@') ? userEmail.split('@').first : userEmail);
+  final photoUrl = user?.photoURL;
+  final role = auth.role;
+
+  final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
+  if (renderBox == null) return;
+  final Offset offset = renderBox.localToGlobal(Offset.zero);
+  final double buttonWidth = renderBox.size.width;
+  final double buttonHeight = renderBox.size.height;
+
+  final double left = (offset.dx + buttonWidth - 240).clamp(8.0, double.infinity);
+  final RelativeRect position = RelativeRect.fromLTRB(
+    left,
+    offset.dy + buttonHeight + 8,
+    left + 240,
+    offset.dy + buttonHeight + 8 + 180,
+  );
+
+  await showMenu(
+    context: context,
+    position: position,
+    elevation: 8,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: BorderSide(color: CafeColors.charcoal.withOpacity(0.08), width: 1),
+    ),
+    color: Colors.white,
+    constraints: const BoxConstraints(
+      minWidth: 240,
+      maxWidth: 240,
+    ),
+    items: [
+      PopupMenuItem<void>(
+        padding: EdgeInsets.zero,
+        enabled: true,
+        child: FocusScope(
+          child: GestureDetector(
+            onTap: () {},
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      AppUserAvatar(
+                        photoUrl: photoUrl,
+                        userName: userName,
+                        radius: 18,
+                        fontSize: 14,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              userName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: CafeColors.charcoal,
+                              ),
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              userEmail,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: CafeColors.charcoal.withOpacity(0.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: CafeColors.creme,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      role.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: CafeColors.flame,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Divider(height: 1, thickness: 1, color: CafeColors.latte),
+                  const SizedBox(height: 12),
+                  Builder(
+                    builder: (buttonContext) {
+                      return InkWell(
+                        onTap: () async {
+                          Navigator.of(buttonContext).pop();
+                          await auth.logout();
+                          if (context.mounted) {
+                            Navigator.of(context).pushNamedAndRemoveUntil(
+                              '/login',
+                              (route) => false,
+                            );
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.logout_rounded,
+                                color: Colors.red.shade600,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Logout',
+                                style: TextStyle(
+                                  color: Colors.red.shade600,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
 class AppDrawerAvatarButton extends StatelessWidget {
   const AppDrawerAvatarButton({
     super.key,
@@ -76,30 +240,28 @@ class AppDrawerAvatarButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Builder(
-      builder: (builderContext) => Padding(
-        padding: const EdgeInsets.only(right: 12),
-        child: ClickableCursor(
-          child: GestureDetector(
-            onTap: () => Scaffold.of(builderContext).openDrawer(),
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white54, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: AppUserAvatar(
-                photoUrl: photoUrl,
-                userName: userName,
-                radius: 18,
-                fontSize: 14,
-              ),
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: ClickableCursor(
+        child: GestureDetector(
+          onTap: () => showUserCredentialsCard(context),
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white54, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: AppUserAvatar(
+              photoUrl: photoUrl,
+              userName: userName,
+              radius: 18,
+              fontSize: 14,
             ),
           ),
         ),
@@ -515,51 +677,6 @@ class AppNavigationAppBar extends StatelessWidget
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ...actions,
-                    if (!AppNavigationShell.isDesktop(context))
-                      IconButton(
-                        tooltip: 'Logout',
-                        icon: const Icon(Icons.logout_rounded,
-                            color: Colors.white70),
-                        onPressed: () async {
-                          final isMobile =
-                              MediaQuery.sizeOf(context).width < 600;
-                          bool confirm = true;
-                          if (!isMobile) {
-                            confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (dialogCtx) => AlertDialog(
-                                    title: const Text('Logout'),
-                                    content: const Text(
-                                        'Are you sure you want to logout?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(dialogCtx, false),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(dialogCtx, true),
-                                        style: TextButton.styleFrom(
-                                            foregroundColor: Colors.red),
-                                        child: const Text('Logout'),
-                                      ),
-                                    ],
-                                  ),
-                                ) ??
-                                false;
-                          }
-                          if (confirm && context.mounted) {
-                            await Provider.of<AuthProvider>(context,
-                                    listen: false)
-                                .logout();
-                            if (context.mounted) {
-                              Navigator.of(context).pushNamedAndRemoveUntil(
-                                  '/login', (route) => false);
-                            }
-                          }
-                        },
-                      ),
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: AppDrawerAvatarButton(
