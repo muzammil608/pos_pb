@@ -626,18 +626,4 @@ class _DonutMeta {
   });
 }
 
-class StatusBarChart extends StatelessWidget {
-  final double height;
-  final String ownerId;
 
-  const StatusBarChart({
-    super.key,
-    required this.ownerId,
-    this.height = 220,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return StatusDonutChart(ownerId: ownerId);
-  }
-}

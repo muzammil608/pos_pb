@@ -729,6 +729,15 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
       return;
     }
 
+    final searchBar = _searchBarKey.currentState;
+    if (searchBar != null && searchBar.hasFocus) {
+      searchBar.unfocus();
+      if (_focusedProductIndex < 0 && _lastFilteredProducts.isNotEmpty) {
+        _setFocusedProductIndex(0);
+      }
+      return;
+    }
+
     if (_lastFilteredProducts.isEmpty) return;
     final step = _currentCrossAxisCount;
     final nextIndex = _focusedProductIndex + step;
@@ -748,11 +757,18 @@ class _PosScreenState extends State<PosScreen> with TickerProviderStateMixin {
       return;
     }
 
+    final searchBar = _searchBarKey.currentState;
+    if (searchBar != null && searchBar.hasFocus) {
+      return;
+    }
+
     if (_lastFilteredProducts.isEmpty) return;
     final step = _currentCrossAxisCount;
     final nextIndex = _focusedProductIndex - step;
     if (nextIndex >= 0) {
       _setFocusedProductIndex(nextIndex);
+    } else {
+      searchBar?.requestFocus();
     }
   }
 

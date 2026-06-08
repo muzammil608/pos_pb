@@ -425,46 +425,6 @@ class _ToastCard extends StatelessWidget {
   }
 }
 
-class _ProgressBar extends StatefulWidget {
-  final Duration duration;
-  final Color color;
-
-  const _ProgressBar({required this.duration, required this.color});
-
-  @override
-  State<_ProgressBar> createState() => _ProgressBarState();
-}
-
-class _ProgressBarState extends State<_ProgressBar>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: widget.duration)
-      ..forward();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (_, __) => LinearProgressIndicator(
-        value: 1.0 - _ctrl.value,
-        minHeight: 3,
-        backgroundColor: widget.color.withOpacity(0.15),
-        valueColor: AlwaysStoppedAnimation(widget.color),
-      ),
-    );
-  }
-}
 
 class _NoticeScheme {
   const _NoticeScheme({

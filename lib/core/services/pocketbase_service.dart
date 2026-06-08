@@ -42,8 +42,4 @@ class PocketBaseService {
 
     return _instance!;
   }
-
-  static void reset() {
-    _instance = null;
-  }
 }

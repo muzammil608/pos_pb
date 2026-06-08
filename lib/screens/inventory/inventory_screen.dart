@@ -767,7 +767,7 @@ class _InventoryBodyState extends State<_InventoryBody> {
 
         if (!snapshot.hasData) {
           return const Center(
-              child: CircularProgressIndicator(color: NovaColors.teal));
+              child: CircularProgressIndicator(color: NovaColors.violet));
         }
 
         final products = snapshot.data![0] as List<Product>;
@@ -1810,7 +1810,7 @@ class _InventoryOrderReportCard extends StatelessWidget {
 
   Color get _statusColor {
     return switch (order['status']?.toString() ?? '') {
-      'completed' => NovaColors.tealDeep,
+      'completed' => NovaColors.violetDeep,
       'ready' => NovaColors.amberDeep,
       'pending' => NovaColors.danger,
       _ => NovaColors.textSecondary,
@@ -1819,7 +1819,7 @@ class _InventoryOrderReportCard extends StatelessWidget {
 
   Color get _statusBg {
     return switch (order['status']?.toString() ?? '') {
-      'completed' => NovaColors.tealLight,
+      'completed' => NovaColors.violetLight,
       'ready' => NovaColors.amberLight,
       'pending' => NovaColors.dangerLight,
       _ => NovaColors.bgSecondary,
@@ -2176,7 +2176,7 @@ class _BarcodeRestockPanelState extends State<_BarcodeRestockPanel> {
               }
             },
             style: FilledButton.styleFrom(
-              backgroundColor: NovaColors.teal,
+              backgroundColor: NovaColors.violet,
               foregroundColor: Colors.white,
             ).copyWith(
               mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
@@ -2195,7 +2195,7 @@ class _BarcodeRestockPanelState extends State<_BarcodeRestockPanel> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: NovaColors.textSecondary),
-      prefixIcon: Icon(icon, color: NovaColors.teal, size: 18),
+      prefixIcon: Icon(icon, color: NovaColors.violet, size: 18),
       filled: true,
       fillColor: NovaColors.bgSecondary,
       enabledBorder: OutlineInputBorder(
@@ -2203,7 +2203,7 @@ class _BarcodeRestockPanelState extends State<_BarcodeRestockPanel> {
         borderRadius: BorderRadius.circular(10),
       ),
       focusedBorder: OutlineInputBorder(
-        borderSide: const BorderSide(color: NovaColors.teal, width: 1.5),
+        borderSide: const BorderSide(color: NovaColors.violet, width: 1.5),
         borderRadius: BorderRadius.circular(10),
       ),
       errorBorder: OutlineInputBorder(
@@ -2235,12 +2235,12 @@ class _BarcodeRestockPanelState extends State<_BarcodeRestockPanel> {
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                color: NovaColors.tealLight,
+                color: NovaColors.violetLight,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
                 Icons.qr_code_scanner_rounded,
-                color: NovaColors.tealDeep,
+                color: NovaColors.violetDeep,
                 size: 19,
               ),
             ),
@@ -2290,7 +2290,7 @@ class _BarcodeRestockPanelState extends State<_BarcodeRestockPanel> {
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: NovaColors.teal,
+                        color: NovaColors.violet,
                       ),
                     ),
                   )
@@ -2411,11 +2411,11 @@ class _ProfitExpansionPanel extends StatelessWidget {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: NovaColors.tealLight,
+                      color: NovaColors.violetLight,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.trending_up_rounded,
-                        color: NovaColors.tealDeep, size: 19),
+                        color: NovaColors.violetDeep, size: 19),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -2447,7 +2447,7 @@ class _ProfitExpansionPanel extends StatelessWidget {
                     _formatMoney(profit),
                     style: NovaFonts.price(
                       color: profit >= 0
-                          ? NovaColors.tealDeep
+                          ? NovaColors.violetDeep
                           : const Color(0xFFB54724),
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -2621,7 +2621,7 @@ class _ProfitProductRow extends StatelessWidget {
             _formatMoney(profit),
             style: TextStyle(
               color:
-                  profit >= 0 ? NovaColors.tealDeep : const Color(0xFFB54724),
+                  profit >= 0 ? NovaColors.violetDeep : const Color(0xFFB54724),
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -2680,7 +2680,7 @@ List<Widget> _buildMetricCards(
       value: '${summary.totalProducts}',
       subText: '${products.where((p) => p.stockQty > 0).length} in stock',
       icon: Icons.inventory_2_rounded,
-      iconColor: NovaColors.teal,
+      iconColor: NovaColors.violet,
     ),
     _MetricCard(
       title: 'Stock Value',
@@ -3165,7 +3165,7 @@ class _InventoryTablePanelState extends State<_InventoryTablePanel> {
                                 _TableActionButton(
                                   tooltip: 'Restock',
                                   icon: Icons.add_circle_outline_rounded,
-                                  color: NovaColors.teal,
+                                  color: NovaColors.violet,
                                   onPressed: () =>
                                       _showRestockDialog(context, p),
                                 ),
@@ -3617,10 +3617,10 @@ class _CurrentStockChip extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: NovaColors.tealLight,
+              color: NovaColors.violetLight,
               borderRadius: BorderRadius.circular(11),
             ),
-            child: Icon(product.icon, color: NovaColors.tealDeep, size: 20),
+            child: Icon(product.icon, color: NovaColors.violetDeep, size: 20),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -3763,7 +3763,7 @@ class _ProductCardList extends StatelessWidget {
                         tooltip: 'Restock',
                         mouseCursor: SystemMouseCursors.click,
                         icon: const Icon(Icons.add_circle_outline_rounded,
-                            size: 20, color: NovaColors.teal),
+                            size: 20, color: NovaColors.violet),
                         onPressed: () => onRestock(p),
                       ),
                       IconButton(
@@ -3828,6 +3828,14 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
   int? _editingSupplierIndex;
 
   late final List<Product> _orderProducts;
+  late final List<String> _categories;
+  String _selectedCategory = 'All Categories';
+
+  final _productSearchController = TextEditingController();
+  String _productSearchQuery = '';
+
+  final _supplierSearchController = TextEditingController();
+  String _supplierSearchQuery = '';
 
   @override
   void initState() {
@@ -3853,6 +3861,9 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
       );
     }
     _selectedProductIds.add(widget.product.id);
+
+    final categorySet = _orderProducts.map((p) => p.category.trim()).toSet();
+    _categories = categorySet.where((c) => c.isNotEmpty).toList()..sort();
   }
 
   @override
@@ -3866,6 +3877,8 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
     _supplierAddressController.dispose();
     _supplierLeadTimeController.dispose();
     _supplierTermsController.dispose();
+    _productSearchController.dispose();
+    _supplierSearchController.dispose();
     super.dispose();
   }
 
@@ -3887,29 +3900,46 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
         .toList();
   }
 
+  List<Product> get _filteredProducts {
+    List<Product> list = _orderProducts;
+    if (_selectedCategory != 'All Categories') {
+      list = list.where((p) => p.category.trim() == _selectedCategory).toList();
+    }
+    if (_productSearchQuery.isNotEmpty) {
+      final q = _productSearchQuery.toLowerCase();
+      list = list
+          .where((p) =>
+              p.name.toLowerCase().contains(q) ||
+              p.barcode.toLowerCase().contains(q))
+          .toList();
+    }
+    return list;
+  }
+
   int get _selectedItemCount => _selectedProductIds.length;
 
   void _selectAllOrderProducts() {
     setState(() {
       _selectedProductIds
-        ..clear()
-        ..addAll(_orderProducts.map((product) => product.id));
+          .addAll(_filteredProducts.map((product) => product.id));
     });
   }
 
   void _selectLowStockOrderProducts() {
-    final lowStockIds = _orderProducts
+    final lowStockIds = _filteredProducts
         .where((product) => product.stockQty <= product.lowStockThreshold)
         .map((product) => product.id);
     setState(() {
-      _selectedProductIds
-        ..clear()
-        ..addAll(lowStockIds);
+      _selectedProductIds.addAll(lowStockIds);
     });
   }
 
   void _clearOrderProducts() {
-    setState(_selectedProductIds.clear);
+    setState(() {
+      final filteredIds =
+          _filteredProducts.map((product) => product.id).toSet();
+      _selectedProductIds.removeWhere((id) => filteredIds.contains(id));
+    });
   }
 
   void _addSupplier() {
@@ -4282,6 +4312,355 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
     return opened;
   }
 
+  Widget _buildCategoryDropdown() {
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        value: _selectedCategory,
+        dropdownColor: NovaColors.bgSecondary,
+        icon: const Icon(Icons.keyboard_arrow_down_rounded,
+            color: NovaColors.textSecondary, size: 18),
+        style: const TextStyle(
+          color: NovaColors.textPrimary,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        items: [
+          const DropdownMenuItem(
+            value: 'All Categories',
+            child: Text('All Categories'),
+          ),
+          ..._categories.map(
+            (cat) => DropdownMenuItem(
+              value: cat,
+              child: Text(cat),
+            ),
+          ),
+        ],
+        onChanged: (v) {
+          if (v != null) {
+            setState(() {
+              _selectedCategory = v;
+            });
+          }
+        },
+      ),
+    );
+  }
+
+  void _showSuppliersDialog() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final query = _supplierSearchQuery.toLowerCase();
+            final filteredSuppliers = _suppliers
+                .where((s) =>
+                    s.name.toLowerCase().contains(query) ||
+                    s.contact.contains(query) ||
+                    s.email.toLowerCase().contains(query))
+                .toList();
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+              child: ConstrainedBox(
+                constraints:
+                    const BoxConstraints(maxWidth: 420, maxHeight: 520),
+                child: Card(
+                  color: NovaColors.bgPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: NovaColors.borderTertiary),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Suppliers List',
+                              style: TextStyle(
+                                color: NovaColors.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close,
+                                  size: 20, color: NovaColors.textSecondary),
+                              onPressed: () {
+                                _supplierSearchController.clear();
+                                setState(() {
+                                  _supplierSearchQuery = '';
+                                });
+                                Navigator.of(dialogContext).pop();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(
+                          height: 1, color: NovaColors.borderTertiary),
+                      // Search bar
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: SizedBox(
+                          height: 38,
+                          child: TextField(
+                            controller: _supplierSearchController,
+                            onChanged: (v) {
+                              setDialogState(() {
+                                _supplierSearchQuery = v.trim();
+                              });
+                            },
+                            style: const TextStyle(
+                                color: NovaColors.textPrimary, fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: 'Search suppliers...',
+                              hintStyle: const TextStyle(
+                                  color: NovaColors.textTertiary, fontSize: 12),
+                              prefixIcon: const Icon(Icons.search,
+                                  size: 18, color: NovaColors.textSecondary),
+                              suffixIcon: _supplierSearchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear,
+                                          size: 16,
+                                          color: NovaColors.textSecondary),
+                                      onPressed: () {
+                                        _supplierSearchController.clear();
+                                        setDialogState(() {
+                                          _supplierSearchQuery = '';
+                                        });
+                                      },
+                                    )
+                                  : null,
+                              filled: true,
+                              fillColor: NovaColors.bgSecondary,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 0),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: const BorderSide(
+                                    color: NovaColors.borderTertiary),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide:
+                                    const BorderSide(color: NovaColors.violet),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const Divider(
+                          height: 1, color: NovaColors.borderTertiary),
+                      // List of suppliers
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              if (filteredSuppliers.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 20),
+                                  child: _MutedText(
+                                      text: 'No matching suppliers found.'),
+                                )
+                              else
+                                for (var i = 0; i < _suppliers.length; i++)
+                                  if (filteredSuppliers.contains(_suppliers[i]))
+                                    _SupplierOption(
+                                      supplier: _suppliers[i],
+                                      selected: i == _selectedSupplier,
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedSupplier = i;
+                                        });
+                                        _supplierSearchController.clear();
+                                        setState(() {
+                                          _supplierSearchQuery = '';
+                                        });
+                                        Navigator.of(dialogContext).pop();
+                                      },
+                                      onEdit: () {
+                                        Navigator.of(dialogContext).pop();
+                                        _startEditSupplier(i);
+                                      },
+                                      onDelete: () {
+                                        setDialogState(() {
+                                          _deleteSupplier(i);
+                                        });
+                                      },
+                                    ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).then((_) {
+      _supplierSearchController.clear();
+      setState(() {
+        _supplierSearchQuery = '';
+      });
+    });
+  }
+
+  Widget _buildSupplierDetailsCard() {
+    final supplier = _suppliers.isEmpty ? null : _suppliers[_selectedSupplier];
+
+    if (supplier == null) {
+      return const Padding(
+        padding: EdgeInsets.all(14),
+        child: _MutedText(text: 'No suppliers yet. Add one below.'),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.business_rounded,
+                color: NovaColors.violet,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  supplier.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: NovaColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _buildDetailRow(Icons.phone_outlined, 'Contact', supplier.contact),
+          if (supplier.email.isNotEmpty)
+            _buildDetailRow(Icons.email_outlined, 'Email', supplier.email),
+          _buildDetailRow(
+              Icons.location_on_outlined, 'Address', supplier.address),
+          _buildDetailRow(
+              Icons.schedule_outlined, 'Lead time', supplier.leadTime),
+          _buildDetailRow(
+              Icons.receipt_long_outlined, 'Payment terms', supplier.terms),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 14, color: NovaColors.textTertiary),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style:
+                const TextStyle(color: NovaColors.textSecondary, fontSize: 12),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: NovaColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupplierForm() {
+    return _ManualSupplierForm(
+      formKey: _supplierFormKey,
+      nameController: _supplierNameController,
+      contactController: _supplierContactController,
+      emailController: _supplierEmailController,
+      addressController: _supplierAddressController,
+      leadTimeController: _supplierLeadTimeController,
+      termsController: _supplierTermsController,
+      onSubmit: _submitSupplierForm,
+      onCancel: _editingSupplierIndex == null ? null : _cancelEditSupplier,
+      submitLabel:
+          _editingSupplierIndex == null ? 'Add Supplier' : 'Save Changes',
+    );
+  }
+
+  Widget _buildOrderSummaryCard(
+    _SupplierInfo? supplier,
+    int totalQty,
+    List<_SupplierOrderLine> lines,
+  ) {
+    return Column(
+      children: [
+        _OrderSummaryRow(
+          label: 'Supplier',
+          value: supplier?.name ?? 'None selected',
+        ),
+        _OrderSummaryRow(
+          label: 'Selected Items',
+          value: '$_selectedItemCount',
+        ),
+        _OrderSummaryRow(
+          label: 'Total Quantity',
+          value: '$totalQty',
+          strong: true,
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 42,
+          child: FilledButton.icon(
+            onPressed: (lines.isEmpty || _suppliers.isEmpty)
+                ? null
+                : _prepareAndSendOrder,
+            icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+            label: const Text('Prepare Order'),
+            style: FilledButton.styleFrom(
+              backgroundColor: NovaColors.violet,
+              foregroundColor: Colors.white,
+            ).copyWith(
+              mouseCursor: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.disabled)
+                    ? SystemMouseCursors.basic
+                    : SystemMouseCursors.click,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final supplier = _suppliers.isEmpty ? null : _suppliers[_selectedSupplier];
@@ -4329,129 +4708,195 @@ class _SupplierOrderScreenState extends State<SupplierOrderScreen> {
           child: Container(height: 0.5, color: Colors.white24),
         ),
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 980),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _OrderProductHeader(product: widget.product),
-              const SizedBox(height: 14),
-              _PanelCard(
-                title: 'Products to Order',
-                child: _SupplierOrderItemsList(
-                  products: _orderProducts,
-                  selectedProductIds: _selectedProductIds,
-                  qtyControllers: _qtyControllers,
-                  onSelectAll: _selectAllOrderProducts,
-                  onSelectLowStock: _selectLowStockOrderProducts,
-                  onClear: _clearOrderProducts,
-                  onSelectionChanged: (product, selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedProductIds.add(product.id);
-                      } else {
-                        _selectedProductIds.remove(product.id);
-                      }
-                    });
-                  },
-                  onQtyChanged: () => setState(() {}),
-                ),
-              ),
-              const SizedBox(height: 14),
-              _PanelCard(
-                title: 'Supplier Details',
-                child: _suppliers.isEmpty
-                    ? const _MutedText(text: 'No suppliers yet. Add one below.')
-                    : Column(
-                        children: [
-                          for (var i = 0; i < _suppliers.length; i++)
-                            _SupplierOption(
-                              supplier: _suppliers[i],
-                              selected: i == _selectedSupplier,
-                              onTap: () =>
-                                  setState(() => _selectedSupplier = i),
-                              onEdit: () => _startEditSupplier(i),
-                              onDelete: () => _deleteSupplier(i),
-                            ),
-                        ],
-                      ),
-              ),
-              const SizedBox(height: 14),
-              _PanelCard(
-                title: _editingSupplierIndex == null
-                    ? 'Add Supplier'
-                    : 'Edit Supplier',
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                  child: _ManualSupplierForm(
-                    formKey: _supplierFormKey,
-                    nameController: _supplierNameController,
-                    contactController: _supplierContactController,
-                    emailController: _supplierEmailController,
-                    addressController: _supplierAddressController,
-                    leadTimeController: _supplierLeadTimeController,
-                    termsController: _supplierTermsController,
-                    onSubmit: _submitSupplierForm,
-                    onCancel: _editingSupplierIndex == null
-                        ? null
-                        : _cancelEditSupplier,
-                    submitLabel: _editingSupplierIndex == null
-                        ? 'Add Supplier'
-                        : 'Save Changes',
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < AppBreakpoints.tablet;
+
+          if (isCompact) {
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _OrderProductHeader(product: widget.product),
+                const SizedBox(height: 14),
+                _PanelCard(
+                  title: 'Products to Order',
+                  action: _buildCategoryDropdown(),
+                  child: _SupplierOrderItemsList(
+                    products: _filteredProducts,
+                    selectedProductIds: _selectedProductIds,
+                    qtyControllers: _qtyControllers,
+                    onSelectAll: _selectAllOrderProducts,
+                    onSelectLowStock: _selectLowStockOrderProducts,
+                    onClear: _clearOrderProducts,
+                    onSelectionChanged: (product, selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedProductIds.add(product.id);
+                        } else {
+                          _selectedProductIds.remove(product.id);
+                        }
+                      });
+                    },
+                    onQtyChanged: () => setState(() {}),
+                    searchController: _productSearchController,
+                    onSearchChanged: (v) => setState(() {
+                      _productSearchQuery = v.trim();
+                    }),
                   ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              _PanelCard(
-                title: 'Order',
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                  child: Column(
-                    children: [
-                      _OrderSummaryRow(
-                        label: 'Supplier',
-                        value: supplier?.name ?? 'None selected',
-                      ),
-                      _OrderSummaryRow(
-                        label: 'Selected Items',
-                        value: '$_selectedItemCount',
-                      ),
-                      _OrderSummaryRow(
-                        label: 'Total Quantity',
-                        value: '$totalQty',
-                        strong: true,
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 42,
-                        child: FilledButton.icon(
-                          onPressed: (lines.isEmpty || _suppliers.isEmpty)
-                              ? null
-                              : _prepareAndSendOrder,
-                          icon: const Icon(Icons.check_circle_outline_rounded,
-                              size: 18),
-                          label: const Text('Prepare Order'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: NovaColors.teal,
-                            foregroundColor: Colors.white,
-                          ).copyWith(
-                            mouseCursor: WidgetStateProperty.resolveWith(
-                              (states) => states.contains(WidgetState.disabled)
-                                  ? SystemMouseCursors.basic
-                                  : SystemMouseCursors.click,
+                const SizedBox(height: 14),
+                _PanelCard(
+                  title: 'Supplier Details',
+                  action: TextButton.icon(
+                    onPressed: _showSuppliersDialog,
+                    icon: const Icon(
+                      Icons.open_in_new_rounded,
+                      size: 16,
+                      color: NovaColors.violet,
+                    ),
+                    label: const Text(
+                      'View Suppliers',
+                      style: TextStyle(
+                          color: NovaColors.violet,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      minimumSize: Size.zero,
+                    ),
+                  ),
+                  child: _buildSupplierDetailsCard(),
+                ),
+                const SizedBox(height: 14),
+                _PanelCard(
+                  title: _editingSupplierIndex == null
+                      ? 'Add Supplier'
+                      : 'Edit Supplier',
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: _buildSupplierForm(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _PanelCard(
+                  title: 'Order',
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: _buildOrderSummaryCard(supplier, totalQty, lines),
+                  ),
+                ),
+              ],
+            );
+          } else {
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Left side: Products (scrollable)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _OrderProductHeader(product: widget.product),
+                        const SizedBox(height: 14),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _PanelCard(
+                              title: 'Products to Order',
+                              action: _buildCategoryDropdown(),
+                              child: _SupplierOrderItemsList(
+                                products: _filteredProducts,
+                                selectedProductIds: _selectedProductIds,
+                                qtyControllers: _qtyControllers,
+                                onSelectAll: _selectAllOrderProducts,
+                                onSelectLowStock: _selectLowStockOrderProducts,
+                                onClear: _clearOrderProducts,
+                                onSelectionChanged: (product, selected) {
+                                  setState(() {
+                                    if (selected) {
+                                      _selectedProductIds.add(product.id);
+                                    } else {
+                                      _selectedProductIds.remove(product.id);
+                                    }
+                                  });
+                                },
+                                onQtyChanged: () => setState(() {}),
+                                searchController: _productSearchController,
+                                onSearchChanged: (v) => setState(() {
+                                  _productSearchQuery = v.trim();
+                                }),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 16),
+                  // Right side: Supplier Details and Prepare Order (fixed, no scroll)
+                  SizedBox(
+                    width: 420,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _PanelCard(
+                          title: 'Supplier Details',
+                          action: TextButton.icon(
+                            onPressed: _showSuppliersDialog,
+                            icon: const Icon(
+                              Icons.open_in_new_rounded,
+                              size: 16,
+                              color: NovaColors.violet,
+                            ),
+                            label: const Text(
+                              'View Suppliers',
+                              style: TextStyle(
+                                color: NovaColors.violet,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              minimumSize: Size.zero,
+                            ),
+                          ),
+                          child: _buildSupplierDetailsCard(),
+                        ),
+                        const SizedBox(height: 14),
+                        _PanelCard(
+                          title: _editingSupplierIndex == null
+                              ? 'Add Supplier'
+                              : 'Edit Supplier',
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: _buildSupplierForm(),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _PanelCard(
+                          title: 'Order',
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: _buildOrderSummaryCard(
+                                supplier, totalQty, lines),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            );
+          }
+        },
       ),
     );
   }
@@ -4526,10 +4971,10 @@ class _OrderProductHeader extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: NovaColors.tealLight,
+              color: NovaColors.violetLight,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(product.icon, color: NovaColors.tealDeep, size: 22),
+            child: Icon(product.icon, color: NovaColors.violetDeep, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -4573,6 +5018,8 @@ class _SupplierOrderItemsList extends StatelessWidget {
     required this.onClear,
     required this.onSelectionChanged,
     required this.onQtyChanged,
+    required this.searchController,
+    required this.onSearchChanged,
   });
 
   final List<Product> products;
@@ -4583,11 +5030,56 @@ class _SupplierOrderItemsList extends StatelessWidget {
   final VoidCallback onClear;
   final void Function(Product product, bool selected) onSelectionChanged;
   final VoidCallback onQtyChanged;
+  final TextEditingController searchController;
+  final ValueChanged<String> onSearchChanged;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+          child: SizedBox(
+            height: 38,
+            child: TextField(
+              controller: searchController,
+              onChanged: onSearchChanged,
+              style:
+                  const TextStyle(color: NovaColors.textPrimary, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Search products by name or barcode...',
+                hintStyle: const TextStyle(
+                    color: NovaColors.textTertiary, fontSize: 12),
+                prefixIcon: const Icon(Icons.search,
+                    color: NovaColors.textSecondary, size: 18),
+                suffixIcon: searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear,
+                            size: 16, color: NovaColors.textSecondary),
+                        onPressed: () {
+                          searchController.clear();
+                          onSearchChanged('');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: NovaColors.bgSecondary,
+                enabledBorder: OutlineInputBorder(
+                  borderSide:
+                      const BorderSide(color: NovaColors.borderTertiary),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: NovaColors.violet),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              ),
+            ),
+          ),
+        ),
+        const Divider(height: 1, color: NovaColors.borderTertiary),
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
           child: LayoutBuilder(builder: (context, constraints) {
@@ -4613,7 +5105,7 @@ class _SupplierOrderItemsList extends StatelessWidget {
                 _SupplierBulkButton(
                   icon: Icons.done_all_rounded,
                   label: 'All',
-                  color: NovaColors.teal,
+                  color: NovaColors.violet,
                   onPressed: onSelectAll,
                 ),
                 _SupplierBulkButton(
@@ -4687,7 +5179,7 @@ class _SupplierOrderItemRow extends StatelessWidget {
             value: selected,
             onChanged: onSelected,
             mouseCursor: SystemMouseCursors.click,
-            activeColor: NovaColors.teal,
+            activeColor: NovaColors.violet,
             visualDensity: VisualDensity.compact,
           ),
           const SizedBox(width: 4),
@@ -4802,9 +5294,9 @@ class _SupplierOption extends StatelessWidget {
       mouseCursor: SystemMouseCursors.click,
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? NovaColors.tealLight : Colors.transparent,
+          color: selected ? NovaColors.violetLight : Colors.transparent,
           border: const Border(
             bottom: BorderSide(color: NovaColors.borderTertiary),
           ),
@@ -4815,53 +5307,28 @@ class _SupplierOption extends StatelessWidget {
               selected
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_off_rounded,
-              color: selected ? NovaColors.tealDeep : NovaColors.textTertiary,
+              color: selected ? NovaColors.violetDeep : NovaColors.textTertiary,
               size: 18,
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    supplier.name,
-                    style: const TextStyle(
-                      color: NovaColors.textPrimary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '${supplier.contact} | ${supplier.email}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: NovaColors.textSecondary, fontSize: 11),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    supplier.address,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: NovaColors.textTertiary, fontSize: 11),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Lead time: ${supplier.leadTime} | Terms: ${supplier.terms}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: NovaColors.textTertiary, fontSize: 11),
-                  ),
-                ],
+              child: Text(
+                supplier.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: NovaColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             IconButton(
               tooltip: 'Edit supplier',
               mouseCursor: SystemMouseCursors.click,
+              constraints: const BoxConstraints(),
+              padding: const EdgeInsets.all(6),
               onPressed: onEdit,
               icon: const Icon(
                 Icons.edit_outlined,
@@ -4869,9 +5336,12 @@ class _SupplierOption extends StatelessWidget {
                 size: 18,
               ),
             ),
+            const SizedBox(width: 4),
             IconButton(
               tooltip: 'Delete supplier',
               mouseCursor: SystemMouseCursors.click,
+              constraints: const BoxConstraints(),
+              padding: const EdgeInsets.all(6),
               onPressed: onDelete,
               icon: const Icon(
                 Icons.delete_outline_rounded,
@@ -4916,7 +5386,7 @@ class _ManualSupplierForm extends StatelessWidget {
     return Form(
       key: formKey,
       child: LayoutBuilder(builder: (context, c) {
-        final isCompact = c.maxWidth < AppBreakpoints.mobile;
+        final isCompact = c.maxWidth < 320;
 
         final fields = [
           _SupplierTextField(
@@ -5032,7 +5502,7 @@ class _ManualSupplierForm extends StatelessWidget {
                     ),
                     label: Text(submitLabel),
                     style: FilledButton.styleFrom(
-                      backgroundColor: NovaColors.teal,
+                      backgroundColor: NovaColors.violet,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 12),
@@ -5074,56 +5544,47 @@ class _SupplierTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: NovaColors.textSecondary,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: NovaColors.textPrimary, fontSize: 13),
+      validator: validator ??
+          (requiredField
+              ? (value) => value == null || value.trim().isEmpty
+                  ? '$label is required'
+                  : null
+              : null),
+      decoration: InputDecoration(
+        labelText: requiredField ? '$label *' : label,
+        labelStyle:
+            const TextStyle(color: NovaColors.textSecondary, fontSize: 12),
+        floatingLabelStyle:
+            const TextStyle(color: NovaColors.violet, fontSize: 12),
+        hintText: label,
+        hintStyle:
+            const TextStyle(color: NovaColors.textTertiary, fontSize: 12),
+        filled: true,
+        fillColor: NovaColors.bgSecondary,
+        prefixIcon: Icon(icon, color: NovaColors.textSecondary, size: 18),
+        enabledBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: NovaColors.borderTertiary),
+          borderRadius: BorderRadius.circular(8),
         ),
-        const SizedBox(height: 6),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          style: const TextStyle(color: NovaColors.textPrimary, fontSize: 13),
-          validator: validator ??
-              (requiredField
-                  ? (value) => value == null || value.trim().isEmpty
-                      ? '$label is required'
-                      : null
-                  : null),
-          decoration: InputDecoration(
-            hintText: label,
-            hintStyle:
-                const TextStyle(color: NovaColors.textTertiary, fontSize: 12),
-            filled: true,
-            fillColor: NovaColors.bgSecondary,
-            prefixIcon: Icon(icon, color: NovaColors.textSecondary, size: 18),
-            enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: NovaColors.borderTertiary),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: NovaColors.teal),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color(0xFFD85A30)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color(0xFFD85A30)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: NovaColors.violet),
+          borderRadius: BorderRadius.circular(8),
         ),
-      ],
+        errorBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Color(0xFFD85A30)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Color(0xFFD85A30)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
     );
   }
 }
@@ -5184,7 +5645,7 @@ InputDecoration _orderInputDecoration() => InputDecoration(
         borderRadius: BorderRadius.circular(8),
       ),
       focusedBorder: OutlineInputBorder(
-        borderSide: const BorderSide(color: NovaColors.teal),
+        borderSide: const BorderSide(color: NovaColors.violet),
         borderRadius: BorderRadius.circular(8),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
@@ -5316,7 +5777,7 @@ class _MoneyCell extends StatelessWidget {
         color: emphasize && value < 0
             ? const Color(0xFFB54724)
             : emphasize
-                ? NovaColors.tealDeep
+                ? NovaColors.violetDeep
                 : NovaColors.textPrimary,
         fontSize: 13,
         fontWeight: emphasize ? FontWeight.w900 : FontWeight.w800,
@@ -5439,10 +5900,12 @@ class _PanelCard extends StatelessWidget {
   const _PanelCard({
     required this.title,
     required this.child,
+    this.action,
   });
 
   final String title;
   final Widget child;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -5472,6 +5935,7 @@ class _PanelCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (action != null) action!,
               ],
             ),
           ),
@@ -5507,7 +5971,7 @@ class _LoadingScaffold extends StatelessWidget {
     return const Scaffold(
       backgroundColor: NovaColors.bgTertiary,
       body: Center(
-        child: CircularProgressIndicator(color: NovaColors.teal),
+        child: CircularProgressIndicator(color: NovaColors.violet),
       ),
     );
   }
